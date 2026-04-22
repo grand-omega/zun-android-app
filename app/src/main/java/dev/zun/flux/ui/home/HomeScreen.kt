@@ -33,6 +33,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import coil.compose.AsyncImage
+import dev.zun.flux.BuildConfig
+import dev.zun.flux.R
 import dev.zun.flux.data.repo.JobRepository
 
 private const val HARDCODED_PROMPT_ID = "ghibli"
@@ -92,6 +94,17 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text("From gallery")
+            }
+
+            if (BuildConfig.DEBUG) {
+                OutlinedButton(
+                    onClick = {
+                        imageUri = Uri.parse("android.resource://${BuildConfig.APPLICATION_ID}/${R.raw.sample}")
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Use sample image (debug)")
+                }
             }
 
             Box(
