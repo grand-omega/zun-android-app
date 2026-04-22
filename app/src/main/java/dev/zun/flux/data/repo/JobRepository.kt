@@ -1,6 +1,9 @@
 package dev.zun.flux.data.repo
 
+import android.net.Uri
 import dev.zun.flux.data.api.HealthResponse
+import dev.zun.flux.data.api.JobCreatedResponse
+import dev.zun.flux.data.api.JobStatusDto
 
 /**
  * Single seam between the UI and the backend. UI layers depend on this
@@ -8,4 +11,14 @@ import dev.zun.flux.data.api.HealthResponse
  */
 interface JobRepository {
     suspend fun health(): HealthResponse
+
+    suspend fun submitJob(
+        inputUri: Uri,
+        promptId: String,
+    ): JobCreatedResponse
+
+    suspend fun getJob(jobId: String): JobStatusDto
+
+    /** Anything Coil can load. Fake echoes the input URI; real returns an HTTP URL. */
+    fun resultModel(jobId: String): Any?
 }
