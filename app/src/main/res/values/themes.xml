@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Base Material3 theme. Full Compose theming is applied at runtime; this
+         exists so the manifest has a valid android:theme reference. -->
+    <style name="Theme.ZunFlux" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>

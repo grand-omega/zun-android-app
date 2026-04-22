@@ -1,0 +1,5 @@
+# Copy this file to local.properties (which is gitignored) and fill in real values.
+# The Rust server address and bearer token are baked into BuildConfig at build time.
+
+server.url=https://your-server.your-tailnet.ts.net
+api.token=your-long-random-token-here
