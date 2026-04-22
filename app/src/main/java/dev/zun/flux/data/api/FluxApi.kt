@@ -16,7 +16,6 @@ import retrofit2.http.Query
  * RealJobRepository replaces the fake.
  */
 interface FluxApi {
-
     @GET("api/health")
     suspend fun health(): HealthResponse
 
@@ -27,19 +26,23 @@ interface FluxApi {
     @POST("api/jobs")
     suspend fun submitJob(
         @Part image: MultipartBody.Part,
-        @Part("prompt_id") promptId: RequestBody
+        @Part("prompt_id") promptId: RequestBody,
     ): JobCreatedResponse
 
     @GET("api/jobs/{id}")
-    suspend fun getJob(@Path("id") id: String): JobStatusDto
+    suspend fun getJob(
+        @Path("id") id: String,
+    ): JobStatusDto
 
     @GET("api/jobs")
     suspend fun listJobs(
         @Query("status") status: String = "done",
         @Query("limit") limit: Int = 30,
-        @Query("before") before: Long? = null
+        @Query("before") before: Long? = null,
     ): List<JobSummaryDto>
 
     @DELETE("api/jobs/{id}")
-    suspend fun deleteJob(@Path("id") id: String)
+    suspend fun deleteJob(
+        @Path("id") id: String,
+    )
 }
