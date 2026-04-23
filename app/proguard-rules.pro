@@ -1,3 +1,7 @@
+# ---- Project Specific -------------------------------------------------------
+-keep class dev.zun.flux.data.api.** { *; }
+-keep interface dev.zun.flux.data.api.** { *; }
+
 # ---- Retrofit (R8 full mode) ------------------------------------------------
 # Retrofit 2.7+ ships consumer-rules.pro, but R8 full mode still needs these
 # to preserve generic return types and suspend continuations.
@@ -51,6 +55,11 @@
     public static <1> INSTANCE;
     kotlinx.serialization.KSerializer serializer(...);
 }
+
+# ---- Room -------------------------------------------------------------------
+-keep class * extends androidx.room.RoomDatabase
+-keep @androidx.room.Dao interface *
+-keep class * implements androidx.room.Entity
 
 # ---- Coil -------------------------------------------------------------------
 -dontwarn coil.**
