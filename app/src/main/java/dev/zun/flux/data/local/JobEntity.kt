@@ -15,7 +15,7 @@ data class JobEntity(
     val error: String?,
     val createdAt: Long,
     val completedAt: Long?,
-    val durationSeconds: Int?
+    val durationSeconds: Int?,
 )
 
 fun JobStatusDto.toEntity(): JobEntity = JobEntity(
@@ -27,7 +27,7 @@ fun JobStatusDto.toEntity(): JobEntity = JobEntity(
     error = error,
     createdAt = created_at,
     completedAt = completed_at,
-    durationSeconds = completed_at?.let { (it - created_at).toInt() }
+    durationSeconds = completed_at?.let { (it - created_at).toInt() },
 )
 
 fun JobSummaryDto.toEntity(): JobEntity = JobEntity(
@@ -39,7 +39,7 @@ fun JobSummaryDto.toEntity(): JobEntity = JobEntity(
     error = null,
     createdAt = created_at,
     completedAt = created_at + (duration_seconds ?: 0),
-    durationSeconds = duration_seconds
+    durationSeconds = duration_seconds,
 )
 
 fun JobEntity.toSummaryDto(): JobSummaryDto = JobSummaryDto(
@@ -47,7 +47,7 @@ fun JobEntity.toSummaryDto(): JobSummaryDto = JobSummaryDto(
     prompt_id = promptId,
     prompt_label = promptLabel,
     created_at = createdAt,
-    duration_seconds = durationSeconds
+    duration_seconds = durationSeconds,
 )
 
 fun JobEntity.toStatusDto(): JobStatusDto = JobStatusDto(
@@ -58,5 +58,5 @@ fun JobEntity.toStatusDto(): JobStatusDto = JobStatusDto(
     progress = progress,
     error = error,
     created_at = createdAt,
-    completed_at = completedAt
+    completed_at = completedAt,
 )

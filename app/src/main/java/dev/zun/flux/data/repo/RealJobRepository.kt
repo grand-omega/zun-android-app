@@ -100,13 +100,11 @@ class RealJobRepository(
         dao.deleteJobById(jobId)
     }
 
-    override fun getJobsFlow(): Flow<List<JobSummaryDto>> =
-        dao.getAllJobs().map { entities ->
-            entities.map { it.toSummaryDto() }
-        }
+    override fun getJobsFlow(): Flow<List<JobSummaryDto>> = dao.getAllJobs().map { entities ->
+        entities.map { it.toSummaryDto() }
+    }
 
-    override fun getJobFlow(jobId: String): Flow<JobStatusDto?> =
-        dao.getJobByIdFlow(jobId).map { it?.toStatusDto() }
+    override fun getJobFlow(jobId: String): Flow<JobStatusDto?> = dao.getJobByIdFlow(jobId).map { it?.toStatusDto() }
 
     override suspend fun syncHistory() {
         try {

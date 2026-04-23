@@ -8,7 +8,7 @@ import kotlinx.coroutines.delay
 
 class PollWorker(
     context: Context,
-    params: WorkerParameters
+    params: WorkerParameters,
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {

@@ -144,19 +144,17 @@ class FakeJobRepository(
         updates.value++
     }
 
-    override fun getJobsFlow(): Flow<List<JobSummaryDto>> =
-        updates.map {
-            listJobs(status = "done", limit = 100, before = null)
-        }
+    override fun getJobsFlow(): Flow<List<JobSummaryDto>> = updates.map {
+        listJobs(status = "done", limit = 100, before = null)
+    }
 
-    override fun getJobFlow(jobId: String): Flow<JobStatusDto?> =
-        updates.map {
-            try {
-                getJob(jobId)
-            } catch (_: Exception) {
-                null
-            }
+    override fun getJobFlow(jobId: String): Flow<JobStatusDto?> = updates.map {
+        try {
+            getJob(jobId)
+        } catch (_: Exception) {
+            null
         }
+    }
 
     override suspend fun syncHistory() {
         // No-op for fake
