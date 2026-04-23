@@ -43,6 +43,9 @@ class HomeViewModel(
     private val _health = MutableStateFlow<HealthState>(HealthState.Checking)
     val health: StateFlow<HealthState> = _health.asStateFlow()
 
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
     init {
         fetchPrompts()
         startHealthCheck()
@@ -62,19 +65,32 @@ class HomeViewModel(
     private fun startHealthCheck() {
         viewModelScope.launch {
             while (true) {
-                _health.value =
-                    try {
-                        repository.health()
-                        HealthState.Connected
-                    } catch (e: retrofit2.HttpException) {
-                        HealthState.ServerError(e.code(), e.message())
-                    } catch (e: java.io.IOException) {
-                        HealthState.NetworkError("Network unreachable")
-                    } catch (e: Throwable) {
-                        HealthState.NetworkError(e.message ?: "Unknown error")
-                    }
+                performHealthCheck()
                 delay(10_000) // Check every 10s
             }
+        }
+    }
+
+    private suspend fun performHealthCheck() {
+        _health.value =
+            try {
+                repository.health()
+                HealthState.Connected
+            } catch (e: retrofit2.HttpException) {
+                HealthState.ServerError(e.code(), e.message())
+            } catch (_: java.io.IOException) {
+                HealthState.NetworkError("Network unreachable")
+            } catch (e: Throwable) {
+                HealthState.NetworkError(e.message ?: "Unknown error")
+            }
+    }
+
+    fun manualRefresh() {
+        viewModelScope.launch {
+            _isRefreshing.value = true
+            fetchPrompts()
+            performHealthCheck()
+            _isRefreshing.value = false
         }
     }
 

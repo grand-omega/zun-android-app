@@ -4,12 +4,12 @@ import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -23,7 +23,6 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -38,14 +37,16 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
@@ -81,6 +82,7 @@ fun PhotoViewerScreen(
 
     var showDetails by remember { mutableStateOf(false) }
     var showContextMenu by remember { mutableStateOf(false) }
+    var showUI by remember { mutableStateOf(true) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -88,7 +90,7 @@ fun PhotoViewerScreen(
         containerColor = Color.Black,
         topBar = {
             AnimatedVisibility(
-                visible = !showDetails,
+                visible = showUI,
                 enter = fadeIn(),
                 exit = fadeOut(),
             ) {
@@ -100,11 +102,6 @@ fun PhotoViewerScreen(
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
-                    actions = {
-                        IconButton(onClick = { showDetails = true }) {
-                            Icon(Icons.Default.Info, contentDescription = "Details", tint = Color.White)
-                        }
-                    },
                 )
             }
         },
@@ -113,14 +110,7 @@ fun PhotoViewerScreen(
             modifier =
             Modifier
                 .fillMaxSize()
-                .padding(inner)
-                .pointerInput(Unit) {
-                    detectVerticalDragGestures { change, dragAmount ->
-                        change.consume()
-                        if (dragAmount < -20) showDetails = true
-                        if (dragAmount > 20) showDetails = false
-                    }
-                },
+                .padding(inner),
         ) {
             HorizontalPager(
                 state = pagerState,
@@ -130,74 +120,122 @@ fun PhotoViewerScreen(
                 val job = jobs.getOrNull(page) ?: return@HorizontalPager
                 val model = repository.resultModel(job.id)
 
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    AsyncImage(
-                        model = model,
-                        contentDescription = null,
-                        contentScale = ContentScale.Fit,
-                        modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .combinedClickable(
-                                onClick = { showDetails = !showDetails },
-                                onLongClick = { showContextMenu = true },
-                            ),
-                    )
+                ZoomableImage(
+                    model = model,
+                    onClick = { showUI = !showUI },
+                    onLongClick = { showContextMenu = true },
+                )
 
-                    // Context Menu for Long Press
-                    DropdownMenu(
-                        expanded = showContextMenu,
-                        onDismissRequest = { showContextMenu = false },
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Save to photos") },
-                            onClick = {
-                                showContextMenu = false
-                                scope.launch {
-                                    try {
-                                        saveToPictures(context, model ?: return@launch, "flux-${job.id}.jpg")
-                                        Toast.makeText(context, "Saved to Gallery", Toast.LENGTH_SHORT).show()
-                                    } catch (e: Exception) {
-                                        Toast.makeText(context, "Save failed: ${e.message}", Toast.LENGTH_SHORT).show()
-                                    }
+                // Context Menu for Long Press
+                DropdownMenu(
+                    expanded = showContextMenu,
+                    onDismissRequest = { showContextMenu = false },
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("View details") },
+                        onClick = {
+                            showContextMenu = false
+                            showDetails = true
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Save to photos") },
+                        onClick = {
+                            showContextMenu = false
+                            scope.launch {
+                                try {
+                                    saveToPictures(context, model ?: return@launch, "flux-${job.id}.jpg")
+                                    Toast.makeText(context, "Saved to Gallery", Toast.LENGTH_SHORT).show()
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Save failed: ${e.message}", Toast.LENGTH_SHORT).show()
                                 }
-                            },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Delete") },
-                            onClick = {
-                                showContextMenu = false
-                                viewModel.deleteJob(job.id)
-                                // If it was the last photo, we might need to pop back
-                                if (jobs.size <= 1) onBack()
-                            },
-                        )
-                    }
+                            }
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Delete") },
+                        onClick = {
+                            showContextMenu = false
+                            viewModel.deleteJob(job.id)
+                            if (jobs.size <= 1) onBack()
+                        },
+                    )
                 }
             }
 
-            // Details Overlay (Swipe Up)
-            AnimatedVisibility(
-                visible = showDetails,
-                modifier = Modifier.align(Alignment.BottomCenter),
-                enter = slideInVertically { it },
-                exit = slideOutVertically { it },
-            ) {
-                val currentJob = jobs.getOrNull(pagerState.currentPage)
-                if (currentJob != null) {
-                    JobDetailsSheet(
-                        job = currentJob,
-                        onClose = { showDetails = false },
-                    )
+            // Details Overlay (Modal)
+            if (showDetails) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.6f))
+                        .combinedClickable(
+                            onClick = { showDetails = false },
+                            onLongClick = {},
+                        ),
+                    contentAlignment = Alignment.BottomCenter,
+                ) {
+                    val currentJob = jobs.getOrNull(pagerState.currentPage)
+                    if (currentJob != null) {
+                        JobDetailsSheet(
+                            job = currentJob,
+                            onClose = { showDetails = false },
+                        )
+                    }
                 }
             }
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun ZoomableImage(
+    model: Any?,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+) {
+    var scale by remember { mutableFloatStateOf(1f) }
+    var offset by remember { mutableStateOf(Offset.Zero) }
+    val state =
+        rememberTransformableState { zoomChange, offsetChange, _ ->
+            scale = (scale * zoomChange).coerceIn(1f, 5f)
+            if (scale > 1f) {
+                offset += offsetChange
+            } else {
+                offset = Offset.Zero
+            }
+        }
+
+    Box(
+        modifier =
+        Modifier
+            .fillMaxSize()
+            .transformable(state = state)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        AsyncImage(
+            model = model,
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            modifier =
+            Modifier
+                .fillMaxSize()
+                .graphicsLayer(
+                    scaleX = scale,
+                    scaleY = scale,
+                    translationX = offset.x,
+                    translationY = offset.y,
+                ),
+        )
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun JobDetailsSheet(
     job: JobSummaryDto,
@@ -224,11 +262,7 @@ private fun JobDetailsSheet(
                     .padding(bottom = 16.dp)
                     .size(width = 40.dp, height = 4.dp)
                     .background(MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(2.dp))
-                    .pointerInput(Unit) {
-                        detectVerticalDragGestures { _, dragAmount ->
-                            if (dragAmount > 10) onClose()
-                        }
-                    },
+                    .combinedClickable(onClick = onClose, onLongClick = {}),
             )
 
             Text(
@@ -238,7 +272,7 @@ private fun JobDetailsSheet(
 
             Column(
                 modifier = Modifier.padding(top = 16.dp),
-                verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 DetailRow("Job ID", job.id, isMonospace = true)
                 DetailRow(
@@ -259,7 +293,7 @@ private fun DetailRow(
     value: String,
     isMonospace: Boolean = false,
 ) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(text = label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary)
         Text(
             text = value,
