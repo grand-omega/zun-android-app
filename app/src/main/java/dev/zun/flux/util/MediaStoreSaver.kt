@@ -8,22 +8,24 @@ import android.os.Environment
 import android.provider.MediaStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.net.URL
 
 /**
  * Writes a copy of [source] into the phone's public Pictures/FluxEdit album.
  * Returns the MediaStore content Uri of the newly created entry, or throws.
+ * Supports both local Uri and remote URL strings.
  */
 suspend fun saveToPictures(
     context: Context,
-    source: Uri,
+    source: Any,
     displayName: String,
 ): Uri = withContext(Dispatchers.IO) {
     val resolver = context.contentResolver
-    val mime = resolver.getType(source) ?: "image/jpeg"
+
     val values =
         ContentValues().apply {
             put(MediaStore.Images.Media.DISPLAY_NAME, displayName)
-            put(MediaStore.Images.Media.MIME_TYPE, mime)
+            put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 put(
                     MediaStore.Images.Media.RELATIVE_PATH,
@@ -40,9 +42,19 @@ suspend fun saveToPictures(
 
     resolver.openOutputStream(dest).use { out ->
         requireNotNull(out) { "Could not open output stream for $dest" }
-        resolver.openInputStream(source).use { input ->
-            requireNotNull(input) { "Could not read source $source" }
-            input.copyTo(out)
+        when (source) {
+            is Uri -> {
+                resolver.openInputStream(source).use { input ->
+                    requireNotNull(input) { "Could not read source $source" }
+                    input.copyTo(out)
+                }
+            }
+            is String -> {
+                URL(source).openStream().use { input ->
+                    input.copyTo(out)
+                }
+            }
+            else -> error("Unsupported source type: ${source::class.java}")
         }
     }
 

@@ -1,6 +1,5 @@
 package dev.zun.flux.ui.result
 
-import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -57,7 +56,7 @@ fun ResultScreen(
     jobId: String,
     repository: JobRepository,
     windowSizeClass: WindowSizeClass,
-    onTryAnotherPrompt: (Uri) -> Unit,
+    onTryAnotherPrompt: (Any) -> Unit,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -181,7 +180,7 @@ fun ResultScreen(
 
             Button(
                 onClick = {
-                    val src = resultModel as? Uri ?: return@Button
+                    val src = resultModel ?: return@Button
                     saving = true
                     scope.launch {
                         val msg =
@@ -195,7 +194,7 @@ fun ResultScreen(
                         Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                     }
                 },
-                enabled = resultModel is Uri && !saving,
+                enabled = resultModel != null && !saving,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(if (saving) "Saving…" else "Save to gallery")
@@ -207,10 +206,16 @@ fun ResultScreen(
             ) {
                 OutlinedButton(
                     onClick = {
-                        val src = resultModel as? Uri ?: return@OutlinedButton
-                        shareImage(context, src)
+                        val src = resultModel ?: return@OutlinedButton
+                        scope.launch {
+                            try {
+                                shareImage(context, src)
+                            } catch (t: Throwable) {
+                                Toast.makeText(context, "Share failed: ${t.message}", Toast.LENGTH_SHORT).show()
+                            }
+                        }
                     },
-                    enabled = resultModel is Uri,
+                    enabled = resultModel != null,
                     modifier = Modifier.weight(1f),
                 ) {
                     Icon(
@@ -223,10 +228,10 @@ fun ResultScreen(
 
                 OutlinedButton(
                     onClick = {
-                        val src = inputModel as? Uri ?: return@OutlinedButton
+                        val src = inputModel ?: return@OutlinedButton
                         onTryAnotherPrompt(src)
                     },
-                    enabled = inputModel is Uri,
+                    enabled = inputModel != null,
                     modifier = Modifier.weight(1f),
                 ) {
                     Icon(
