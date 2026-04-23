@@ -43,7 +43,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import dev.zun.flux.data.repo.JobRepository
+import androidx.compose.material.icons.filled.Share
 import dev.zun.flux.util.saveToPictures
+import dev.zun.flux.util.shareImage
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -165,6 +167,22 @@ fun ResultScreen(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(if (saving) "Saving…" else "Save to gallery")
+            }
+
+            OutlinedButton(
+                onClick = {
+                    val src = resultModel as? Uri ?: return@OutlinedButton
+                    shareImage(context, src)
+                },
+                enabled = resultModel is Uri,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Icon(
+                    Icons.Default.Share,
+                    contentDescription = null,
+                    modifier = Modifier.padding(end = 8.dp),
+                )
+                Text("Share")
             }
 
             OutlinedButton(
