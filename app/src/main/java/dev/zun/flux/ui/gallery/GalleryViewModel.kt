@@ -31,6 +31,12 @@ class GalleryViewModel(
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    private val _isSaving = MutableStateFlow(false)
+    val isSaving: StateFlow<Boolean> = _isSaving.asStateFlow()
+
+    private val _eventMessage = MutableStateFlow<String?>(null)
+    val eventMessage: StateFlow<String?> = _eventMessage.asStateFlow()
+
     init {
         refresh()
     }
@@ -71,16 +77,27 @@ class GalleryViewModel(
 
     fun saveSelected(context: Context) {
         val ids = _selectedIds.value
+        if (ids.isEmpty()) return
+
         viewModelScope.launch {
+            _isSaving.value = true
+            var savedCount = 0
             ids.forEach { id ->
                 try {
                     val model = repository.resultModel(id) ?: return@forEach
                     saveToPictures(context, model, "flux-$id.jpg")
+                    savedCount++
                 } catch (_: Throwable) {
                 }
             }
             clearSelection()
+            _isSaving.value = false
+            _eventMessage.value = "Saved $savedCount images to Pictures"
         }
+    }
+
+    fun clearEventMessage() {
+        _eventMessage.value = null
     }
 
     fun deleteJob(jobId: String) {

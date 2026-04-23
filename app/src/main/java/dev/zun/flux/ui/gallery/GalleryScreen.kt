@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -31,12 +32,18 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -60,25 +67,42 @@ fun GalleryScreen(
 ) {
     val jobs by viewModel.jobs.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val isSaving by viewModel.isSaving.collectAsStateWithLifecycle()
+    val eventMessage by viewModel.eventMessage.collectAsStateWithLifecycle()
     val selectedIds by viewModel.selectedIds.collectAsStateWithLifecycle()
     val isSelectionMode by viewModel.isSelectionMode.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
+    val snackbarHostState = remember { SnackbarHostState() }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    LaunchedEffect(eventMessage) {
+        eventMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearEventMessage()
+        }
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             if (isSelectionMode) {
                 TopAppBar(
                     title = { Text("${selectedIds.size} selected") },
                     navigationIcon = {
-                        IconButton(onClick = { viewModel.clearSelection() }) {
+                        IconButton(onClick = { viewModel.clearSelection() }, enabled = !isSaving) {
                             Icon(Icons.Default.Close, contentDescription = "Clear selection")
                         }
                     },
                     actions = {
-                        IconButton(onClick = { viewModel.saveSelected(context) }) {
-                            Icon(Icons.Default.Download, contentDescription = "Save selected")
+                        IconButton(onClick = { viewModel.saveSelected(context) }, enabled = !isSaving) {
+                            if (isSaving) {
+                                CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                            } else {
+                                Icon(Icons.Default.Download, contentDescription = "Save selected")
+                            }
                         }
-                        IconButton(onClick = { viewModel.deleteSelected() }) {
+                        IconButton(onClick = { showDeleteConfirm = true }, enabled = !isSaving) {
                             Icon(Icons.Default.Delete, contentDescription = "Delete selected")
                         }
                     },
@@ -154,6 +178,29 @@ fun GalleryScreen(
                 }
             }
         }
+    }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Delete selected?") },
+            text = { Text("This will permanently remove ${selectedIds.size} generations from your history and the server.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteSelected()
+                        showDeleteConfirm = false
+                    },
+                ) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) {
+                    Text("Cancel")
+                }
+            },
+        )
     }
 }
 
