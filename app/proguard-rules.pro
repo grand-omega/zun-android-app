@@ -22,6 +22,12 @@
 -dontwarn okio.**
 -dontwarn org.conscrypt.**
 
+# ---- Tink (via androidx.security.crypto / EncryptedSharedPreferences) -------
+# Tink references compile-only error-prone annotations that aren't on the
+# runtime classpath; safe to ignore.
+-dontwarn com.google.errorprone.annotations.**
+-dontwarn com.google.crypto.tink.**
+
 # ---- kotlinx.serialization (canonical rules from the upstream README) -------
 # Keep `Companion` object fields of serializable classes.
 -if @kotlinx.serialization.Serializable class **
