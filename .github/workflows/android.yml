@@ -31,13 +31,13 @@ jobs:
       uses: gradle/actions/setup-gradle@v4
 
     - name: Build with Gradle
-      run: ./gradlew assembleDebug --stacktrace
+      run: ./gradlew assembleDebug --stacktrace -Porg.gradle.java.installations.auto-download=false
 
     - name: Run Lint
-      run: ./gradlew lintDebug --stacktrace
+      run: ./gradlew lintDebug --stacktrace -Porg.gradle.java.installations.auto-download=false
 
     - name: Run Spotless Check
-      run: ./gradlew spotlessCheck --stacktrace
+      run: ./gradlew spotlessCheck --stacktrace -Porg.gradle.java.installations.auto-download=false
 
     - name: Upload APK
       if: github.ref == 'refs/heads/main'
