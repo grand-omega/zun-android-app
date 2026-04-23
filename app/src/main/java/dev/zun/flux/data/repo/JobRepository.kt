@@ -21,6 +21,10 @@ interface JobRepository {
 
     suspend fun getJob(jobId: String): JobStatusDto
 
+    /**
+     * Lists completed jobs.
+     * @param before Unix timestamp in SECONDS.
+     */
     suspend fun listJobs(
         status: String = "done",
         limit: Int = 30,
