@@ -6,6 +6,7 @@ import coil.ImageLoader
 import dev.zun.flux.data.api.FluxApi
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.data.repo.RealJobRepository
+import dev.zun.flux.data.repo.SettingsManager
 import dev.zun.flux.ui.auth.AuthStateHolder
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
@@ -21,10 +22,17 @@ class FluxApp : Application() {
     lateinit var okHttpClient: OkHttpClient
         private set
 
-    val authStateHolder = AuthStateHolder()
+    lateinit var settingsManager: SettingsManager
+        private set
+
+    lateinit var authStateHolder: AuthStateHolder
+        private set
 
     override fun onCreate() {
         super.onCreate()
+
+        settingsManager = SettingsManager(this)
+        authStateHolder = AuthStateHolder(settingsManager)
 
         okHttpClient =
             OkHttpClient

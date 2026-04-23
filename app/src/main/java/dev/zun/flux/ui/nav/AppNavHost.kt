@@ -17,12 +17,18 @@ import dev.zun.flux.ui.gallery.GalleryScaffold
 import dev.zun.flux.ui.home.HomeScreen
 import dev.zun.flux.ui.progress.ProgressScreen
 import dev.zun.flux.ui.result.ResultScreen
+import dev.zun.flux.ui.settings.SettingsScreen
+import dev.zun.flux.FluxApp
+import androidx.compose.ui.platform.LocalContext
 
 @Composable
 fun AppNavHost(
     repository: JobRepository,
     windowSizeClass: WindowSizeClass,
 ) {
+    val context = LocalContext.current
+    val app = context.applicationContext as FluxApp
+    val settingsManager = app.settingsManager
     val nav = rememberNavController()
     NavHost(navController = nav, startDestination = Routes.HOME) {
         composable(Routes.HOME) { entry ->
@@ -43,6 +49,7 @@ fun AppNavHost(
                 capturedUri = capturedUri,
                 onTakePhoto = { nav.navigate(Routes.CAMERA) },
                 onGalleryClick = { nav.navigate(Routes.GALLERY) },
+                onSettingsClick = { nav.navigate(Routes.SETTINGS) },
                 onJobSubmitted = { jobId ->
                     nav.navigate(Routes.progress(jobId))
                 },
@@ -60,6 +67,12 @@ fun AppNavHost(
         composable(Routes.GALLERY) {
             GalleryScaffold(
                 repository = repository,
+                onBack = { nav.popBackStack() },
+            )
+        }
+        composable(Routes.SETTINGS) {
+            SettingsScreen(
+                settingsManager = settingsManager,
                 onBack = { nav.popBackStack() },
             )
         }

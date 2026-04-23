@@ -171,7 +171,10 @@ fun ProgressScreen(
                 Spacer(Modifier.height(32.dp))
 
                 OutlinedButton(
-                    onClick = onBack,
+                    onClick = {
+                        viewModel.cancelJob(jobId)
+                        onBack()
+                    },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text("Cancel")
