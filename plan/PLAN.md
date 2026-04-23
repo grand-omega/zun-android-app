@@ -43,7 +43,7 @@ Samsung Galaxy Z Fold 7 running a modern Android version (Android 14+). Must wor
 ---
 
 ## Current Status: v0.1.3-beta
-The v1 client is **100% feature-complete** and has undergone a robustness/UX polish phase. It is currently running against a `FakeJobRepository`. The next major step is integration with the real Rust server.
+The v1 client is **100% feature-complete** and has undergone a robustness/UX polish phase. It is currently running against a `RealJobRepository` connected to the Rust server.
 
 ---
 
@@ -77,10 +77,11 @@ The v1 client is **100% feature-complete** and has undergone a robustness/UX pol
 
 | Concern | Choice | Rationale |
 |---------|--------|-----------|
-| Language | Kotlin | Standard for modern Android |
+| Language | Kotlin 2.2.10 | Standard for modern Android; K2 compiler enabled |
 | UI | Jetpack Compose | Declarative, foldable-friendly, modern |
 | Min SDK | 30 (Android 11) | Covers Z Fold 7; unlocks modern APIs |
 | Compile / Target SDK | 36 (Android 16) | Matches installed SDK platform |
+| Build Tools | AGP 9.2.0 / Gradle 9.4.1 | Latest stable versions |
 | Navigation | Navigation-Compose | Simple for a handful of screens |
 | Networking | Retrofit + OkHttp | Standard, reliable |
 | Serialization | kotlinx.serialization | First-party Kotlin, clean syntax |
@@ -122,7 +123,6 @@ The v1 client is **100% feature-complete** and has undergone a robustness/UX pol
 
 ### v2 (Polish, up next)
 
-- [ ] Real server integration (`RealJobRepository` implementation)
 - [ ] Image preprocessing (downscale to 2048px before upload)
 - [ ] WorkManager-based polling (survives app backgrounding)
 - [ ] Re-run a past generation with a different prompt
@@ -204,3 +204,4 @@ All core screens, adaptive layouts, navigation, and fake data flow are implement
 - **Haptic Feedback**: Vibrations on shutter, submission, and completion.
 - **Sharing**: Integrated Android `FileProvider` for sharing results.
 - **Technical Debt**: Refactored CameraX, enabled Edge-to-Edge, and fixed lint issues.
+- **CI/CD**: Added GitHub Actions workflow for automated builds and linting.

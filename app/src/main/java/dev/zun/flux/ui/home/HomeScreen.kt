@@ -346,7 +346,8 @@ private fun ConnectionIndicator(health: HealthState) {
     val (color, text) = when (health) {
         HealthState.Checking -> MaterialTheme.colorScheme.outlineVariant to "Checking connection…"
         HealthState.Connected -> Color(0xFF1D9E75) to "Connected to tailnet"
-        HealthState.Disconnected -> MaterialTheme.colorScheme.error to "Disconnected from server"
+        is HealthState.NetworkError -> MaterialTheme.colorScheme.error to health.message
+        is HealthState.ServerError -> MaterialTheme.colorScheme.error to "Server Error (${health.code})"
     }
 
     Row(

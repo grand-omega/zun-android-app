@@ -26,16 +26,14 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import dev.zun.flux.data.api.JobSummaryDto
 import dev.zun.flux.data.repo.JobRepository
@@ -45,21 +43,12 @@ import dev.zun.flux.util.formatTimestamp
 @Composable
 fun GalleryScreen(
     repository: JobRepository,
+    viewModel: GalleryViewModel,
     onJobClick: (String) -> Unit,
     onBack: () -> Unit,
 ) {
-    var jobs by remember { mutableStateOf<List<JobSummaryDto>?>(null) }
-    var isLoading by remember { mutableStateOf(true) }
-
-    LaunchedEffect(Unit) {
-        jobs =
-            try {
-                repository.listJobs(status = "done", limit = 100)
-            } catch (t: Throwable) {
-                emptyList()
-            }
-        isLoading = false
-    }
+    val jobs by viewModel.jobs.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -73,14 +62,14 @@ fun GalleryScreen(
             )
         },
     ) { inner ->
-        if (isLoading) {
+        if (isLoading && jobs.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
         } else {
             val groupedJobs =
                 remember(jobs) {
-                    jobs.orEmpty().groupBy { formatTimestamp(it.created_at) }
+                    jobs.groupBy { formatTimestamp(it.created_at) }
                 }
 
             LazyVerticalGrid(

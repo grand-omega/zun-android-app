@@ -6,8 +6,10 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import dev.zun.flux.FluxApp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.Request
 import java.net.URL
 
 /**
@@ -21,6 +23,7 @@ suspend fun saveToPictures(
     displayName: String,
 ): Uri = withContext(Dispatchers.IO) {
     val resolver = context.contentResolver
+    val okHttpClient = (context.applicationContext as? FluxApp)?.okHttpClient
 
     val values =
         ContentValues().apply {
@@ -50,8 +53,18 @@ suspend fun saveToPictures(
                 }
             }
             is String -> {
-                URL(source).openStream().use { input ->
-                    input.copyTo(out)
+                if (okHttpClient != null) {
+                    val request = Request.Builder().url(source).build()
+                    okHttpClient.newCall(request).execute().use { response ->
+                        if (!response.isSuccessful) error("Failed to download image: ${response.code}")
+                        response.body?.byteStream()?.use { input ->
+                            input.copyTo(out)
+                        } ?: error("Empty response body")
+                    }
+                } else {
+                    URL(source).openStream().use { input ->
+                        input.copyTo(out)
+                    }
                 }
             }
             else -> error("Unsupported source type: ${source::class.java}")
