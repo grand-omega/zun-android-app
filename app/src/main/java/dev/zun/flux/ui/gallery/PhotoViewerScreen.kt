@@ -85,9 +85,8 @@ fun PhotoViewerScreen(
     var showContextMenu by remember { mutableStateOf(false) }
     var showUI by remember { mutableStateOf(true) }
 
-    // This state tells the pager if it can scroll.
-    // It is updated by the current visible page's zoom level.
-    var isPagerScrollEnabled by remember { mutableStateOf(true) }
+    // Explicit "Zoom Mode" state
+    var isZoomMode by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -96,7 +95,7 @@ fun PhotoViewerScreen(
         containerColor = Color.Black,
         topBar = {
             AnimatedVisibility(
-                visible = showUI,
+                visible = showUI && !isZoomMode,
                 enter = fadeIn(),
                 exit = fadeOut(),
             ) {
@@ -122,25 +121,22 @@ fun PhotoViewerScreen(
                 state = pagerState,
                 modifier = Modifier.fillMaxSize(),
                 pageSpacing = 16.dp,
-                userScrollEnabled = isPagerScrollEnabled,
+                // DISABLE horizontal swiping if we are in Zoom Mode
+                userScrollEnabled = !isZoomMode,
             ) { page ->
                 val job = jobs.getOrNull(page) ?: return@HorizontalPager
                 val model = repository.resultModel(job.id)
 
                 ZoomableImage(
                     model = model,
-                    onClick = { showUI = !showUI },
-                    onLongClick = { showContextMenu = true },
-                    onZoomStateChanged = { isZoomed ->
-                        // Only the current page should control the pager scroll
-                        if (pagerState.currentPage == page) {
-                            isPagerScrollEnabled = !isZoomed
-                        }
-                    },
+                    isZoomMode = isZoomMode,
+                    onClick = { if (!isZoomMode) showUI = !showUI },
+                    onLongClick = { if (!isZoomMode) showContextMenu = true },
+                    onToggleZoomMode = { isZoomMode = !isZoomMode },
                     shouldReset = pagerState.currentPage != page,
                 )
 
-                // Context Menu for Long Press
+                // Context Menu for Long Press (only in standard mode)
                 DropdownMenu(
                     expanded = showContextMenu,
                     onDismissRequest = { showContextMenu = false },
@@ -158,7 +154,8 @@ fun PhotoViewerScreen(
                             showContextMenu = false
                             scope.launch {
                                 try {
-                                    saveToPictures(context, model ?: return@launch, "flux-${job.id}.jpg")
+                                    val m = model ?: return@launch
+                                    saveToPictures(context, m, "flux-${job.id}.jpg")
                                     Toast.makeText(context, "Saved to Gallery", Toast.LENGTH_SHORT).show()
                                 } catch (e: Exception) {
                                     Toast.makeText(context, "Save failed: ${e.message}", Toast.LENGTH_SHORT).show()
@@ -198,6 +195,24 @@ fun PhotoViewerScreen(
                     }
                 }
             }
+            
+            // "Zoom Mode" Indicator
+            if (isZoomMode) {
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 16.dp),
+                    color = Color.Black.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Text(
+                        text = "Zoom Mode (Double tap to exit)",
+                        color = Color.White,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                }
+            }
         }
     }
 }
@@ -206,20 +221,20 @@ fun PhotoViewerScreen(
 @Composable
 private fun ZoomableImage(
     model: Any?,
+    isZoomMode: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
-    onZoomStateChanged: (Boolean) -> Unit,
+    onToggleZoomMode: () -> Unit,
     shouldReset: Boolean,
 ) {
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
 
-    // Reset when page is hidden
-    LaunchedEffect(shouldReset) {
-        if (shouldReset) {
+    // Reset when page is hidden or when zoom mode is exited
+    LaunchedEffect(shouldReset, isZoomMode) {
+        if (shouldReset || !isZoomMode) {
             scale = 1f
             offset = Offset.Zero
-            onZoomStateChanged(false)
         }
     }
 
@@ -230,29 +245,17 @@ private fun ZoomableImage(
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick,
-                onDoubleClick = {
-                    if (scale > 1f) {
-                        scale = 1f
-                        offset = Offset.Zero
-                        onZoomStateChanged(false)
-                    } else {
-                        scale = 3f
-                        onZoomStateChanged(true)
-                    }
-                },
+                onDoubleClick = onToggleZoomMode,
             )
-            .pointerInput(Unit) {
-                detectTransformGestures { _, pan, zoom, _ ->
-                    val newScale = (scale * zoom).coerceIn(1f, 5f)
-                    if (newScale != scale) {
-                        scale = newScale
-                        onZoomStateChanged(newScale > 1f)
-                    }
-
-                    if (scale > 1f) {
-                        offset += pan
-                    } else {
-                        offset = Offset.Zero
+            .pointerInput(isZoomMode) {
+                if (isZoomMode) {
+                    detectTransformGestures { _, pan, zoom, _ ->
+                        scale = (scale * zoom).coerceIn(1f, 5f)
+                        if (scale > 1f) {
+                            offset += pan
+                        } else {
+                            offset = Offset.Zero
+                        }
                     }
                 }
             },

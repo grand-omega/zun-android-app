@@ -93,5 +93,6 @@ dependencies {
     implementation(libs.androidx.camera.view)
 
     implementation(libs.androidx.biometric)
+    implementation(libs.androidx.exifinterface)
     implementation(libs.androidx.security.crypto)
 }

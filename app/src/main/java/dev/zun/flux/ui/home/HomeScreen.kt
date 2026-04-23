@@ -30,6 +30,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -81,6 +82,7 @@ fun HomeScreen(
     val prompts by viewModel.prompts.collectAsStateWithLifecycle()
     val health by viewModel.health.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
+    val uploadProgress by viewModel.uploadProgress.collectAsStateWithLifecycle()
     val haptic = LocalHapticFeedback.current
 
     var imageUri by rememberSaveable { mutableStateOf<Uri?>(null) }
@@ -136,6 +138,7 @@ fun HomeScreen(
                     selectedPromptId = selectedPromptId,
                     state = state,
                     health = health,
+                    uploadProgress = uploadProgress,
                     onTakePhoto = onTakePhoto,
                     onPickGallery = {
                         picker.launch(
@@ -158,6 +161,7 @@ fun HomeScreen(
                     selectedPromptId = selectedPromptId,
                     state = state,
                     health = health,
+                    uploadProgress = uploadProgress,
                     onTakePhoto = onTakePhoto,
                     onPickGallery = {
                         picker.launch(
@@ -186,6 +190,7 @@ private fun CompactHomeContent(
     selectedPromptId: String?,
     state: SubmitState,
     health: HealthState,
+    uploadProgress: Float?,
     onTakePhoto: () -> Unit,
     onPickGallery: () -> Unit,
     onSelectPrompt: (String) -> Unit,
@@ -253,6 +258,20 @@ private fun CompactHomeContent(
 
         Spacer(Modifier.weight(1f))
 
+        if (uploadProgress != null) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = "Uploading… ${(uploadProgress * 100).toInt()}%",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                LinearProgressIndicator(
+                    progress = { uploadProgress },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+
         ConnectionIndicator(health)
 
         Button(
@@ -279,6 +298,7 @@ private fun WideHomeContent(
     selectedPromptId: String?,
     state: SubmitState,
     health: HealthState,
+    uploadProgress: Float?,
     onTakePhoto: () -> Unit,
     onPickGallery: () -> Unit,
     onSelectPrompt: (String) -> Unit,
@@ -339,6 +359,20 @@ private fun WideHomeContent(
             }
 
             Spacer(Modifier.weight(1f))
+
+            if (uploadProgress != null) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = "Uploading… ${(uploadProgress * 100).toInt()}%",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    LinearProgressIndicator(
+                        progress = { uploadProgress },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
 
             ConnectionIndicator(health)
 
