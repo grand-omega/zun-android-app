@@ -29,6 +29,8 @@ sealed interface HealthState {
     data class NetworkError(val message: String) : HealthState
 
     data class ServerError(val code: Int, val message: String) : HealthState
+
+    data object Unauthorized : HealthState
 }
 
 class HomeViewModel(
@@ -80,7 +82,11 @@ class HomeViewModel(
                 repository.health()
                 HealthState.Connected
             } catch (e: retrofit2.HttpException) {
-                HealthState.ServerError(e.code(), e.message())
+                if (e.code() == 401) {
+                    HealthState.Unauthorized
+                } else {
+                    HealthState.ServerError(e.code(), e.message())
+                }
             } catch (_: java.io.IOException) {
                 HealthState.NetworkError("Network unreachable")
             } catch (e: Throwable) {
