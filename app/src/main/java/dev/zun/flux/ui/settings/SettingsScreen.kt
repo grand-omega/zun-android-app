@@ -19,7 +19,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -39,7 +38,7 @@ import dev.zun.flux.data.repo.SettingsManager
 @Composable
 fun SettingsScreen(
     settingsManager: SettingsManager,
-    onBack: () -> Unit
+    onBack: () -> Unit,
 ) {
     var lockoutDuration by remember { mutableLongStateOf(settingsManager.lockoutDurationMs) }
 
@@ -49,7 +48,7 @@ fun SettingsScreen(
         60_000L to "1 minute",
         300_000L to "5 minutes",
         600_000L to "10 minutes",
-        1_800_000L to "30 minutes"
+        1_800_000L to "30 minutes",
     )
 
     Scaffold(
@@ -60,9 +59,9 @@ fun SettingsScreen(
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
-                }
+                },
             )
-        }
+        },
     ) { inner ->
         Column(
             modifier = Modifier
@@ -70,11 +69,11 @@ fun SettingsScreen(
                 .padding(inner)
                 .verticalScroll(rememberScrollState())
                 .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+            verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
             // Security Section
             Text("Security", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-            
+
             Column(modifier = Modifier.selectableGroup()) {
                 Text("Lock app after backgrounding for:", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom = 8.dp))
                 lockoutOptions.forEach { (duration, label) ->
@@ -87,19 +86,19 @@ fun SettingsScreen(
                                     lockoutDuration = duration
                                     settingsManager.lockoutDurationMs = duration
                                 },
-                                role = Role.RadioButton
+                                role = Role.RadioButton,
                             )
                             .padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         RadioButton(
                             selected = lockoutDuration == duration,
-                            onClick = null
+                            onClick = null,
                         )
                         Text(
                             text = label,
                             style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.padding(start = 16.dp)
+                            modifier = Modifier.padding(start = 16.dp),
                         )
                     }
                 }
@@ -109,7 +108,7 @@ fun SettingsScreen(
 
             // App Info Section
             Text("App Info", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-            
+
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 InfoRow("Version", BuildConfig.VERSION_NAME)
                 InfoRow("Build", BuildConfig.VERSION_CODE.toString())
@@ -127,7 +126,7 @@ private fun InfoRow(label: String, value: String, isMonospace: Boolean = false) 
         Text(
             text = value,
             style = if (isMonospace) MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace) else MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(top = 2.dp)
+            modifier = Modifier.padding(top = 2.dp),
         )
     }
 }

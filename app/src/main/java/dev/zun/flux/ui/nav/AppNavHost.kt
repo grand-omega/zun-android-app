@@ -7,10 +7,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.core.net.toUri
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import dev.zun.flux.FluxApp
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.ui.capture.CameraScreen
 import dev.zun.flux.ui.gallery.GalleryScaffold
@@ -18,8 +20,6 @@ import dev.zun.flux.ui.home.HomeScreen
 import dev.zun.flux.ui.progress.ProgressScreen
 import dev.zun.flux.ui.result.ResultScreen
 import dev.zun.flux.ui.settings.SettingsScreen
-import dev.zun.flux.FluxApp
-import androidx.compose.ui.platform.LocalContext
 
 @Composable
 fun AppNavHost(

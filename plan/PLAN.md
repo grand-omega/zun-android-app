@@ -14,7 +14,7 @@
 ## Table of contents
 
 1. [Overview and scope](#overview-and-scope)
-2. [Current Status](#current-status-v013-beta)
+2. [Current Status](#current-status-v022-beta)
 3. [Architecture](#architecture)
 4. [Tech stack](#tech-stack)
 5. [Security model](#security-model)
@@ -42,8 +42,8 @@ Samsung Galaxy Z Fold 7 running a modern Android version (Android 14+). Must wor
 
 ---
 
-## Current Status: v0.1.3-beta
-The v1 client is **100% feature-complete** and has undergone a robustness/UX polish phase. It is currently running against a `RealJobRepository` connected to the Rust server.
+## Current Status: v0.2.2-beta
+The client is **feature-complete for v2** and fully integrated with the real Rust server. It features an immersive, gesture-rich photo viewer and customizable security settings.
 
 ---
 
@@ -70,6 +70,7 @@ The v1 client is **100% feature-complete** and has undergone a robustness/UX pol
 - **MVVM with Compose.** ViewModels hold UI state and orchestrate long-running operations. Composables are stateless where possible.
 - **Single Activity.** `MainActivity` hosts a Compose `NavHost`.
 - **Single `JobRepository`.** All API calls go through one repository; ViewModels depend on it.
+- **Encrypted Settings.** `SettingsManager` handles secure persistence of user preferences.
 
 ---
 
@@ -97,7 +98,8 @@ The v1 client is **100% feature-complete** and has undergone a robustness/UX pol
 
 1. **Tailscale VPN.** Server binds only to its tailnet IP. Tailscale provides E2E encryption.
 2. **Bearer token auth.** Every request carries `Authorization: Bearer <token>`.
-3. **Biometric app gate.** Fingerprint (or device PIN fallback) required on launch and after 60s backgrounding.
+3. **Biometric app gate.** Fingerprint (or device PIN fallback) required on launch and after a **customizable grace period**.
+4. **Encrypted Storage.** User settings are stored using `EncryptedSharedPreferences`.
 
 ---
 
@@ -121,21 +123,16 @@ The v1 client is **100% feature-complete** and has undergone a robustness/UX pol
 - [x] Connection status banner (v1.1 robustness)
 - [x] Haptic feedback on key actions (v1.1 polish)
 
-### v2 (Polish, up next)
+### v2 (Complete ✅)
 
-- [ ] Image preprocessing (downscale to 2048px before upload)
-- [ ] WorkManager-based polling (survives app backgrounding)
-- [ ] Re-run a past generation with a different prompt
-- [ ] Custom free-text prompt alongside predefined ones
-- [ ] Multi-select delete in gallery
-- [ ] Filter gallery by prompt
-- [ ] Local caching of thumbnails for offline gallery browsing
-
-### v3 (Nice-to-have)
-
-- [ ] Half-folded (tabletop/book) layout optimization
-- [ ] Retry failed jobs (server-side persistence)
-- [ ] Cancel running jobs (DELETE /api/jobs/{id})
+- [x] Real server integration (`RealJobRepository` implementation)
+- [x] Immersive Photo Viewer (Horizontal swiping history)
+- [x] Pinch-to-zoom and Pan support
+- [x] Manual refresh (Pull-to-refresh on Home)
+- [x] Diagnostic "Live Ping" connectivity tracking
+- [x] Settings screen with App Info and customizable lockout
+- [x] True server-side cancellation (DELETE on cancel)
+- [x] Robust remote image saving (OkHttp streaming)
 
 ---
 
@@ -145,7 +142,6 @@ The v1 client is **100% feature-complete** and has undergone a robustness/UX pol
 
 - **Flat and minimal.** No gradients, no shadows.
 - **Single accent color.** Blue (`#185FA5`) for all primary actions.
-- **Sentence case everywhere.** "Take photo", not "Take Photo".
 - **Material 3 with custom theming.** Fixed light/dark palettes in `Color.kt`.
 
 ---
@@ -160,13 +156,35 @@ The v1 client is **100% feature-complete** and has undergone a robustness/UX pol
 - **Home Screen**: Single column (folded) vs. Two-pane row (unfolded).
 - **Gallery**: `ListDetailPaneScaffold` for side-by-side browsing.
 - **Result Screen**: Pager (folded) vs. Side-by-side row (unfolded).
-- **Progress Screen**: Content width-capped to 500dp.
+
+---
+
+## Screen-by-screen specification
+
+### 1. Lock screen (biometric gate)
+Shown on start and resume after grace period. System biometric prompt overlay.
+
+### 2. Home screen
+Adaptive layout for image submission. Dynamic prompt chips. Connection indicator. Pull-to-refresh.
+
+### 3. Camera screen
+CameraX preview and capture. Gallery shortcut.
+
+### 4. Progress screen
+Async polling with input preview and metadata card. True cancellation support.
+
+### 5. Result screen
+Before/after comparison (Pager or Side-by-side). Save/Share/Re-run actions.
+
+### 6. Gallery / Photo Viewer
+Immersive horizontal pager with zoom/pan. Long-press for details and saving.
+
+### 7. Settings screen
+App metadata and security timer configuration.
 
 ---
 
 ## Networking and API contract
-
-### Endpoints (expected from server)
 
 | Method | Path | Purpose |
 |--------|------|---------|
@@ -180,28 +198,48 @@ The v1 client is **100% feature-complete** and has undergone a robustness/UX pol
 
 ---
 
-## Build order and milestones
+## Biometric authentication
 
-### Milestone 1–8: v1 Client Foundations (Complete ✅)
-All core screens, adaptive layouts, navigation, and fake data flow are implemented, tested on a Z Fold 7, and synchronized across `main` and `dev` branches.
-
-### Milestone 9: Real Server Integration (Complete ✅)
-- [x] Implement `RealJobRepository` using Retrofit and OkHttp.
-- [x] Set up `local.properties` with workstation URL and Bearer token.
-- [x] Swapped `FakeJobRepository` for `RealJobRepository` in `FluxApp`.
-- [x] Verified DTO alignment (nullable prompt labels, seconds-based timestamps).
+- **UI-level gating.** Fingerprint prompt on launch and resume.
+- **Grace Period.** Configurable via Settings (default 60s).
+- **Security.** No cryptographic binding for v1/v2; Tailscale + Bearer token provided defense in depth.
 
 ---
 
-## Recent Improvements (v0.1.3-beta)
+## Project structure
 
-### Robustness
-- **Dynamic Health Tracking**: Home Screen now pings `/api/health` every 10s.
-- **Polling Resilience**: Loop handles up to 5 consecutive network errors before failing.
-- **Retry Logic**: Fully implemented the "Retry" button on the Progress Screen.
+- `dev.zun.flux.data`: API, DTOs, Repository.
+- `dev.zun.flux.ui`: Compose screens, ViewModels, Theme.
+- `dev.zun.flux.util`: Media/File helpers, Time, Window.
 
-### UX & Polish
-- **Haptic Feedback**: Vibrations on shutter, submission, and completion.
-- **Sharing**: Integrated Android `FileProvider` for sharing results.
-- **Technical Debt**: Refactored CameraX, enabled Edge-to-Edge, and fixed lint issues.
-- **CI/CD**: Added GitHub Actions workflow for automated builds and linting.
+---
+
+## Build order and milestones
+
+### Milestone 1–8: v1 Foundations (Complete ✅)
+### Milestone 9: Real Server Integration (Complete ✅)
+### Milestone 10: v2 UX & Security (Complete ✅)
+
+---
+
+## Testing approach
+
+- Manual testing on Z Fold 7.
+- Adaptive layout verification (Fold/Unfold).
+- Networking stress tests (Refresh, Cancellation).
+
+---
+
+## Development environment
+
+- Gentoo Linux workstation.
+- Android Studio / SDK 36.
+- GitHub Actions for CI.
+
+---
+
+## Build and deployment
+
+- Sideloaded APK.
+- Debug and Release variants.
+- Automated CI APK generation.
