@@ -27,14 +27,17 @@ jobs:
         echo "server.url=https://example.com" > local.properties
         echo "api.token=placeholder" >> local.properties
 
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v4
+
     - name: Build with Gradle
-      run: ./gradlew assembleDebug
+      run: ./gradlew assembleDebug --stacktrace
 
     - name: Run Lint
-      run: ./gradlew lintDebug
+      run: ./gradlew lintDebug --stacktrace
 
     - name: Run Spotless Check
-      run: ./gradlew spotlessCheck
+      run: ./gradlew spotlessCheck --stacktrace
 
     - name: Upload APK
       if: github.ref == 'refs/heads/main'
