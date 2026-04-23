@@ -43,6 +43,9 @@ class HomeViewModel(
     private val _health = MutableStateFlow<HealthState>(HealthState.Checking)
     val health: StateFlow<HealthState> = _health.asStateFlow()
 
+    private val _uploadProgress = MutableStateFlow<Float?>(null)
+    val uploadProgress: StateFlow<Float?> = _uploadProgress.asStateFlow()
+
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
@@ -100,13 +103,19 @@ class HomeViewModel(
     ) {
         if (_state.value is SubmitState.InFlight) return
         _state.value = SubmitState.InFlight
+        _uploadProgress.value = 0f
         viewModelScope.launch {
             _state.value =
                 try {
-                    val resp = repository.submitJob(inputUri, promptId)
+                    val resp =
+                        repository.submitJob(inputUri, promptId) { progress ->
+                            _uploadProgress.value = progress
+                        }
                     SubmitState.Done(resp.job_id)
                 } catch (t: Throwable) {
                     SubmitState.Failed(t.message ?: t::class.simpleName.orEmpty())
+                } finally {
+                    _uploadProgress.value = null
                 }
         }
     }
