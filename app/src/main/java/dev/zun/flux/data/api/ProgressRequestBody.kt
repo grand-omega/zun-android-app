@@ -15,11 +15,8 @@ class ProgressRequestBody(
     override fun contentLength(): Long = delegate.contentLength()
 
     override fun writeTo(sink: BufferedSink) {
-        val countingSink = CountingSink(sink)
-        val bufferedSink = countingSink.buffer()
-
+        val bufferedSink = CountingSink(sink).buffer()
         delegate.writeTo(bufferedSink)
-
         bufferedSink.flush()
     }
 
