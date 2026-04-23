@@ -5,20 +5,26 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -31,7 +37,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -105,7 +110,6 @@ fun ProgressScreen(
                     AsyncImage(
                         model = inputModel,
                         contentDescription = null,
-                        contentScale = ContentScale.Fit,
                         modifier = Modifier.fillMaxSize().alpha(0.6f),
                     )
                     CircularProgressIndicator(color = Color.White)
@@ -116,14 +120,29 @@ fun ProgressScreen(
                     when (val s = state) {
                         PollState.Starting -> Text("Starting…", style = MaterialTheme.typography.titleMedium)
                         is PollState.Running -> {
-                            Text("Status: ${s.dto.status.replaceFirstChar { it.uppercase() }}", style = MaterialTheme.typography.titleMedium)
+                            AssistChip(
+                                onClick = {},
+                                label = { Text(s.dto.status.replaceFirstChar { it.uppercase() }) },
+                                leadingIcon = {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .background(Color(0xFF1D9E75), CircleShape),
+                                    )
+                                },
+                            )
                             val pct = s.dto.progress?.let { (it * 100).toInt() }
                             if (pct != null) {
                                 Text("$pct%", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                             }
                         }
                         is PollState.Done -> Text("Done", style = MaterialTheme.typography.titleMedium)
-                        is PollState.Failed -> Text("Failed: ${s.message}", color = MaterialTheme.colorScheme.error)
+                        is PollState.Failed -> {
+                            Text("Failed: ${s.message}", color = MaterialTheme.colorScheme.error)
+                            Button(onClick = { /* Milestone 8 retry logic placeholder */ }) {
+                                Text("Retry")
+                            }
+                        }
                     }
                 }
 
@@ -141,6 +160,15 @@ fun ProgressScreen(
                             MetadataRow("Job ID", dto.id, isMonospace = true)
                         }
                     }
+                }
+
+                Spacer(Modifier.height(32.dp))
+
+                OutlinedButton(
+                    onClick = onBack,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Cancel")
                 }
             }
         }
