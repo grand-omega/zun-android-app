@@ -119,13 +119,18 @@ fun SetupScreen(
                             // 2. Rebuild repo to point to new URL
                             app.rebuildRepository()
 
-                            // 3. Ping health
-                            app.repository.health()
+                            // 3. Validate Token & Connectivity (listPrompts requires Auth)
+                            app.repository.listPrompts()
 
                             // 4. Success!
                             onSuccess()
                         } catch (t: Throwable) {
-                            error = "Connection failed: ${t.message ?: "Unknown error"}"
+                            error =
+                                if (t is retrofit2.HttpException && t.code() == 401) {
+                                    "Invalid API Token"
+                                } else {
+                                    "Connection failed: ${t.message ?: "Unknown error"}"
+                                }
                         } finally {
                             isTesting = false
                         }
