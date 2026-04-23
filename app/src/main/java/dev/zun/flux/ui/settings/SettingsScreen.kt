@@ -150,7 +150,7 @@ fun SettingsScreen(
                 InfoRow("Version", BuildConfig.VERSION_NAME)
                 InfoRow("Build", BuildConfig.VERSION_CODE.toString())
                 InfoRow("Package", BuildConfig.APPLICATION_ID)
-                InfoRow("Server URL", BuildConfig.SERVER_URL, isMonospace = true)
+                InfoRow("Server URL", settingsManager.serverUrl ?: "(not configured)", isMonospace = true)
             }
         }
     }

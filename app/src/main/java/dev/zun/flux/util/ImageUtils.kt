@@ -48,25 +48,31 @@ fun prepareImageForUpload(
     var bitmap = BitmapFactory.decodeByteArray(originalBytes, 0, originalBytes.size, decodeOptions)
         ?: error("Failed to decode bitmap")
 
-    // 4. Precise scaling and rotation
-    if (scale < 1f || rotation != 0) {
-        val matrix = Matrix().apply {
-            if (scale < 1f) postScale(scale, scale)
-            if (rotation != 0) postRotate(rotation.toFloat())
-        }
-        val scaledBitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
-        if (scaledBitmap != bitmap) {
-            bitmap.recycle()
-            bitmap = scaledBitmap
-        }
-    }
-
-    // 5. Save to temporary file
     val outputFile = File(context.cacheDir, "upload_preprocessed_${System.currentTimeMillis()}.jpg")
-    FileOutputStream(outputFile).use { out ->
-        bitmap.compress(Bitmap.CompressFormat.JPEG, quality, out)
+    try {
+        // 4. Precise scaling and rotation
+        if (scale < 1f || rotation != 0) {
+            val matrix = Matrix().apply {
+                if (scale < 1f) postScale(scale, scale)
+                if (rotation != 0) postRotate(rotation.toFloat())
+            }
+            val scaledBitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+            if (scaledBitmap != bitmap) {
+                bitmap.recycle()
+                bitmap = scaledBitmap
+            }
+        }
+
+        // 5. Save to temporary file
+        FileOutputStream(outputFile).use { out ->
+            bitmap.compress(Bitmap.CompressFormat.JPEG, quality, out)
+        }
+    } catch (t: Throwable) {
+        outputFile.delete()
+        throw t
+    } finally {
+        bitmap.recycle()
     }
-    bitmap.recycle()
 
     return outputFile
 }
