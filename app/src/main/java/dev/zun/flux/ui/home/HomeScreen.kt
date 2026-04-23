@@ -32,6 +32,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.windowsizeclass.WindowSizeClass
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.runtime.Composable
@@ -75,6 +76,7 @@ fun HomeScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val prompts by viewModel.prompts.collectAsStateWithLifecycle()
     val health by viewModel.health.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val haptic = LocalHapticFeedback.current
 
     var imageUri by rememberSaveable { mutableStateOf<Uri?>(null) }
@@ -114,50 +116,56 @@ fun HomeScreen(
         },
         contentWindowInsets = WindowInsets.safeDrawing,
     ) { inner ->
-        if (isWide) {
-            WideHomeContent(
-                modifier = Modifier.padding(inner),
-                imageUri = imageUri,
-                prompts = prompts,
-                selectedPromptId = selectedPromptId,
-                state = state,
-                health = health,
-                onTakePhoto = onTakePhoto,
-                onPickGallery = {
-                    picker.launch(
-                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-                    )
-                },
-                onSelectPrompt = { selectedPromptId = it },
-                onSubmit = {
-                    val uri = imageUri ?: return@WideHomeContent
-                    val promptId = selectedPromptId ?: return@WideHomeContent
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    viewModel.submit(uri, promptId)
-                },
-            )
-        } else {
-            CompactHomeContent(
-                modifier = Modifier.padding(inner),
-                imageUri = imageUri,
-                prompts = prompts,
-                selectedPromptId = selectedPromptId,
-                state = state,
-                health = health,
-                onTakePhoto = onTakePhoto,
-                onPickGallery = {
-                    picker.launch(
-                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-                    )
-                },
-                onSelectPrompt = { selectedPromptId = it },
-                onSubmit = {
-                    val uri = imageUri ?: return@CompactHomeContent
-                    val promptId = selectedPromptId ?: return@CompactHomeContent
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    viewModel.submit(uri, promptId)
-                },
-            )
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { viewModel.manualRefresh() },
+            modifier = Modifier.padding(inner),
+        ) {
+            if (isWide) {
+                WideHomeContent(
+                    modifier = Modifier,
+                    imageUri = imageUri,
+                    prompts = prompts,
+                    selectedPromptId = selectedPromptId,
+                    state = state,
+                    health = health,
+                    onTakePhoto = onTakePhoto,
+                    onPickGallery = {
+                        picker.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                        )
+                    },
+                    onSelectPrompt = { selectedPromptId = it },
+                    onSubmit = {
+                        val uri = imageUri ?: return@WideHomeContent
+                        val promptId = selectedPromptId ?: return@WideHomeContent
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        viewModel.submit(uri, promptId)
+                    },
+                )
+            } else {
+                CompactHomeContent(
+                    modifier = Modifier,
+                    imageUri = imageUri,
+                    prompts = prompts,
+                    selectedPromptId = selectedPromptId,
+                    state = state,
+                    health = health,
+                    onTakePhoto = onTakePhoto,
+                    onPickGallery = {
+                        picker.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                        )
+                    },
+                    onSelectPrompt = { selectedPromptId = it },
+                    onSubmit = {
+                        val uri = imageUri ?: return@CompactHomeContent
+                        val promptId = selectedPromptId ?: return@CompactHomeContent
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        viewModel.submit(uri, promptId)
+                    },
+                )
+            }
         }
     }
 }
