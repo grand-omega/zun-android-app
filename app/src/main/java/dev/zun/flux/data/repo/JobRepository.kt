@@ -15,8 +15,9 @@ interface JobRepository {
     suspend fun listPrompts(): List<dev.zun.flux.data.api.PromptDto>
 
     suspend fun submitJob(
-        inputUri: Uri,
+        inputUri: android.net.Uri,
         promptId: String,
+        onUploadProgress: ((Float) -> Unit)? = null,
     ): JobCreatedResponse
 
     suspend fun getJob(jobId: String): JobStatusDto

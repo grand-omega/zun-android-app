@@ -47,7 +47,15 @@ class FakeJobRepository(
     override suspend fun submitJob(
         inputUri: Uri,
         promptId: String,
+        onUploadProgress: ((Float) -> Unit)?,
     ): JobCreatedResponse {
+        // Simulate upload progress
+        if (onUploadProgress != null) {
+            for (i in 1..10) {
+                delay(100)
+                onUploadProgress(i.toFloat() / 10f)
+            }
+        }
         delay(400)
         val id = "fake-${UUID.randomUUID().toString().take(8)}"
         val label =
