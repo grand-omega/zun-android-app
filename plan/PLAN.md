@@ -14,7 +14,7 @@
 ## Table of contents
 
 1. [Overview and scope](#overview-and-scope)
-2. [Current Status](#current-status-v022-beta)
+2. [Current Status](#current-status-v100-stable)
 3. [Architecture](#architecture)
 4. [Tech stack](#tech-stack)
 5. [Security model](#security-model)
@@ -42,8 +42,8 @@ Samsung Galaxy Z Fold 7 running a modern Android version (Android 14+). Must wor
 
 ---
 
-## Current Status: v0.2.2-beta
-The client is **feature-complete for v2** and fully integrated with the real Rust server. It features an immersive, gesture-rich photo viewer and customizable security settings.
+## Current Status: v1.0.0-stable
+The app is **fully feature-complete and stable**. It is integrated with the real Rust server, features an immersive photo viewer with "Zoom Mode," upload progress tracking, and secure biometric settings.
 
 ---
 
