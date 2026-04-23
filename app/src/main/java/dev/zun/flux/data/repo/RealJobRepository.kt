@@ -30,7 +30,7 @@ class RealJobRepository(
         val imagePart = MultipartBody.Part.createFormData(
             "image",
             file.name,
-            file.asRequestBody("image/jpeg".toMediaType())
+            file.asRequestBody("image/jpeg".toMediaType()),
         )
         val promptPart = promptId.toRequestBody("text/plain".toMediaType())
 
@@ -39,19 +39,15 @@ class RealJobRepository(
 
     override suspend fun getJob(jobId: String): JobStatusDto = api.getJob(jobId)
 
-    override suspend fun listJobs(status: String, limit: Int, before: Long?): List<JobSummaryDto> =
-        api.listJobs(status, limit, before)
+    override suspend fun listJobs(status: String, limit: Int, before: Long?): List<JobSummaryDto> = api.listJobs(status, limit, before)
 
     override suspend fun deleteJob(jobId: String) = api.deleteJob(jobId)
 
-    override fun inputModel(jobId: String): Any =
-        "${BuildConfig.SERVER_URL}/api/jobs/$jobId/input"
+    override fun inputModel(jobId: String): Any = "${BuildConfig.SERVER_URL}/api/jobs/$jobId/input"
 
-    override fun thumbModel(jobId: String): Any =
-        "${BuildConfig.SERVER_URL}/api/jobs/$jobId/thumb"
+    override fun thumbModel(jobId: String): Any = "${BuildConfig.SERVER_URL}/api/jobs/$jobId/thumb"
 
-    override fun resultModel(jobId: String): Any =
-        "${BuildConfig.SERVER_URL}/api/jobs/$jobId/result"
+    override fun resultModel(jobId: String): Any = "${BuildConfig.SERVER_URL}/api/jobs/$jobId/result"
 
     /**
      * Crude URI to File helper. In a real app we might use ImageUtils to downscale first.

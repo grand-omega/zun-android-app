@@ -18,12 +18,15 @@ class FluxApp : Application() {
     lateinit var repository: JobRepository
         private set
 
+    lateinit var okHttpClient: OkHttpClient
+        private set
+
     val authStateHolder = AuthStateHolder()
 
     override fun onCreate() {
         super.onCreate()
 
-        val okHttp =
+        okHttpClient =
             OkHttpClient
                 .Builder()
                 .connectTimeout(30, TimeUnit.SECONDS)
@@ -47,7 +50,7 @@ class FluxApp : Application() {
             Retrofit
                 .Builder()
                 .baseUrl(BuildConfig.SERVER_URL)
-                .client(okHttp)
+                .client(okHttpClient)
                 .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
                 .build()
 
@@ -56,7 +59,7 @@ class FluxApp : Application() {
         Coil.setImageLoader(
             ImageLoader
                 .Builder(this)
-                .okHttpClient(okHttp)
+                .okHttpClient(okHttpClient)
                 .build(),
         )
 

@@ -26,7 +26,9 @@ sealed interface HealthState {
 
     data object Connected : HealthState
 
-    data object Disconnected : HealthState
+    data class NetworkError(val message: String) : HealthState
+
+    data class ServerError(val code: Int, val message: String) : HealthState
 }
 
 class HomeViewModel(
@@ -64,8 +66,12 @@ class HomeViewModel(
                     try {
                         repository.health()
                         HealthState.Connected
-                    } catch (_: Throwable) {
-                        HealthState.Disconnected
+                    } catch (e: retrofit2.HttpException) {
+                        HealthState.ServerError(e.code(), e.message())
+                    } catch (e: java.io.IOException) {
+                        HealthState.NetworkError("Network unreachable")
+                    } catch (e: Throwable) {
+                        HealthState.NetworkError(e.message ?: "Unknown error")
                     }
                 delay(10_000) // Check every 10s
             }
