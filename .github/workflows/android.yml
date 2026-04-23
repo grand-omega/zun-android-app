@@ -12,10 +12,10 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: set up JDK 17
+    - name: set up JDK 21
       uses: actions/setup-java@v4
       with:
-        java-version: '17'
+        java-version: '21'
         distribution: 'temurin'
         cache: gradle
 
@@ -27,14 +27,17 @@ jobs:
         echo "server.url=https://example.com" > local.properties
         echo "api.token=placeholder" >> local.properties
 
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v4
+
     - name: Build with Gradle
-      run: ./gradlew assembleDebug
+      run: ./gradlew assembleDebug --stacktrace -Porg.gradle.java.installations.auto-download=false -Porg.gradle.java.installations.auto-detect=true
 
     - name: Run Lint
-      run: ./gradlew lintDebug
+      run: ./gradlew lintDebug --stacktrace -Porg.gradle.java.installations.auto-download=false -Porg.gradle.java.installations.auto-detect=true
 
     - name: Run Spotless Check
-      run: ./gradlew spotlessCheck
+      run: ./gradlew spotlessCheck --stacktrace -Porg.gradle.java.installations.auto-download=false -Porg.gradle.java.installations.auto-detect=true
 
     - name: Upload APK
       if: github.ref == 'refs/heads/main'

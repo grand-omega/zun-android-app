@@ -133,12 +133,12 @@ private fun MetadataCard(job: JobStatusDto) {
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            MetadataRow("Prompt", job.prompt_label)
+            MetadataRow("Prompt", job.prompt_label ?: job.prompt_id)
             MetadataRow("Status", job.status)
             MetadataRow("Job ID", job.id, isMonospace = true)
             MetadataRow(
                 "Created",
-                SimpleDateFormat("MMM d, yyyy · HH:mm", Locale.getDefault()).format(Date(job.created_at)),
+                SimpleDateFormat("MMM d, yyyy · HH:mm", Locale.getDefault()).format(Date(job.created_at * 1000)),
             )
         }
     }

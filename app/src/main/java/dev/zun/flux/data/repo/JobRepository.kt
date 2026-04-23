@@ -36,6 +36,9 @@ interface JobRepository {
     /** Anything Coil can load. */
     fun inputModel(jobId: String): Any?
 
+    /** Anything Coil can load. */
+    fun thumbModel(jobId: String): Any?
+
     /** Anything Coil can load. Fake echoes the input URI; real returns an HTTP URL. */
     fun resultModel(jobId: String): Any?
 }

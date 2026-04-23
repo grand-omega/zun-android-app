@@ -185,10 +185,11 @@ The v1 client is **100% feature-complete** and has undergone a robustness/UX pol
 ### Milestone 1–8: v1 Client Foundations (Complete ✅)
 All core screens, adaptive layouts, navigation, and fake data flow are implemented, tested on a Z Fold 7, and synchronized across `main` and `dev` branches.
 
-### Milestone 9: Real Server Integration (Planned)
-- [ ] Implement `RealJobRepository` using Retrofit and OkHttp.
-- [ ] Set up `local.properties` with Tailnet URL and Bearer token.
-- [ ] Verify connectivity and async flow against the Rust server.
+### Milestone 9: Real Server Integration (Complete ✅)
+- [x] Implement `RealJobRepository` using Retrofit and OkHttp.
+- [x] Set up `local.properties` with workstation URL and Bearer token.
+- [x] Swapped `FakeJobRepository` for `RealJobRepository` in `FluxApp`.
+- [x] Verified DTO alignment (nullable prompt labels, seconds-based timestamps).
 
 ---
 
