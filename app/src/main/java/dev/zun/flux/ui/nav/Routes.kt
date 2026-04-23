@@ -2,6 +2,7 @@ package dev.zun.flux.ui.nav
 
 object Routes {
     const val HOME = "home"
+    const val SETUP = "setup"
     const val CAMERA = "camera"
     const val GALLERY = "gallery"
     const val SETTINGS = "settings"

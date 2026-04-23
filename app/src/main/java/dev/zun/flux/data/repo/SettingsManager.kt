@@ -21,7 +21,20 @@ class SettingsManager(context: Context) {
         get() = prefs.getLong(KEY_LOCKOUT_DURATION, 60_000L)
         set(value) = prefs.edit().putLong(KEY_LOCKOUT_DURATION, value).apply()
 
+    var serverUrl: String?
+        get() = prefs.getString(KEY_SERVER_URL, null)
+        set(value) = prefs.edit().putString(KEY_SERVER_URL, value).apply()
+
+    var apiToken: String?
+        get() = prefs.getString(KEY_API_TOKEN, null)
+        set(value) = prefs.edit().putString(KEY_API_TOKEN, value).apply()
+
+    val isConfigured: Boolean
+        get() = !serverUrl.isNullOrBlank() && !apiToken.isNullOrBlank()
+
     companion object {
         private const val KEY_LOCKOUT_DURATION = "lockout_duration_ms"
+        private const val KEY_SERVER_URL = "server_url"
+        private const val KEY_API_TOKEN = "api_token"
     }
 }
