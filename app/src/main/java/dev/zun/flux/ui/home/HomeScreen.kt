@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,17 +12,22 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -32,10 +38,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -43,9 +51,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import coil.compose.AsyncImage
+import dev.zun.flux.data.api.PromptDto
 import dev.zun.flux.data.repo.JobRepository
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     repository: JobRepository,
@@ -95,11 +104,12 @@ fun HomeScreen(
                 title = { Text("FluxEdit") },
                 actions = {
                     IconButton(onClick = onGalleryClick) {
-                        Icon(Icons.Default.List, contentDescription = "Gallery")
+                        Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Gallery")
                     }
                 },
             )
         },
+        contentWindowInsets = WindowInsets.safeDrawing,
     ) { inner ->
         if (isWide) {
             WideHomeContent(
@@ -150,7 +160,7 @@ fun HomeScreen(
 private fun CompactHomeContent(
     modifier: Modifier = Modifier,
     imageUri: Uri?,
-    prompts: List<dev.zun.flux.data.api.PromptDto>,
+    prompts: List<PromptDto>,
     selectedPromptId: String?,
     state: SubmitState,
     onTakePhoto: () -> Unit,
@@ -165,7 +175,7 @@ private fun CompactHomeContent(
             .padding(horizontal = 24.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("Image source")
+        Text("Image source", style = MaterialTheme.typography.labelLarge)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -192,7 +202,7 @@ private fun CompactHomeContent(
             contentAlignment = Alignment.Center,
         ) {
             if (imageUri == null) {
-                Text("No image selected")
+                Text("No image selected", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
             } else {
                 AsyncImage(
                     model = imageUri,
@@ -203,7 +213,7 @@ private fun CompactHomeContent(
             }
         }
 
-        Text("Prompt")
+        Text("Prompt", style = MaterialTheme.typography.labelLarge)
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -219,6 +229,8 @@ private fun CompactHomeContent(
 
         Spacer(Modifier.weight(1f))
 
+        ConnectionIndicator()
+
         Button(
             onClick = onSubmit,
             enabled = imageUri != null && selectedPromptId != null && state !is SubmitState.InFlight,
@@ -229,7 +241,7 @@ private fun CompactHomeContent(
 
         val failure = state as? SubmitState.Failed
         if (failure != null) {
-            Text("Submit failed: ${failure.message}")
+            Text("Submit failed: ${failure.message}", color = MaterialTheme.colorScheme.error)
         }
     }
 }
@@ -239,7 +251,7 @@ private fun CompactHomeContent(
 private fun WideHomeContent(
     modifier: Modifier = Modifier,
     imageUri: Uri?,
-    prompts: List<dev.zun.flux.data.api.PromptDto>,
+    prompts: List<PromptDto>,
     selectedPromptId: String?,
     state: SubmitState,
     onTakePhoto: () -> Unit,
@@ -255,7 +267,7 @@ private fun WideHomeContent(
         horizontalArrangement = Arrangement.spacedBy(24.dp),
     ) {
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text("Image source")
+            Text("Image source", style = MaterialTheme.typography.labelLarge)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -273,7 +285,7 @@ private fun WideHomeContent(
                 contentAlignment = Alignment.Center,
             ) {
                 if (imageUri == null) {
-                    Text("No image selected")
+                    Text("No image selected", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
                 } else {
                     AsyncImage(
                         model = imageUri,
@@ -286,7 +298,7 @@ private fun WideHomeContent(
         }
 
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text("Prompt")
+            Text("Prompt", style = MaterialTheme.typography.labelLarge)
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -302,6 +314,8 @@ private fun WideHomeContent(
 
             Spacer(Modifier.weight(1f))
 
+            ConnectionIndicator()
+
             Button(
                 onClick = onSubmit,
                 enabled = imageUri != null && selectedPromptId != null && state !is SubmitState.InFlight,
@@ -312,8 +326,28 @@ private fun WideHomeContent(
 
             val failure = state as? SubmitState.Failed
             if (failure != null) {
-                Text("Submit failed: ${failure.message}")
+                Text("Submit failed: ${failure.message}", color = MaterialTheme.colorScheme.error)
             }
         }
+    }
+}
+
+@Composable
+private fun ConnectionIndicator() {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.padding(vertical = 8.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(10.dp)
+                .background(Color(0xFF1D9E75), CircleShape),
+        )
+        Text(
+            text = "Connected to tailnet",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.secondary,
+        )
     }
 }

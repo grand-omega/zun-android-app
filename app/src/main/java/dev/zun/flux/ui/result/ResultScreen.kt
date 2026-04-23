@@ -17,8 +17,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -43,7 +47,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import dev.zun.flux.data.repo.JobRepository
-import androidx.compose.material.icons.filled.Share
 import dev.zun.flux.util.saveToPictures
 import dev.zun.flux.util.shareImage
 import kotlinx.coroutines.launch
@@ -72,6 +75,35 @@ fun ResultScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    var showMenu by remember { mutableStateOf(false) }
+                    IconButton(onClick = { showMenu = true }) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "More")
+                    }
+                    DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                        DropdownMenuItem(
+                            text = { Text("View details") },
+                            onClick = {
+                                showMenu = false
+                                /* Placeholder for detail navigation */
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Copy job ID") },
+                            onClick = {
+                                showMenu = false
+                                /* Placeholder for copy */
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Delete") },
+                            onClick = {
+                                showMenu = false
+                                /* Placeholder for delete */
+                            },
+                        )
                     }
                 },
             )
@@ -169,36 +201,41 @@ fun ResultScreen(
                 Text(if (saving) "Saving…" else "Save to gallery")
             }
 
-            OutlinedButton(
-                onClick = {
-                    val src = resultModel as? Uri ?: return@OutlinedButton
-                    shareImage(context, src)
-                },
-                enabled = resultModel is Uri,
+            Row(
                 modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Icon(
-                    Icons.Default.Share,
-                    contentDescription = null,
-                    modifier = Modifier.padding(end = 8.dp),
-                )
-                Text("Share")
-            }
+                OutlinedButton(
+                    onClick = {
+                        val src = resultModel as? Uri ?: return@OutlinedButton
+                        shareImage(context, src)
+                    },
+                    enabled = resultModel is Uri,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Icon(
+                        Icons.Default.Share,
+                        contentDescription = null,
+                        modifier = Modifier.padding(end = 8.dp),
+                    )
+                    Text("Share")
+                }
 
-            OutlinedButton(
-                onClick = {
-                    val src = inputModel as? Uri ?: return@OutlinedButton
-                    onTryAnotherPrompt(src)
-                },
-                enabled = inputModel is Uri,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Icon(
-                    Icons.Default.Refresh,
-                    contentDescription = null,
-                    modifier = Modifier.padding(end = 8.dp),
-                )
-                Text("Try another prompt on this image")
+                OutlinedButton(
+                    onClick = {
+                        val src = inputModel as? Uri ?: return@OutlinedButton
+                        onTryAnotherPrompt(src)
+                    },
+                    enabled = inputModel is Uri,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Icon(
+                        Icons.Default.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.padding(end = 8.dp),
+                    )
+                    Text("Try another")
+                }
             }
         }
     }
