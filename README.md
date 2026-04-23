@@ -10,16 +10,13 @@ A personal, high-performance image editing client for the **Project ZUN** stack.
 - **Rust Server** (Running on your workstation)
 
 ### 2. Configuration (The "Secrets")
-The app expects its server connection details in a `local.properties` file at the root of the project. **This file is gitignored.**
+Server URL and API token are **not** baked into the APK. Install the app, then
+enter them on the in-app **Setup** screen — they are persisted in
+`EncryptedSharedPreferences`.
 
-Create or edit `local.properties`:
-```properties
-# Your workstation's LAN IP or Tailscale IP
-server.url=http://192.168.1.15:8080
-
-# The token you set as ZUN_TOKEN on the server
-api.token=your-secret-token-here
-```
+> Release builds disallow cleartext HTTP (see `network_security_config.xml`).
+> Use an HTTPS endpoint (e.g. Tailscale MagicDNS) for release, or use a debug
+> build when targeting a plain `http://…` dev server.
 
 ### 3. Build & Run Commands
 
