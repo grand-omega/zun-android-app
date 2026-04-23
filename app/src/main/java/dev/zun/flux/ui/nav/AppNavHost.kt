@@ -20,6 +20,7 @@ import dev.zun.flux.ui.home.HomeScreen
 import dev.zun.flux.ui.progress.ProgressScreen
 import dev.zun.flux.ui.result.ResultScreen
 import dev.zun.flux.ui.settings.SettingsScreen
+import dev.zun.flux.ui.settings.SetupScreen
 
 @Composable
 fun AppNavHost(
@@ -29,8 +30,10 @@ fun AppNavHost(
     val context = LocalContext.current
     val app = context.applicationContext as FluxApp
     val settingsManager = app.settingsManager
+    val startDestination = if (settingsManager.isConfigured) Routes.HOME else Routes.SETUP
+
     val nav = rememberNavController()
-    NavHost(navController = nav, startDestination = Routes.HOME) {
+    NavHost(navController = nav, startDestination = startDestination) {
         composable(Routes.HOME) { entry ->
             // Check for photo capture result
             var capturedUri by remember { mutableStateOf<android.net.Uri?>(null) }
@@ -55,6 +58,16 @@ fun AppNavHost(
                 },
             )
         }
+        composable(Routes.SETUP) {
+            SetupScreen(
+                app = app,
+                onSuccess = {
+                    nav.navigate(Routes.HOME) {
+                        popUpTo(Routes.SETUP) { inclusive = true }
+                    }
+                },
+            )
+        }
         composable(Routes.CAMERA) {
             CameraScreen(
                 onCaptured = { uri ->
@@ -72,7 +85,7 @@ fun AppNavHost(
         }
         composable(Routes.SETTINGS) {
             SettingsScreen(
-                settingsManager = settingsManager,
+                app = app,
                 onBack = { nav.popBackStack() },
             )
         }

@@ -2,7 +2,6 @@ package dev.zun.flux.data.repo
 
 import android.content.Context
 import android.net.Uri
-import dev.zun.flux.BuildConfig
 import dev.zun.flux.data.api.FluxApi
 import dev.zun.flux.data.api.HealthResponse
 import dev.zun.flux.data.api.JobCreatedResponse
@@ -19,6 +18,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 class RealJobRepository(
     private val context: Context,
     private val api: FluxApi,
+    private val settingsManager: SettingsManager,
 ) : JobRepository {
     override suspend fun health(): HealthResponse = api.health()
 
@@ -29,10 +29,7 @@ class RealJobRepository(
         promptId: String,
         onUploadProgress: ((Float) -> Unit)?,
     ): JobCreatedResponse {
-        // 1. Preprocess (downscale & compress)
         val file = prepareImageForUpload(context, inputUri)
-
-        // 2. Wrap with progress if requested
         val rawBody = file.asRequestBody("image/jpeg".toMediaType())
         val finalBody =
             if (onUploadProgress != null) {
@@ -52,7 +49,7 @@ class RealJobRepository(
         return try {
             api.submitJob(imagePart, promptPart)
         } finally {
-            file.delete() // Clean up preprocessed file
+            file.delete()
         }
     }
 
@@ -66,9 +63,9 @@ class RealJobRepository(
 
     override suspend fun deleteJob(jobId: String) = api.deleteJob(jobId)
 
-    override fun inputModel(jobId: String): Any = "${BuildConfig.SERVER_URL}/api/jobs/$jobId/input"
+    override fun inputModel(jobId: String): Any = "${settingsManager.serverUrl}/api/jobs/$jobId/input"
 
-    override fun thumbModel(jobId: String): Any = "${BuildConfig.SERVER_URL}/api/jobs/$jobId/thumb"
+    override fun thumbModel(jobId: String): Any = "${settingsManager.serverUrl}/api/jobs/$jobId/thumb"
 
-    override fun resultModel(jobId: String): Any = "${BuildConfig.SERVER_URL}/api/jobs/$jobId/result"
+    override fun resultModel(jobId: String): Any = "${settingsManager.serverUrl}/api/jobs/$jobId/result"
 }

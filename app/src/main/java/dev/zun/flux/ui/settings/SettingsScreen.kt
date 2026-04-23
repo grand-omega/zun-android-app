@@ -17,6 +17,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -24,6 +25,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -32,15 +34,19 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import dev.zun.flux.BuildConfig
-import dev.zun.flux.data.repo.SettingsManager
+import dev.zun.flux.FluxApp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    settingsManager: SettingsManager,
+    app: FluxApp,
     onBack: () -> Unit,
 ) {
+    val settingsManager = app.settingsManager
     var lockoutDuration by remember { mutableLongStateOf(settingsManager.lockoutDurationMs) }
+
+    var url by remember { mutableStateOf(settingsManager.serverUrl ?: "") }
+    var token by remember { mutableStateOf(settingsManager.apiToken ?: "") }
 
     val lockoutOptions = listOf(
         0L to "Always lock",
@@ -102,6 +108,37 @@ fun SettingsScreen(
                         )
                     }
                 }
+            }
+
+            HorizontalDivider()
+
+            // Connection Section
+            Text("Connection", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = url,
+                    onValueChange = {
+                        url = it
+                        settingsManager.serverUrl = it.trim().removeSuffix("/")
+                        app.rebuildRepository()
+                    },
+                    label = { Text("Server URL") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+
+                OutlinedTextField(
+                    value = token,
+                    onValueChange = {
+                        token = it
+                        settingsManager.apiToken = it.trim()
+                        app.rebuildRepository()
+                    },
+                    label = { Text("API Token") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
             }
 
             HorizontalDivider()

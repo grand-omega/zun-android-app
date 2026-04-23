@@ -34,20 +34,38 @@ class FluxApp : Application() {
         settingsManager = SettingsManager(this)
         authStateHolder = AuthStateHolder(settingsManager)
 
+        // Interceptor that reads the current token from settings
         okHttpClient =
             OkHttpClient
                 .Builder()
                 .connectTimeout(30, TimeUnit.SECONDS)
                 .readTimeout(60, TimeUnit.SECONDS)
                 .addInterceptor { chain ->
+                    val token = settingsManager.apiToken ?: ""
                     chain.proceed(
                         chain
                             .request()
                             .newBuilder()
-                            .header("Authorization", "Bearer ${BuildConfig.API_TOKEN}")
+                            .header("Authorization", "Bearer $token")
                             .build(),
                     )
                 }.build()
+
+        Coil.setImageLoader(
+            ImageLoader
+                .Builder(this)
+                .okHttpClient(okHttpClient)
+                .build(),
+        )
+
+        rebuildRepository()
+    }
+
+    /**
+     * Call this when serverUrl or apiToken changes to refresh the repository.
+     */
+    fun rebuildRepository() {
+        val baseUrl = settingsManager.serverUrl.takeIf { !it.isNullOrBlank() } ?: "https://example.invalid"
 
         val json = Json {
             ignoreUnknownKeys = true
@@ -57,21 +75,12 @@ class FluxApp : Application() {
         val retrofit =
             Retrofit
                 .Builder()
-                .baseUrl(BuildConfig.SERVER_URL)
+                .baseUrl(baseUrl)
                 .client(okHttpClient)
                 .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
                 .build()
 
         val api = retrofit.create(FluxApi::class.java)
-
-        Coil.setImageLoader(
-            ImageLoader
-                .Builder(this)
-                .okHttpClient(okHttpClient)
-                .build(),
-        )
-
-        // Swapped to RealJobRepository for Milestone 9
-        repository = RealJobRepository(this, api)
+        repository = RealJobRepository(this, api, settingsManager)
     }
 }
