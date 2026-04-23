@@ -42,6 +42,17 @@ class ProgressViewModel(
         pollJob = viewModelScope.launch { pollLoop(jobId) }
     }
 
+    fun cancelJob(jobId: String) {
+        pollJob?.cancel()
+        viewModelScope.launch {
+            try {
+                repository.deleteJob(jobId)
+            } catch (_: Throwable) {
+                // Ignore failure on cancel
+            }
+        }
+    }
+
     private suspend fun CoroutineScope.pollLoop(jobId: String) {
         var errorCount = 0
         while (isActive) {

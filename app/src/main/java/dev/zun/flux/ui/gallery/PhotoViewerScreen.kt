@@ -7,8 +7,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.rememberTransformableState
-import androidx.compose.foundation.gestures.transformable
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,6 +34,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -47,6 +47,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
@@ -83,6 +84,11 @@ fun PhotoViewerScreen(
     var showDetails by remember { mutableStateOf(false) }
     var showContextMenu by remember { mutableStateOf(false) }
     var showUI by remember { mutableStateOf(true) }
+
+    // This state tells the pager if it can scroll.
+    // It is updated by the current visible page's zoom level.
+    var isPagerScrollEnabled by remember { mutableStateOf(true) }
+
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -116,6 +122,7 @@ fun PhotoViewerScreen(
                 state = pagerState,
                 modifier = Modifier.fillMaxSize(),
                 pageSpacing = 16.dp,
+                userScrollEnabled = isPagerScrollEnabled,
             ) { page ->
                 val job = jobs.getOrNull(page) ?: return@HorizontalPager
                 val model = repository.resultModel(job.id)
@@ -124,6 +131,13 @@ fun PhotoViewerScreen(
                     model = model,
                     onClick = { showUI = !showUI },
                     onLongClick = { showContextMenu = true },
+                    onZoomStateChanged = { isZoomed ->
+                        // Only the current page should control the pager scroll
+                        if (pagerState.currentPage == page) {
+                            isPagerScrollEnabled = !isZoomed
+                        }
+                    },
+                    shouldReset = pagerState.currentPage != page,
                 )
 
                 // Context Menu for Long Press
@@ -194,28 +208,54 @@ private fun ZoomableImage(
     model: Any?,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
+    onZoomStateChanged: (Boolean) -> Unit,
+    shouldReset: Boolean,
 ) {
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
-    val state =
-        rememberTransformableState { zoomChange, offsetChange, _ ->
-            scale = (scale * zoomChange).coerceIn(1f, 5f)
-            if (scale > 1f) {
-                offset += offsetChange
-            } else {
-                offset = Offset.Zero
-            }
+
+    // Reset when page is hidden
+    LaunchedEffect(shouldReset) {
+        if (shouldReset) {
+            scale = 1f
+            offset = Offset.Zero
+            onZoomStateChanged(false)
         }
+    }
 
     Box(
         modifier =
         Modifier
             .fillMaxSize()
-            .transformable(state = state)
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick,
-            ),
+                onDoubleClick = {
+                    if (scale > 1f) {
+                        scale = 1f
+                        offset = Offset.Zero
+                        onZoomStateChanged(false)
+                    } else {
+                        scale = 3f
+                        onZoomStateChanged(true)
+                    }
+                },
+            )
+            .pointerInput(Unit) {
+                detectTransformGestures { _, pan, zoom, _ ->
+                    val newScale = (scale * zoom).coerceIn(1f, 5f)
+                    if (newScale != scale) {
+                        scale = newScale
+                        onZoomStateChanged(newScale > 1f)
+                    }
+
+                    if (scale > 1f) {
+                        offset += pan
+                    } else {
+                        offset = Offset.Zero
+                    }
+                }
+            },
         contentAlignment = Alignment.Center,
     ) {
         AsyncImage(
