@@ -5,8 +5,12 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
-fun formatTimestamp(timestamp: Long): String {
-    val date = Date(timestamp)
+/**
+ * Formats a Unix timestamp in SECONDS to a human-readable string.
+ * Standardizing on seconds to match the Rust server contract.
+ */
+fun formatTimestamp(timestampSeconds: Long): String {
+    val date = Date(timestampSeconds * 1000)
     val now = Calendar.getInstance()
     val then = Calendar.getInstance().apply { time = date }
 

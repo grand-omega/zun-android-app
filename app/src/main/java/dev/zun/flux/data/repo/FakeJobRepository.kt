@@ -59,23 +59,24 @@ class FakeJobRepository(
                 "sketch" -> "Pencil sketch"
                 else -> promptId
             }
-        entries[id] = Entry(id, inputUri, promptId, label, System.currentTimeMillis())
+        // Save createdAt in SECONDS
+        entries[id] = Entry(id, inputUri, promptId, label, System.currentTimeMillis() / 1000)
         return JobCreatedResponse(job_id = id)
     }
 
     override suspend fun getJob(jobId: String): JobStatusDto {
         val entry = entries[jobId] ?: error("Unknown fake job: $jobId")
-        val elapsed = System.currentTimeMillis() - entry.createdAt
+        val elapsedSeconds = (System.currentTimeMillis() / 1000) - entry.createdAt
         val status =
             when {
-                elapsed < queuedDurationMs -> "queued"
-                elapsed < queuedDurationMs + runningDurationMs -> "running"
+                elapsedSeconds < (queuedDurationMs / 1000) -> "queued"
+                elapsedSeconds < ((queuedDurationMs + runningDurationMs) / 1000) -> "running"
                 else -> "done"
             }
         val progress =
             when (status) {
                 "running" ->
-                    ((elapsed - queuedDurationMs).toFloat() / runningDurationMs)
+                    ((elapsedSeconds * 1000 - queuedDurationMs).toFloat() / runningDurationMs)
                         .coerceIn(0f, 1f)
                 "done" -> 1f
                 else -> null
@@ -90,7 +91,7 @@ class FakeJobRepository(
             created_at = entry.createdAt,
             completed_at =
             if (status == "done") {
-                entry.createdAt + queuedDurationMs + runningDurationMs
+                entry.createdAt + (queuedDurationMs + runningDurationMs) / 1000
             } else {
                 null
             },
@@ -103,10 +104,11 @@ class FakeJobRepository(
         before: Long?,
     ): List<JobSummaryDto> {
         delay(600)
+        val nowSeconds = System.currentTimeMillis() / 1000
         return entries.values
             .filter { entry ->
-                val elapsed = System.currentTimeMillis() - entry.createdAt
-                val isDone = elapsed >= queuedDurationMs + runningDurationMs
+                val elapsedSeconds = nowSeconds - entry.createdAt
+                val isDone = elapsedSeconds >= (queuedDurationMs + runningDurationMs) / 1000
                 (status == "done" && isDone) || (status != "done")
             }.filter { entry ->
                 before == null || entry.createdAt < before
