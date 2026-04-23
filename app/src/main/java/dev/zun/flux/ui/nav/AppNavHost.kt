@@ -1,0 +1,92 @@
+package dev.zun.flux.ui.nav
+
+import androidx.compose.material3.windowsizeclass.WindowSizeClass
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import dev.zun.flux.data.repo.JobRepository
+import dev.zun.flux.ui.capture.CameraScreen
+import dev.zun.flux.ui.gallery.GalleryScaffold
+import dev.zun.flux.ui.home.HomeScreen
+import dev.zun.flux.ui.progress.ProgressScreen
+import dev.zun.flux.ui.result.ResultScreen
+
+@Composable
+fun AppNavHost(
+    repository: JobRepository,
+    windowSizeClass: WindowSizeClass,
+) {
+    val nav = rememberNavController()
+    NavHost(navController = nav, startDestination = Routes.HOME) {
+        composable(Routes.HOME) { entry ->
+            // Check for photo capture result
+            var capturedUri by remember { mutableStateOf<android.net.Uri?>(null) }
+            val savedState = entry.savedStateHandle
+            LaunchedEffect(savedState) {
+                val uri = savedState.get<android.net.Uri>("capturedUri")
+                if (uri != null) {
+                    capturedUri = uri
+                    savedState.remove<android.net.Uri>("capturedUri")
+                }
+            }
+
+            HomeScreen(
+                repository = repository,
+                windowSizeClass = windowSizeClass,
+                capturedUri = capturedUri,
+                onTakePhoto = { nav.navigate(Routes.CAMERA) },
+                onGalleryClick = { nav.navigate(Routes.GALLERY) },
+                onJobSubmitted = { jobId ->
+                    nav.navigate(Routes.progress(jobId))
+                },
+            )
+        }
+        composable(Routes.CAMERA) {
+            CameraScreen(
+                onCaptured = { uri ->
+                    nav.previousBackStackEntry?.savedStateHandle?.set("capturedUri", uri)
+                    nav.popBackStack()
+                },
+                onBack = { nav.popBackStack() },
+            )
+        }
+        composable(Routes.GALLERY) {
+            GalleryScaffold(
+                repository = repository,
+                onBack = { nav.popBackStack() },
+            )
+        }
+        composable(Routes.PROGRESS) { entry ->
+            val jobId = entry.arguments?.getString("jobId").orEmpty()
+            ProgressScreen(
+                jobId = jobId,
+                repository = repository,
+                onDone = {
+                    nav.navigate(Routes.result(jobId)) {
+                        popUpTo(Routes.HOME)
+                    }
+                },
+                onBack = { nav.popBackStack() },
+            )
+        }
+        composable(Routes.RESULT) { entry ->
+            val jobId = entry.arguments?.getString("jobId").orEmpty()
+            ResultScreen(
+                jobId = jobId,
+                repository = repository,
+                windowSizeClass = windowSizeClass,
+                onTryAnotherPrompt = { uri ->
+                    nav.previousBackStackEntry?.savedStateHandle?.set("capturedUri", uri)
+                    nav.popBackStack(Routes.HOME, inclusive = false)
+                },
+                onBack = { nav.popBackStack(Routes.HOME, inclusive = false) },
+            )
+        }
+    }
+}
