@@ -1,30 +1,53 @@
-# ---- Retrofit ----
-# Retrofit inspects service interfaces and their generic return types via reflection.
--keep,allowobfuscation,allowshrinking interface retrofit2.Call
--keep,allowobfuscation,allowshrinking class retrofit2.Response
--keep,allowobfuscation,allowshrinking interface * extends retrofit2.Call
--keepattributes Signature, InnerClasses, EnclosingMethod
--keepattributes *Annotation*
--keep,allowobfuscation interface dev.zun.flux.data.api.** { *; }
+# ---- Retrofit (R8 full mode) ------------------------------------------------
+# Retrofit 2.7+ ships consumer-rules.pro, but R8 full mode still needs these
+# to preserve generic return types and suspend continuations.
+-keepattributes Signature, InnerClasses, EnclosingMethod, Exceptions
+-keepattributes RuntimeVisibleAnnotations, RuntimeVisibleParameterAnnotations, AnnotationDefault
 
-# ---- OkHttp / Okio ----
+-keep,allowobfuscation,allowshrinking class kotlin.coroutines.Continuation
+
+# R8 full mode strips generic signatures from return types if not kept.
+-if interface * { @retrofit2.http.* public *** *(...); }
+-keep,allowoptimization,allowshrinking,allowobfuscation class <3>
+
+# Service method parameters must be retained.
+-keepclassmembers,allowshrinking,allowobfuscation interface * {
+    @retrofit2.http.* <methods>;
+}
+
+-dontwarn javax.annotation.**
+-dontwarn retrofit2.KotlinExtensions
+-dontwarn retrofit2.KotlinExtensions$*
 -dontwarn okhttp3.**
 -dontwarn okio.**
 -dontwarn org.conscrypt.**
 
-# ---- kotlinx.serialization ----
-# The plugin generates $$serializer singletons that are referenced only reflectively.
--keepattributes RuntimeVisibleAnnotations, AnnotationDefault
--keep,includedescriptorclasses class dev.zun.flux.data.api.**$$serializer { *; }
--keepclassmembers class dev.zun.flux.data.api.** {
-    *** Companion;
+# ---- kotlinx.serialization (canonical rules from the upstream README) -------
+# Keep `Companion` object fields of serializable classes.
+-if @kotlinx.serialization.Serializable class **
+-keepclassmembers class <1> {
+    static <1>$Companion Companion;
 }
--keepclasseswithmembers class dev.zun.flux.data.api.** {
+
+# Keep `serializer()` on companion objects of serializable classes.
+-if @kotlinx.serialization.Serializable class ** {
+    static **$* *;
+}
+-keepclassmembers class <2>$<3> {
     kotlinx.serialization.KSerializer serializer(...);
 }
 
-# ---- Coil ----
+# Keep `INSTANCE.serializer()` of serializable objects.
+-if @kotlinx.serialization.Serializable class ** {
+    public static ** INSTANCE;
+}
+-keepclassmembers class <1> {
+    public static <1> INSTANCE;
+    kotlinx.serialization.KSerializer serializer(...);
+}
+
+# ---- Coil -------------------------------------------------------------------
 -dontwarn coil.**
 
-# ---- Kotlin metadata (required for Retrofit suspend functions) ----
+# ---- Kotlin metadata --------------------------------------------------------
 -keep class kotlin.Metadata { *; }
