@@ -195,7 +195,7 @@ fun PhotoViewerScreen(
                     }
                 }
             }
-            
+
             // "Zoom Mode" Indicator
             if (isZoomMode) {
                 Surface(
@@ -203,13 +203,13 @@ fun PhotoViewerScreen(
                         .align(Alignment.TopCenter)
                         .padding(top = 16.dp),
                     color = Color.Black.copy(alpha = 0.5f),
-                    shape = RoundedCornerShape(16.dp)
+                    shape = RoundedCornerShape(16.dp),
                 ) {
                     Text(
                         text = "Zoom Mode (Double tap to exit)",
                         color = Color.White,
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        style = MaterialTheme.typography.labelMedium
+                        style = MaterialTheme.typography.labelMedium,
                     )
                 }
             }

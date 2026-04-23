@@ -7,7 +7,7 @@ import okio.buffer
 
 class ProgressRequestBody(
     private val delegate: RequestBody,
-    private val onProgress: (Float) -> Unit
+    private val onProgress: (Float) -> Unit,
 ) : RequestBody() {
 
     override fun contentType(): MediaType? = delegate.contentType()

@@ -18,7 +18,7 @@ fun prepareImageForUpload(
     context: Context,
     uri: Uri,
     maxDimension: Int = 2048,
-    quality: Int = 90
+    quality: Int = 90,
 ): File {
     val inputStream = context.contentResolver.openInputStream(uri) ?: error("Failed to open input stream")
     val originalBytes = inputStream.use { it.readBytes() }
@@ -26,7 +26,7 @@ fun prepareImageForUpload(
     // 1. Get original dimensions and rotation
     val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     BitmapFactory.decodeByteArray(originalBytes, 0, originalBytes.size, options)
-    
+
     val exif = ExifInterface(originalBytes.inputStream())
     val rotation = getRotationDegrees(exif)
 
@@ -34,7 +34,7 @@ fun prepareImageForUpload(
     val w = options.outWidth
     val h = options.outHeight
     val longestSide = max(w, h)
-    
+
     val scale = if (longestSide > maxDimension) {
         maxDimension.toFloat() / longestSide
     } else {
@@ -67,17 +67,15 @@ fun prepareImageForUpload(
         bitmap.compress(Bitmap.CompressFormat.JPEG, quality, out)
     }
     bitmap.recycle()
-    
+
     return outputFile
 }
 
-private fun getRotationDegrees(exif: ExifInterface): Int {
-    return when (exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)) {
-        ExifInterface.ORIENTATION_ROTATE_90 -> 90
-        ExifInterface.ORIENTATION_ROTATE_180 -> 180
-        ExifInterface.ORIENTATION_ROTATE_270 -> 270
-        else -> 0
-    }
+private fun getRotationDegrees(exif: ExifInterface): Int = when (exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)) {
+    ExifInterface.ORIENTATION_ROTATE_90 -> 90
+    ExifInterface.ORIENTATION_ROTATE_180 -> 180
+    ExifInterface.ORIENTATION_ROTATE_270 -> 270
+    else -> 0
 }
 
 private fun calculateInSampleSize(options: BitmapFactory.Options, reqWidth: Int, reqHeight: Int): Int {
