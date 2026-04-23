@@ -39,6 +39,12 @@ enter them on the in-app **Setup** screen — they are persisted in
 ./gradlew spotlessApply
 ```
 
+**Automate Formatting (Git Hooks)**
+To automatically run Spotless before every commit, run:
+```bash
+./scripts/setup-hooks.sh
+```
+
 ---
 
 ## 🛠 Features
