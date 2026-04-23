@@ -14,7 +14,7 @@
 ## Table of contents
 
 1. [Overview and scope](#overview-and-scope)
-2. [Current Status](#current-status-v100-stable)
+2. [Current Status](#current-status-v20-stable)
 3. [Architecture](#architecture)
 4. [Tech stack](#tech-stack)
 5. [Security model](#security-model)
@@ -42,8 +42,8 @@ Samsung Galaxy Z Fold 7 running a modern Android version (Android 14+). Must wor
 
 ---
 
-## Current Status: v1.0.0-stable
-The app is **fully feature-complete and stable**. It is integrated with the real Rust server, features an immersive photo viewer with "Zoom Mode," upload progress tracking, and secure biometric settings.
+## Current Status: v2.0-stable
+The app is **fully feature-complete and stable**. It is hardened with a Room database for persistent history, WorkManager for background polling, and exponential backoff retry logic. It is integrated with the real Rust server and features immersive photo viewing with "Zoom Mode."
 
 ---
 
@@ -218,7 +218,7 @@ App metadata and security timer configuration.
 
 ### Milestone 1–8: v1 Foundations (Complete ✅)
 ### Milestone 9: Real Server Integration (Complete ✅)
-### Milestone 10: v2 UX & Security (Complete ✅)
+### Milestone 10: v2 Performance & Resilience (Complete ✅)
 
 ---
 
