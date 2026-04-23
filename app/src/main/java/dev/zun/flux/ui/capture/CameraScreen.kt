@@ -43,7 +43,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -92,6 +94,7 @@ private fun CameraContent(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val haptic = LocalHapticFeedback.current
     var lensFacing by remember { mutableIntStateOf(CameraSelector.LENS_FACING_BACK) }
     val imageCapture = remember { ImageCapture.Builder().build() }
     val preview = remember { Preview.Builder().build() }
@@ -167,6 +170,7 @@ private fun CameraContent(
             IconButton(
                 onClick = {
                     if (isCapturing) return@IconButton
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     isCapturing = true
                     val file = File(context.cacheDir, "capture_${System.currentTimeMillis()}.jpg")
                     val outputOptions = ImageCapture.OutputFileOptions.Builder(file).build()
@@ -219,16 +223,15 @@ private fun CameraContent(
     }
 }
 
-private suspend fun Context.getCameraProvider(): ProcessCameraProvider =
-    suspendCancellableCoroutine { continuation ->
-        val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
-        cameraProviderFuture.addListener(
-            {
-                continuation.resume(cameraProviderFuture.get())
-            },
-            ContextCompat.getMainExecutor(this),
-        )
-        continuation.invokeOnCancellation {
-            cameraProviderFuture.cancel(true)
-        }
+private suspend fun Context.getCameraProvider(): ProcessCameraProvider = suspendCancellableCoroutine { continuation ->
+    val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
+    cameraProviderFuture.addListener(
+        {
+            continuation.resume(cameraProviderFuture.get())
+        },
+        ContextCompat.getMainExecutor(this),
+    )
+    continuation.invokeOnCancellation {
+        cameraProviderFuture.cancel(true)
     }
+}

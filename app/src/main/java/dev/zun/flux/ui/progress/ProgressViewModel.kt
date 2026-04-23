@@ -36,19 +36,31 @@ class ProgressViewModel(
         pollJob = viewModelScope.launch { pollLoop(jobId) }
     }
 
+    fun retry(jobId: String) {
+        pollJob?.cancel()
+        _state.value = PollState.Starting
+        pollJob = viewModelScope.launch { pollLoop(jobId) }
+    }
+
     private suspend fun CoroutineScope.pollLoop(jobId: String) {
+        var errorCount = 0
         while (isActive) {
             try {
                 val dto = repository.getJob(jobId)
+                errorCount = 0
                 _state.value =
                     when (dto.status) {
                         "done" -> PollState.Done(dto)
                         "failed" -> PollState.Failed(dto.error ?: "Job failed")
                         else -> PollState.Running(dto)
                     }
-                if (dto.status == "done" || dto.status == "failed") return
-            } catch (_: Throwable) {
-                // Swallow transient errors; next tick retries.
+                if ((dto.status == "done") || (dto.status == "failed")) return
+            } catch (t: Throwable) {
+                errorCount++
+                if (errorCount > 5) {
+                    _state.value = PollState.Failed("Connection lost: ${t.message}")
+                    return
+                }
             }
             delay(3_000)
         }

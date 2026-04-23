@@ -37,6 +37,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -65,11 +67,15 @@ fun ProgressScreen(
         )
     val state by viewModel.state.collectAsStateWithLifecycle()
     val inputModel = remember(jobId) { repository.inputModel(jobId) }
+    val haptic = LocalHapticFeedback.current
 
     LaunchedEffect(jobId) { viewModel.start(jobId) }
 
     LaunchedEffect(state) {
-        if (state is PollState.Done) onDone()
+        if (state is PollState.Done) {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            onDone()
+        }
     }
 
     Scaffold(
@@ -139,7 +145,7 @@ fun ProgressScreen(
                         is PollState.Done -> Text("Done", style = MaterialTheme.typography.titleMedium)
                         is PollState.Failed -> {
                             Text("Failed: ${s.message}", color = MaterialTheme.colorScheme.error)
-                            Button(onClick = { /* Milestone 8 retry logic placeholder */ }) {
+                            Button(onClick = { viewModel.retry(jobId) }) {
                                 Text("Retry")
                             }
                         }
