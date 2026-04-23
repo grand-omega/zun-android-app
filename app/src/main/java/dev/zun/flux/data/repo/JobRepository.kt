@@ -4,6 +4,8 @@ import android.net.Uri
 import dev.zun.flux.data.api.HealthResponse
 import dev.zun.flux.data.api.JobCreatedResponse
 import dev.zun.flux.data.api.JobStatusDto
+import dev.zun.flux.data.api.JobSummaryDto
+import kotlinx.coroutines.flow.Flow
 
 /**
  * Single seam between the UI and the backend. UI layers depend on this
@@ -15,7 +17,7 @@ interface JobRepository {
     suspend fun listPrompts(): List<dev.zun.flux.data.api.PromptDto>
 
     suspend fun submitJob(
-        inputUri: android.net.Uri,
+        inputUri: Uri,
         promptId: String,
         onUploadProgress: ((Float) -> Unit)? = null,
     ): JobCreatedResponse
@@ -30,9 +32,16 @@ interface JobRepository {
         status: String = "done",
         limit: Int = 30,
         before: Long? = null,
-    ): List<dev.zun.flux.data.api.JobSummaryDto>
+    ): List<JobSummaryDto>
 
     suspend fun deleteJob(jobId: String)
+
+    /** Local database flows */
+    fun getJobsFlow(): Flow<List<JobSummaryDto>>
+
+    fun getJobFlow(jobId: String): Flow<JobStatusDto?>
+
+    suspend fun syncHistory()
 
     /** Anything Coil can load. */
     fun inputModel(jobId: String): Any?

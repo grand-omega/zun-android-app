@@ -38,7 +38,9 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.work.WorkManager
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -57,12 +59,18 @@ fun ProgressScreen(
     onDone: () -> Unit,
     onBack: () -> Unit,
 ) {
+    val context = LocalContext.current
     val viewModel: ProgressViewModel =
         viewModel(
             key = jobId,
             factory =
             viewModelFactory {
-                initializer { ProgressViewModel(repository) }
+                initializer {
+                    ProgressViewModel(
+                        repository = repository,
+                        workManager = WorkManager.getInstance(context),
+                    )
+                }
             },
         )
     val state by viewModel.state.collectAsStateWithLifecycle()

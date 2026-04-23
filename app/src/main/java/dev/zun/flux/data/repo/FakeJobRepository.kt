@@ -7,6 +7,9 @@ import dev.zun.flux.data.api.JobStatusDto
 import dev.zun.flux.data.api.JobSummaryDto
 import dev.zun.flux.data.api.PromptDto
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
@@ -27,6 +30,7 @@ class FakeJobRepository(
     )
 
     private val entries = ConcurrentHashMap<String, Entry>()
+    private val updates = MutableStateFlow(0)
 
     override suspend fun health(): HealthResponse {
         delay(300)
@@ -69,6 +73,7 @@ class FakeJobRepository(
             }
         // Save createdAt in SECONDS
         entries[id] = Entry(id, inputUri, promptId, label, System.currentTimeMillis() / 1000)
+        updates.value++
         return JobCreatedResponse(job_id = id)
     }
 
@@ -136,6 +141,25 @@ class FakeJobRepository(
     override suspend fun deleteJob(jobId: String) {
         delay(300)
         entries.remove(jobId)
+        updates.value++
+    }
+
+    override fun getJobsFlow(): Flow<List<JobSummaryDto>> =
+        updates.map {
+            listJobs(status = "done", limit = 100, before = null)
+        }
+
+    override fun getJobFlow(jobId: String): Flow<JobStatusDto?> =
+        updates.map {
+            try {
+                getJob(jobId)
+            } catch (_: Exception) {
+                null
+            }
+        }
+
+    override suspend fun syncHistory() {
+        // No-op for fake
     }
 
     override fun inputModel(jobId: String): Any? = entries[jobId]?.inputUri

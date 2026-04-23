@@ -5,15 +5,18 @@ import androidx.lifecycle.viewModelScope
 import dev.zun.flux.data.api.JobSummaryDto
 import dev.zun.flux.data.repo.JobRepository
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class GalleryViewModel(
     private val repository: JobRepository,
 ) : ViewModel() {
-    private val _jobs = MutableStateFlow<List<JobSummaryDto>>(emptyList())
-    val jobs: StateFlow<List<JobSummaryDto>> = _jobs.asStateFlow()
+    val jobs: StateFlow<List<JobSummaryDto>> =
+        repository.getJobsFlow()
+            .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -25,12 +28,7 @@ class GalleryViewModel(
     fun refresh() {
         viewModelScope.launch {
             _isLoading.value = true
-            _jobs.value =
-                try {
-                    repository.listJobs(status = "done", limit = 100)
-                } catch (_: Throwable) {
-                    emptyList()
-                }
+            repository.syncHistory()
             _isLoading.value = false
         }
     }
@@ -39,9 +37,8 @@ class GalleryViewModel(
         viewModelScope.launch {
             try {
                 repository.deleteJob(jobId)
-                _jobs.value = _jobs.value.filter { it.id != jobId }
             } catch (_: Throwable) {
-                // Handle error
+                // Error handling handled by UI if needed
             }
         }
     }

@@ -25,6 +25,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -62,37 +63,47 @@ fun GalleryScreen(
             )
         },
     ) { inner ->
-        if (isLoading && jobs.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
-        } else {
-            val groupedJobs =
-                remember(jobs) {
-                    jobs.groupBy { formatTimestamp(it.created_at) }
-                }
-
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 110.dp),
-                contentPadding = PaddingValues(16.dp),
-                modifier = Modifier.padding(inner),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                groupedJobs.forEach { (date, items) ->
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        Text(
-                            text = date,
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.padding(vertical = 8.dp),
-                        )
+        PullToRefreshBox(
+            isRefreshing = isLoading,
+            onRefresh = { viewModel.refresh() },
+            modifier = Modifier.padding(inner),
+        ) {
+            if (jobs.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    if (isLoading) {
+                        CircularProgressIndicator()
+                    } else {
+                        Text("No generations yet")
                     }
-                    items(items) { job ->
-                        JobThumbnail(
-                            job = job,
-                            model = repository.thumbModel(job.id),
-                            onClick = { onJobClick(job.id) },
-                        )
+                }
+            } else {
+                val groupedJobs =
+                    remember(jobs) {
+                        jobs.groupBy { formatTimestamp(it.created_at) }
+                    }
+
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(minSize = 110.dp),
+                    contentPadding = PaddingValues(16.dp),
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    groupedJobs.forEach { (date, items) ->
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            Text(
+                                text = date,
+                                style = MaterialTheme.typography.titleMedium,
+                                modifier = Modifier.padding(vertical = 8.dp),
+                            )
+                        }
+                        items(items) { job ->
+                            JobThumbnail(
+                                job = job,
+                                model = repository.thumbModel(job.id),
+                                onClick = { onJobClick(job.id) },
+                            )
+                        }
                     }
                 }
             }
