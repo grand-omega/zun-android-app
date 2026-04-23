@@ -12,12 +12,25 @@ import dev.zun.flux.data.api.JobStatusDto
 interface JobRepository {
     suspend fun health(): HealthResponse
 
+    suspend fun listPrompts(): List<dev.zun.flux.data.api.PromptDto>
+
     suspend fun submitJob(
         inputUri: Uri,
         promptId: String,
     ): JobCreatedResponse
 
     suspend fun getJob(jobId: String): JobStatusDto
+
+    suspend fun listJobs(
+        status: String = "done",
+        limit: Int = 30,
+        before: Long? = null,
+    ): List<dev.zun.flux.data.api.JobSummaryDto>
+
+    suspend fun deleteJob(jobId: String)
+
+    /** Anything Coil can load. */
+    fun inputModel(jobId: String): Any?
 
     /** Anything Coil can load. Fake echoes the input URI; real returns an HTTP URL. */
     fun resultModel(jobId: String): Any?

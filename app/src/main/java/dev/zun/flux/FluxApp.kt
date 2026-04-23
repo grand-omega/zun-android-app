@@ -5,12 +5,15 @@ import coil.Coil
 import coil.ImageLoader
 import dev.zun.flux.data.repo.FakeJobRepository
 import dev.zun.flux.data.repo.JobRepository
+import dev.zun.flux.ui.auth.AuthStateHolder
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
 
 class FluxApp : Application() {
     lateinit var repository: JobRepository
         private set
+
+    val authStateHolder = AuthStateHolder()
 
     override fun onCreate() {
         super.onCreate()

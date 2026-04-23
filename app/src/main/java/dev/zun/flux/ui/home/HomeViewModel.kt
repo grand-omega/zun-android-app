@@ -3,6 +3,7 @@ package dev.zun.flux.ui.home
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.zun.flux.data.api.PromptDto
 import dev.zun.flux.data.repo.JobRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,6 +25,24 @@ class HomeViewModel(
 ) : ViewModel() {
     private val _state = MutableStateFlow<SubmitState>(SubmitState.Idle)
     val state: StateFlow<SubmitState> = _state.asStateFlow()
+
+    private val _prompts = MutableStateFlow<List<PromptDto>>(emptyList())
+    val prompts: StateFlow<List<PromptDto>> = _prompts.asStateFlow()
+
+    init {
+        fetchPrompts()
+    }
+
+    private fun fetchPrompts() {
+        viewModelScope.launch {
+            _prompts.value =
+                try {
+                    repository.listPrompts()
+                } catch (t: Throwable) {
+                    emptyList()
+                }
+        }
+    }
 
     fun submit(
         inputUri: Uri,
