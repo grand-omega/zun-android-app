@@ -132,5 +132,7 @@ class FakeJobRepository(
 
     override fun inputModel(jobId: String): Any? = entries[jobId]?.inputUri
 
+    override fun thumbModel(jobId: String): Any? = entries[jobId]?.inputUri
+
     override fun resultModel(jobId: String): Any? = entries[jobId]?.inputUri
 }

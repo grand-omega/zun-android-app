@@ -3,10 +3,15 @@ package dev.zun.flux
 import android.app.Application
 import coil.Coil
 import coil.ImageLoader
-import dev.zun.flux.data.repo.FakeJobRepository
+import dev.zun.flux.data.api.FluxApi
 import dev.zun.flux.data.repo.JobRepository
+import dev.zun.flux.data.repo.RealJobRepository
 import dev.zun.flux.ui.auth.AuthStateHolder
+import kotlinx.serialization.json.Json
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
+import retrofit2.Retrofit
+import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import java.util.concurrent.TimeUnit
 
 class FluxApp : Application() {
@@ -33,6 +38,21 @@ class FluxApp : Application() {
                     )
                 }.build()
 
+        val json = Json {
+            ignoreUnknownKeys = true
+            coerceInputValues = true
+        }
+
+        val retrofit =
+            Retrofit
+                .Builder()
+                .baseUrl(BuildConfig.SERVER_URL)
+                .client(okHttp)
+                .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
+                .build()
+
+        val api = retrofit.create(FluxApi::class.java)
+
         Coil.setImageLoader(
             ImageLoader
                 .Builder(this)
@@ -40,7 +60,7 @@ class FluxApp : Application() {
                 .build(),
         )
 
-        // Milestone 1: fake repo. Swap to RealJobRepository(okHttp) when server is up.
-        repository = FakeJobRepository()
+        // Swapped to RealJobRepository for Milestone 9
+        repository = RealJobRepository(this, api)
     }
 }

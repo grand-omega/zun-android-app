@@ -101,7 +101,7 @@ fun GalleryScreen(
                     items(items) { job ->
                         JobThumbnail(
                             job = job,
-                            model = repository.resultModel(job.id),
+                            model = repository.thumbModel(job.id),
                             onClick = { onJobClick(job.id) },
                         )
                     }
@@ -135,7 +135,7 @@ private fun JobThumbnail(
             )
             // Optional: add prompt label overlay
             Text(
-                text = job.prompt_label,
+                text = job.prompt_label ?: job.prompt_id,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.align(Alignment.BottomStart).padding(4.dp),

@@ -162,7 +162,7 @@ fun ProgressScreen(
                             modifier = Modifier.padding(16.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            MetadataRow("Prompt", dto.prompt_label)
+                            MetadataRow("Prompt", dto.prompt_label ?: dto.prompt_id)
                             MetadataRow("Job ID", dto.id, isMonospace = true)
                         }
                     }

@@ -24,7 +24,7 @@ data class JobStatusDto(
     val id: String,
     val status: String,
     val prompt_id: String,
-    val prompt_label: String,
+    val prompt_label: String? = null,
     val progress: Float? = null,
     val error: String? = null,
     val created_at: Long,
@@ -35,7 +35,7 @@ data class JobStatusDto(
 data class JobSummaryDto(
     val id: String,
     val prompt_id: String,
-    val prompt_label: String,
+    val prompt_label: String? = null,
     val created_at: Long,
     val duration_seconds: Int? = null,
 )
