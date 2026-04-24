@@ -19,6 +19,7 @@ sealed interface PollState {
     data class Running(val dto: JobStatusDto) : PollState
     data class Done(val dto: JobStatusDto) : PollState
     data class Failed(val message: String) : PollState
+    data object Cancelled : PollState
 }
 
 class ProgressViewModel(
@@ -47,6 +48,7 @@ class ProgressViewModel(
                     _state.value = when (job.status) {
                         "done" -> PollState.Done(job)
                         "failed" -> PollState.Failed(job.error ?: "Job failed")
+                        "cancelled" -> PollState.Cancelled
                         else -> PollState.Running(job)
                     }
                 }
@@ -59,11 +61,12 @@ class ProgressViewModel(
     }
 
     fun cancelJob(jobId: String) {
-        workManager.cancelAllWorkByTag(jobId) // We didn't tag it yet, but can add it
+        workManager.cancelAllWorkByTag(jobId)
         viewModelScope.launch {
             try {
-                repository.deleteJob(jobId)
+                repository.cancelJob(jobId)
             } catch (_: Throwable) {
+                // 404 means the job already finished — fine to ignore.
             }
         }
     }

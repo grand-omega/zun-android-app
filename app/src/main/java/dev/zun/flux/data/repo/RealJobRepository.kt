@@ -50,6 +50,19 @@ class RealJobRepository(
         return fetched
     }
 
+    override suspend fun createPrompt(label: String, text: String, workflow: String): PromptDto {
+        val created = api.createPrompt(
+            PromptDto(id = 0L, label = label, text = text, workflow = workflow),
+        )
+        runCatching { listPrompts() }
+        return created
+    }
+
+    override suspend fun deletePrompt(promptId: Long) {
+        api.deletePrompt(promptId)
+        runCatching { listPrompts() }
+    }
+
     override suspend fun submitJob(
         inputUri: Uri,
         promptId: Long?,
@@ -160,8 +173,14 @@ class RealJobRepository(
         runCatching { getJob(jobId) }
     }
 
+    override suspend fun cancelJob(jobId: String) {
+        api.cancelJob(jobId)
+        // Sync the new status into Room so any open Progress screen flips to Cancelled.
+        runCatching { getJob(jobId) }
+    }
+
     override fun getJobsFlow(): Flow<List<JobSummaryDto>> = dao.getAllJobs().map { entities ->
-        entities.map { it.toSummaryDto() }
+        entities.filter { it.status == "done" }.map { it.toSummaryDto() }
     }
 
     override fun getJobFlow(jobId: String): Flow<JobStatusDto?> = dao.getJobByIdFlow(jobId).map { it?.toStatusDto() }
@@ -184,6 +203,8 @@ class RealJobRepository(
     override fun inputModel(inputId: Int?): Any? = inputId?.let { "${settingsManager.serverUrl}/api/v1/inputs/$it/file" }
 
     override fun thumbModel(jobId: String): Any = "${settingsManager.serverUrl}/api/v1/jobs/$jobId/thumb"
+
+    override fun previewModel(jobId: String): Any = "${settingsManager.serverUrl}/api/v1/jobs/$jobId/preview"
 
     override fun resultModel(jobId: String): Any = "${settingsManager.serverUrl}/api/v1/jobs/$jobId/result"
 

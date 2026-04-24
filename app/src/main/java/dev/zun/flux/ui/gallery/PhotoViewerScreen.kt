@@ -128,10 +128,11 @@ fun PhotoViewerScreen(
                 userScrollEnabled = !isZoomMode,
             ) { page ->
                 val job = jobs.getOrNull(page) ?: return@HorizontalPager
-                val model = repository.resultModel(job.id)
+                val previewModel = repository.previewModel(job.id)
+                val fullResModel = repository.resultModel(job.id)
 
                 ZoomableImage(
-                    model = model,
+                    model = previewModel,
                     isZoomMode = isZoomMode,
                     onClick = { if (!isZoomMode) showUI = !showUI },
                     onLongClick = { if (!isZoomMode) showContextMenu = true },
@@ -157,8 +158,8 @@ fun PhotoViewerScreen(
                             showContextMenu = false
                             scope.launch {
                                 try {
-                                    val m = model ?: return@launch
-                                    saveToPictures(context, m, "flux-${job.id}.jpg")
+                                    val src = fullResModel ?: return@launch
+                                    saveToPictures(context, src, "flux-${job.id}.jpg")
                                     Toast.makeText(context, "Saved to Gallery", Toast.LENGTH_SHORT).show()
                                 } catch (e: Exception) {
                                     Toast.makeText(context, "Save failed: ${e.message}", Toast.LENGTH_SHORT).show()

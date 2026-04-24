@@ -8,7 +8,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
-import androidx.core.net.toUri
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -108,15 +107,7 @@ fun AppNavHost(
                 jobId = jobId,
                 repository = repository,
                 windowSizeClass = windowSizeClass,
-                onTryAnotherPrompt = { source ->
-                    val uri = when (source) {
-                        is android.net.Uri -> source
-                        is String -> source.toUri()
-                        else -> null
-                    }
-                    nav.previousBackStackEntry?.savedStateHandle?.set("capturedUri", uri)
-                    nav.popBackStack(Routes.HOME, inclusive = false)
-                },
+                onTryAnotherPrompt = { nav.popBackStack(Routes.HOME, inclusive = false) },
                 onBack = { nav.popBackStack(Routes.HOME, inclusive = false) },
             )
         }

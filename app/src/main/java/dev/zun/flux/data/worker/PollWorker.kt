@@ -18,7 +18,7 @@ class PollWorker(
         while (true) {
             try {
                 val job = repository.getJob(jobId)
-                if (job.status == "done" || job.status == "failed") {
+                if (job.status == "done" || job.status == "failed" || job.status == "cancelled") {
                     return Result.success()
                 }
             } catch (_: Exception) {
