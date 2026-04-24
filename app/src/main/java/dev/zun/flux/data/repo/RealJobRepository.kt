@@ -5,8 +5,11 @@ import android.net.Uri
 import dev.zun.flux.data.api.FluxApi
 import dev.zun.flux.data.api.HealthResponse
 import dev.zun.flux.data.api.JobCreatedResponse
+import dev.zun.flux.data.api.JobListResponse
 import dev.zun.flux.data.api.JobStatusDto
+import dev.zun.flux.data.api.JobSubmitRequest
 import dev.zun.flux.data.api.JobSummaryDto
+import dev.zun.flux.data.api.NeedUploadResponse
 import dev.zun.flux.data.api.ProgressRequestBody
 import dev.zun.flux.data.api.PromptDto
 import dev.zun.flux.data.local.AppDatabase
@@ -14,9 +17,14 @@ import dev.zun.flux.data.local.toEntity
 import dev.zun.flux.data.local.toStatusDto
 import dev.zun.flux.data.local.toSummaryDto
 import dev.zun.flux.util.prepareImageForUpload
+import dev.zun.flux.util.sha256Hex
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
@@ -29,48 +37,92 @@ class RealJobRepository(
     private val settingsManager: SettingsManager,
 ) : JobRepository {
     private val dao = AppDatabase.getDatabase(context).jobDao()
+    private val json = Json { ignoreUnknownKeys = true }
+
+    private val _promptsState = MutableStateFlow<List<PromptDto>>(emptyList())
+    override val promptsState: StateFlow<List<PromptDto>> = _promptsState.asStateFlow()
 
     override suspend fun health(): HealthResponse = api.health()
 
-    override suspend fun listPrompts(): List<PromptDto> = api.listPrompts()
+    override suspend fun listPrompts(): List<PromptDto> {
+        val fetched = api.listPrompts().items
+        _promptsState.value = fetched
+        return fetched
+    }
 
     override suspend fun submitJob(
         inputUri: Uri,
-        promptId: String,
-        customPrompt: String?,
+        promptId: Long?,
+        promptText: String?,
+        workflow: String?,
         onUploadProgress: ((Float) -> Unit)?,
     ): JobCreatedResponse {
+        require((promptId == null) xor (promptText == null)) {
+            "Exactly one of promptId / promptText must be set"
+        }
+        require(promptText == null || !workflow.isNullOrBlank()) {
+            "workflow is required when promptText is set"
+        }
+
         val file = prepareImageForUpload(context, inputUri)
-        val rawBody = file.asRequestBody("image/jpeg".toMediaType())
-        val finalBody =
-            if (onUploadProgress != null) {
-                ProgressRequestBody(rawBody, onUploadProgress)
-            } else {
-                rawBody
-            }
-
-        val imagePart =
-            MultipartBody.Part.createFormData(
-                "image",
-                file.name,
-                finalBody,
-            )
-        val promptPart = promptId.toRequestBody("text/plain".toMediaType())
-        val customPromptPart = customPrompt?.toRequestBody("text/plain".toMediaType())
-
-        var attempt = 0
-        val maxAttempts = 3
-        var lastError: Exception? = null
-
         try {
+            val sha = sha256Hex(file)
+            val inputName = file.name
+
+            var attempt = 0
+            val maxAttempts = 3
+            var lastError: Exception? = null
+
             while (attempt < maxAttempts) {
                 try {
-                    return api.submitJob(imagePart, promptPart, customPromptPart)
+                    // Step 1 — cheap JSON probe.
+                    val jsonResp = api.submitJobJson(
+                        JobSubmitRequest(
+                            input_sha256 = sha,
+                            input_name = inputName,
+                            prompt_id = promptId,
+                            prompt_text = promptText,
+                            workflow = workflow,
+                        ),
+                    )
+                    if (jsonResp.isSuccessful) {
+                        val body = jsonResp.body() ?: throw IOException("Empty submit response")
+                        onUploadProgress?.invoke(1f)
+                        return body
+                    }
+                    if (jsonResp.code() != 409) {
+                        throw IOException("Submit failed: HTTP ${jsonResp.code()}")
+                    }
+                    // 409 → server wants the bytes. Fall through to multipart.
+                    val errText = jsonResp.errorBody()?.string().orEmpty()
+                    val needUpload = runCatching {
+                        json.decodeFromString(NeedUploadResponse.serializer(), errText)
+                    }.getOrNull()
+                    if (needUpload?.need_upload != true && needUpload?.code != "need_upload") {
+                        throw IOException("Unexpected 409 body: $errText")
+                    }
+
+                    // Step 2 — multipart with bytes.
+                    val rawBody = file.asRequestBody("image/jpeg".toMediaType())
+                    val finalBody = if (onUploadProgress != null) {
+                        ProgressRequestBody(rawBody, onUploadProgress)
+                    } else {
+                        rawBody
+                    }
+                    val imagePart = MultipartBody.Part.createFormData("image", inputName, finalBody)
+                    return api.submitJobMultipart(
+                        image = imagePart,
+                        sha256 = sha.toRequestBody(TEXT_PLAIN),
+                        inputName = inputName.toRequestBody(TEXT_PLAIN),
+                        promptId = promptId?.toString()?.toRequestBody(TEXT_PLAIN),
+                        promptText = promptText?.toRequestBody(TEXT_PLAIN),
+                        workflow = workflow?.toRequestBody(TEXT_PLAIN),
+                    )
                 } catch (e: IOException) {
                     attempt++
                     lastError = e
                     if (attempt < maxAttempts) {
-                        delay(1000L * (1 shl (attempt - 1))) // 1s, 2s, 4s...
+                        delay(1000L * (1 shl (attempt - 1))) // 1s, 2s, 4s
                     }
                 }
             }
@@ -87,18 +139,25 @@ class RealJobRepository(
     }
 
     override suspend fun listJobs(
-        status: String,
+        status: String?,
         limit: Int,
-        before: Long?,
-    ): List<JobSummaryDto> {
-        val jobs = api.listJobs(status, limit, before)
-        dao.insertJobs(jobs.map { it.toEntity() })
-        return jobs
+        cursor: String?,
+        inputId: Int?,
+    ): JobListResponse {
+        val resp = api.listJobs(status, limit, cursor, inputId)
+        dao.insertJobs(resp.items.map { it.toEntity() })
+        return resp
     }
 
     override suspend fun deleteJob(jobId: String) {
         api.deleteJob(jobId)
         dao.deleteJobById(jobId)
+    }
+
+    override suspend fun restoreJob(jobId: String) {
+        api.restoreJob(jobId)
+        // Repopulate local copy from server.
+        runCatching { getJob(jobId) }
     }
 
     override fun getJobsFlow(): Flow<List<JobSummaryDto>> = dao.getAllJobs().map { entities ->
@@ -109,16 +168,26 @@ class RealJobRepository(
 
     override suspend fun syncHistory() {
         try {
-            val remoteJobs = api.listJobs(status = "done", limit = 100)
-            dao.insertJobs(remoteJobs.map { it.toEntity() })
+            val resp = api.listJobs(status = "done", limit = 100)
+            dao.insertJobs(resp.items.map { it.toEntity() })
         } catch (_: Exception) {
             // Ignore background sync errors
         }
+        // Opportunistically refresh prompt cache so label lookup works in the gallery.
+        try {
+            _promptsState.value = api.listPrompts().items
+        } catch (_: Exception) {
+            // Ignore
+        }
     }
 
-    override fun inputModel(jobId: String): Any = "${settingsManager.serverUrl}/api/jobs/$jobId/input"
+    override fun inputModel(inputId: Int?): Any? = inputId?.let { "${settingsManager.serverUrl}/api/v1/inputs/$it/file" }
 
-    override fun thumbModel(jobId: String): Any = "${settingsManager.serverUrl}/api/jobs/$jobId/thumb"
+    override fun thumbModel(jobId: String): Any = "${settingsManager.serverUrl}/api/v1/jobs/$jobId/thumb"
 
-    override fun resultModel(jobId: String): Any = "${settingsManager.serverUrl}/api/jobs/$jobId/result"
+    override fun resultModel(jobId: String): Any = "${settingsManager.serverUrl}/api/v1/jobs/$jobId/result"
+
+    private companion object {
+        val TEXT_PLAIN = "text/plain".toMediaType()
+    }
 }

@@ -55,7 +55,9 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.zun.flux.data.api.JobSummaryDto
+import dev.zun.flux.data.api.PromptDto
 import dev.zun.flux.data.repo.JobRepository
+import dev.zun.flux.util.resolvePromptLabel
 import dev.zun.flux.util.saveToPictures
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -70,6 +72,7 @@ fun PhotoViewerScreen(
     onBack: () -> Unit,
 ) {
     val jobs by viewModel.jobs.collectAsState()
+    val prompts by viewModel.prompts.collectAsState()
     val initialIndex =
         remember(initialJobId, jobs) {
             jobs.indexOfFirst { it.id == initialJobId }.coerceAtLeast(0)
@@ -190,6 +193,7 @@ fun PhotoViewerScreen(
                     if (currentJob != null) {
                         JobDetailsSheet(
                             job = currentJob,
+                            prompts = prompts,
                             onClose = { showDetails = false },
                         )
                     }
@@ -282,6 +286,7 @@ private fun ZoomableImage(
 @Composable
 private fun JobDetailsSheet(
     job: JobSummaryDto,
+    prompts: List<PromptDto>,
     onClose: () -> Unit,
 ) {
     Surface(
@@ -309,7 +314,7 @@ private fun JobDetailsSheet(
             )
 
             Text(
-                text = job.prompt_label ?: job.prompt_id,
+                text = resolvePromptLabel(prompts, job.prompt_id, job.prompt_text),
                 style = MaterialTheme.typography.headlineSmall,
             )
 

@@ -8,6 +8,7 @@ import android.net.Uri
 import androidx.exifinterface.media.ExifInterface
 import java.io.File
 import java.io.FileOutputStream
+import java.security.MessageDigest
 import kotlin.math.max
 
 /**
@@ -75,6 +76,24 @@ fun prepareImageForUpload(
     }
 
     return outputFile
+}
+
+/**
+ * SHA-256 of the file's exact bytes, lowercase hex.
+ * Must be computed on the same bytes that will be uploaded — the server re-hashes
+ * and rejects submissions whose `input_sha256` doesn't match the multipart payload.
+ */
+fun sha256Hex(file: File): String {
+    val digest = MessageDigest.getInstance("SHA-256")
+    file.inputStream().use { input ->
+        val buffer = ByteArray(8192)
+        while (true) {
+            val read = input.read(buffer)
+            if (read <= 0) break
+            digest.update(buffer, 0, read)
+        }
+    }
+    return digest.digest().joinToString("") { "%02x".format(it) }
 }
 
 private fun getRotationDegrees(exif: ExifInterface): Int = when (exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)) {
