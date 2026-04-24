@@ -55,10 +55,27 @@ class FakeJobRepository(
         return HealthResponse(status = "ok (fake)")
     }
 
+    private val extraPrompts = MutableStateFlow<List<PromptDto>>(emptyList())
+    private val nextPromptId = AtomicInteger(100)
+
     override suspend fun listPrompts(): List<PromptDto> {
         delay(500)
-        _promptsState.value = fakePrompts
-        return fakePrompts
+        val all = fakePrompts + extraPrompts.value
+        _promptsState.value = all
+        return all
+    }
+
+    override suspend fun createPrompt(label: String, text: String, workflow: String): PromptDto {
+        val id = nextPromptId.getAndIncrement().toLong()
+        val created = PromptDto(id = id, label = label, text = text, workflow = workflow)
+        extraPrompts.value = extraPrompts.value + created
+        listPrompts()
+        return created
+    }
+
+    override suspend fun deletePrompt(promptId: Long) {
+        extraPrompts.value = extraPrompts.value.filterNot { it.id == promptId }
+        listPrompts()
     }
 
     override suspend fun submitJob(
@@ -171,6 +188,11 @@ class FakeJobRepository(
         // Fake doesn't model soft delete
     }
 
+    override suspend fun cancelJob(jobId: String) {
+        entries.remove(jobId)
+        updates.value++
+    }
+
     override fun getJobsFlow(): Flow<List<JobSummaryDto>> = updates.map {
         listJobs(status = "done", limit = 100, cursor = null, inputId = null).items
     }
@@ -192,6 +214,8 @@ class FakeJobRepository(
     }
 
     override fun thumbModel(jobId: String): Any? = entries[jobId]?.inputUri
+
+    override fun previewModel(jobId: String): Any? = entries[jobId]?.inputUri
 
     override fun resultModel(jobId: String): Any? = entries[jobId]?.inputUri
 }

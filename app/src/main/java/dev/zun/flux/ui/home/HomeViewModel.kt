@@ -5,10 +5,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.zun.flux.data.api.PromptDto
 import dev.zun.flux.data.repo.JobRepository
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 
 /** Sentinel for the synthetic "Write your own…" tile. Never sent to the server. */
@@ -56,6 +59,12 @@ class HomeViewModel(
 
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
+    private val _promptSavedEvents = Channel<Long>(Channel.BUFFERED)
+    val promptSavedEvents: Flow<Long> = _promptSavedEvents.receiveAsFlow()
+
+    private val _promptErrors = Channel<String>(Channel.BUFFERED)
+    val promptErrors: Flow<String> = _promptErrors.receiveAsFlow()
 
     init {
         fetchPrompts()
@@ -152,5 +161,32 @@ class HomeViewModel(
 
     fun acknowledgeDone() {
         _state.value = SubmitState.Idle
+    }
+
+    fun savePrompt(label: String, text: String) {
+        viewModelScope.launch {
+            try {
+                val created = repository.createPrompt(
+                    label = label.trim(),
+                    text = text.trim(),
+                    workflow = DEFAULT_CUSTOM_WORKFLOW,
+                )
+                fetchPrompts()
+                _promptSavedEvents.trySend(created.id)
+            } catch (t: Throwable) {
+                _promptErrors.trySend(t.message ?: "Failed to save prompt")
+            }
+        }
+    }
+
+    fun deletePrompt(promptId: Long) {
+        viewModelScope.launch {
+            try {
+                repository.deletePrompt(promptId)
+                fetchPrompts()
+            } catch (t: Throwable) {
+                _promptErrors.trySend(t.message ?: "Failed to delete prompt")
+            }
+        }
     }
 }

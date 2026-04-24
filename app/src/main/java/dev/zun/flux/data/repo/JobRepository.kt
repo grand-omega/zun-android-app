@@ -23,6 +23,12 @@ interface JobRepository {
     /** Last known prompts list (seeded by [listPrompts] / [syncHistory]). */
     val promptsState: StateFlow<List<PromptDto>>
 
+    /** Creates a new server-side prompt and refreshes [promptsState]. Returns the new row. */
+    suspend fun createPrompt(label: String, text: String, workflow: String): PromptDto
+
+    /** Soft-deletes a server-side prompt and refreshes [promptsState]. */
+    suspend fun deletePrompt(promptId: Long)
+
     /**
      * Submit a job. Exactly one of [promptId] / [promptText] must be non-null.
      * [workflow] is required when [promptText] is set.
@@ -57,6 +63,9 @@ interface JobRepository {
     /** Undoes a soft delete within the server's 30-day grace window. */
     suspend fun restoreJob(jobId: String)
 
+    /** Cancels a queued/running job (server transitions it to status=cancelled). */
+    suspend fun cancelJob(jobId: String)
+
     /** Local database flows */
     fun getJobsFlow(): Flow<List<JobSummaryDto>>
 
@@ -70,6 +79,9 @@ interface JobRepository {
     /** Anything Coil can load. */
     fun thumbModel(jobId: String): Any?
 
-    /** Anything Coil can load. Fake echoes the input URI; real returns an HTTP URL. */
+    /** ~1280px JPEG, ideal for full-screen viewers. */
+    fun previewModel(jobId: String): Any?
+
+    /** Original PNG. Use only for save-to-gallery / share / explicit zoom. */
     fun resultModel(jobId: String): Any?
 }

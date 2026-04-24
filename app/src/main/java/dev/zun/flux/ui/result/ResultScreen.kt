@@ -57,7 +57,7 @@ fun ResultScreen(
     jobId: String,
     repository: JobRepository,
     windowSizeClass: WindowSizeClass,
-    onTryAnotherPrompt: (Any) -> Unit,
+    onTryAnotherPrompt: () -> Unit,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -66,6 +66,7 @@ fun ResultScreen(
         repository.getJobFlow(jobId).collect { value = it }
     }
     val inputModel = remember(jobDto?.input_id) { repository.inputModel(jobDto?.input_id) }
+    val previewModel = remember(jobId) { repository.previewModel(jobId) }
     val resultModel = remember(jobId) { repository.resultModel(jobId) }
 
     var saving by remember { mutableStateOf(false) }
@@ -131,7 +132,7 @@ fun ResultScreen(
                         modifier = Modifier.weight(1f).fillMaxSize(),
                     )
                     CompareImage(
-                        model = resultModel,
+                        model = previewModel,
                         label = "After",
                         modifier = Modifier.weight(1f).fillMaxSize(),
                     )
@@ -150,7 +151,7 @@ fun ResultScreen(
                         if (page == 0) {
                             CompareImage(model = inputModel, label = "Before")
                         } else {
-                            CompareImage(model = resultModel, label = "After")
+                            CompareImage(model = previewModel, label = "After")
                         }
                     }
 
@@ -231,11 +232,7 @@ fun ResultScreen(
                 }
 
                 OutlinedButton(
-                    onClick = {
-                        val src = inputModel ?: return@OutlinedButton
-                        onTryAnotherPrompt(src)
-                    },
-                    enabled = inputModel != null,
+                    onClick = onTryAnotherPrompt,
                     modifier = Modifier.weight(1f),
                 ) {
                     Icon(
