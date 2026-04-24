@@ -11,6 +11,7 @@ import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.lifecycle.awaitInstance
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -50,9 +51,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import kotlinx.coroutines.suspendCancellableCoroutine
 import java.io.File
-import kotlin.coroutines.resume
 
 @Composable
 fun CameraScreen(
@@ -223,15 +222,4 @@ private fun CameraContent(
     }
 }
 
-private suspend fun Context.getCameraProvider(): ProcessCameraProvider = suspendCancellableCoroutine { continuation ->
-    val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
-    cameraProviderFuture.addListener(
-        {
-            continuation.resume(cameraProviderFuture.get())
-        },
-        ContextCompat.getMainExecutor(this),
-    )
-    continuation.invokeOnCancellation {
-        cameraProviderFuture.cancel(true)
-    }
-}
+private suspend fun Context.getCameraProvider(): ProcessCameraProvider = ProcessCameraProvider.awaitInstance(this)

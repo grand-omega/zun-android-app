@@ -1,3 +1,7 @@
+// androidx.security-crypto is deprecated by Google with no drop-in replacement;
+// suppress until we migrate to Keystore/Tink directly.
+@file:Suppress("DEPRECATION")
+
 package dev.zun.flux.data.repo
 
 import android.content.Context

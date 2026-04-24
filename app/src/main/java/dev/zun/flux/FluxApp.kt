@@ -1,8 +1,9 @@
 package dev.zun.flux
 
 import android.app.Application
-import coil.Coil
-import coil.ImageLoader
+import coil3.ImageLoader
+import coil3.SingletonImageLoader
+import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import dev.zun.flux.data.api.FluxApi
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.data.repo.RealJobRepository
@@ -51,12 +52,13 @@ class FluxApp : Application() {
                     )
                 }.build()
 
-        Coil.setImageLoader(
-            ImageLoader
-                .Builder(this)
-                .okHttpClient(okHttpClient)
-                .build(),
-        )
+        SingletonImageLoader.setSafe {
+            ImageLoader.Builder(this)
+                .components {
+                    add(OkHttpNetworkFetcherFactory(callFactory = { okHttpClient }))
+                }
+                .build()
+        }
 
         rebuildRepository()
     }

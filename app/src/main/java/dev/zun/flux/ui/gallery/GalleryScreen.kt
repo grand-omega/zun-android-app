@@ -52,7 +52,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 import dev.zun.flux.data.api.JobSummaryDto
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.util.formatTimestamp

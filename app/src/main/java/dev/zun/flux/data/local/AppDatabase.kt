@@ -18,7 +18,7 @@ abstract class AppDatabase : RoomDatabase() {
                 context.applicationContext,
                 AppDatabase::class.java,
                 "flux_database",
-            ).fallbackToDestructiveMigration()
+            ).fallbackToDestructiveMigration(dropAllTables = true)
                 .build()
             instance = createdInstance
             createdInstance

@@ -48,7 +48,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.work.WorkManager
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 import dev.zun.flux.data.repo.JobRepository
 
 @OptIn(ExperimentalMaterial3Api::class)

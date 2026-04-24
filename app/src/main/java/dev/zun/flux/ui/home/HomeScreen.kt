@@ -57,7 +57,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 import dev.zun.flux.data.api.PromptDto
 import dev.zun.flux.data.repo.JobRepository
 

@@ -20,23 +20,51 @@ enter them on the in-app **Setup** screen — they are persisted in
 
 ### 3. Build & Run Commands
 
+All commands are run from the repo root via the Gradle wrapper (`./gradlew`).
+
 **Debug Build (Fastest for testing)**
 ```bash
-./gradlew installDebug
+./gradlew installDebug                  # build + install to connected device
+./gradlew assembleDebug                 # APK only → app/build/outputs/apk/debug/
 ```
 
 **Release Build (Optimized)**
-```bash
-# Generate the APK
-./gradlew assembleRelease
 
-# The APK will be located at:
-# app/build/outputs/apk/release/app-release.apk
+The `release` build type has R8 code-shrinking, resource shrinking, and the
+optimizing ProGuard preset enabled (see `app/build.gradle.kts`). Output size is
+typically ~40–60% smaller than debug.
+
+First-time setup for a personal signing key (one-time):
+```bash
+# 1. Generate a keystore in the repo root
+keytool -genkey -v -keystore flux-release.jks -alias flux \
+        -keyalg RSA -keysize 2048 -validity 36500
+
+# 2. Copy the template and fill in the passwords you chose
+cp keystore.properties.example keystore.properties
 ```
 
-**Format Code (Lint/Style)**
+Both `flux-release.jks` and `keystore.properties` are gitignored. If
+`keystore.properties` is absent, release falls back to the debug keystore — fine
+for quick testing, but the resulting APK cannot replace a build signed with any
+other key.
+
+Build and install:
 ```bash
-./gradlew spotlessApply
+./gradlew assembleRelease
+adb install -r app/build/outputs/apk/release/app-release.apk
+```
+
+**Common install failures**
+- `INSTALL_FAILED_UPDATE_INCOMPATIBLE` → `adb uninstall dev.zun.flux` first (signature mismatch with an already-installed build).
+- `INSTALL_FAILED_VERSION_DOWNGRADE` → bump `versionCode` in `app/build.gradle.kts`.
+- `INSTALL_PARSE_FAILED_NO_CERTIFICATES` → `keystore.properties` paths or passwords are wrong.
+
+**Other useful tasks**
+```bash
+./gradlew spotlessApply                 # format Kotlin sources
+./gradlew clean                         # wipe build/ directories
+./gradlew :app:tasks                    # list every task on the app module
 ```
 
 **Automate Formatting (Git Hooks)**
