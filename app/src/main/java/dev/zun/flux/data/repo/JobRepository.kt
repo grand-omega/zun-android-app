@@ -19,6 +19,7 @@ interface JobRepository {
     suspend fun submitJob(
         inputUri: Uri,
         promptId: String,
+        customPrompt: String? = null,
         onUploadProgress: ((Float) -> Unit)? = null,
     ): JobCreatedResponse
 

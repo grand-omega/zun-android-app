@@ -58,12 +58,20 @@ class HomeViewModel(
 
     private fun fetchPrompts() {
         viewModelScope.launch {
-            _prompts.value =
+            val fetched =
                 try {
                     repository.listPrompts()
                 } catch (_: Throwable) {
                     emptyList()
                 }
+
+            // Add a virtual "Custom Prompt" entry if it doesn't exist
+            val customEntry = PromptDto("__custom__", "Write your own...", "Enter a custom text prompt")
+            _prompts.value = if (fetched.none { it.id == "__custom__" }) {
+                fetched + customEntry
+            } else {
+                fetched
+            }
         }
     }
 
@@ -106,6 +114,7 @@ class HomeViewModel(
     fun submit(
         inputUri: Uri,
         promptId: String,
+        customPrompt: String? = null,
     ) {
         if (_state.value is SubmitState.InFlight) return
         _state.value = SubmitState.InFlight
@@ -114,7 +123,7 @@ class HomeViewModel(
             _state.value =
                 try {
                     val resp =
-                        repository.submitJob(inputUri, promptId) { progress ->
+                        repository.submitJob(inputUri, promptId, customPrompt) { progress ->
                             _uploadProgress.value = progress
                         }
                     SubmitState.Done(resp.job_id)

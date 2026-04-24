@@ -33,6 +33,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -87,6 +88,7 @@ fun HomeScreen(
 
     var imageUri by rememberSaveable { mutableStateOf<Uri?>(null) }
     var selectedPromptId by rememberSaveable { mutableStateOf<String?>(null) }
+    var customPromptText by rememberSaveable { mutableStateOf("") }
 
     LaunchedEffect(capturedUri) {
         if (capturedUri != null) imageUri = capturedUri
@@ -136,6 +138,8 @@ fun HomeScreen(
                     imageUri = imageUri,
                     prompts = prompts,
                     selectedPromptId = selectedPromptId,
+                    customPromptText = customPromptText,
+                    onCustomPromptChange = { customPromptText = it },
                     state = state,
                     health = health,
                     uploadProgress = uploadProgress,
@@ -149,8 +153,9 @@ fun HomeScreen(
                     onSubmit = {
                         val uri = imageUri ?: return@WideHomeContent
                         val promptId = selectedPromptId ?: return@WideHomeContent
+                        val cp = if (promptId == "__custom__") customPromptText else null
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        viewModel.submit(uri, promptId)
+                        viewModel.submit(uri, promptId, cp)
                     },
                 )
             } else {
@@ -159,6 +164,8 @@ fun HomeScreen(
                     imageUri = imageUri,
                     prompts = prompts,
                     selectedPromptId = selectedPromptId,
+                    customPromptText = customPromptText,
+                    onCustomPromptChange = { customPromptText = it },
                     state = state,
                     health = health,
                     uploadProgress = uploadProgress,
@@ -172,8 +179,9 @@ fun HomeScreen(
                     onSubmit = {
                         val uri = imageUri ?: return@CompactHomeContent
                         val promptId = selectedPromptId ?: return@CompactHomeContent
+                        val cp = if (promptId == "__custom__") customPromptText else null
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        viewModel.submit(uri, promptId)
+                        viewModel.submit(uri, promptId, cp)
                     },
                 )
             }
@@ -188,6 +196,8 @@ private fun CompactHomeContent(
     imageUri: Uri?,
     prompts: List<PromptDto>,
     selectedPromptId: String?,
+    customPromptText: String,
+    onCustomPromptChange: (String) -> Unit,
     state: SubmitState,
     health: HealthState,
     uploadProgress: Float?,
@@ -256,6 +266,16 @@ private fun CompactHomeContent(
             }
         }
 
+        if (selectedPromptId == "__custom__") {
+            OutlinedTextField(
+                value = customPromptText,
+                onValueChange = onCustomPromptChange,
+                label = { Text("Custom Prompt") },
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("e.g. A cat wearing a spacesuit") },
+            )
+        }
+
         Spacer(Modifier.weight(1f))
 
         if (uploadProgress != null) {
@@ -274,9 +294,14 @@ private fun CompactHomeContent(
 
         ConnectionIndicator(health)
 
+        val canSubmit = imageUri != null &&
+            selectedPromptId != null &&
+            (selectedPromptId != "__custom__" || customPromptText.isNotBlank()) &&
+            state !is SubmitState.InFlight
+
         Button(
             onClick = onSubmit,
-            enabled = imageUri != null && selectedPromptId != null && state !is SubmitState.InFlight,
+            enabled = canSubmit,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(if (state is SubmitState.InFlight) "Submitting…" else "Generate")
@@ -296,6 +321,8 @@ private fun WideHomeContent(
     imageUri: Uri?,
     prompts: List<PromptDto>,
     selectedPromptId: String?,
+    customPromptText: String,
+    onCustomPromptChange: (String) -> Unit,
     state: SubmitState,
     health: HealthState,
     uploadProgress: Float?,
@@ -358,6 +385,16 @@ private fun WideHomeContent(
                 }
             }
 
+            if (selectedPromptId == "__custom__") {
+                OutlinedTextField(
+                    value = customPromptText,
+                    onValueChange = onCustomPromptChange,
+                    label = { Text("Custom Prompt") },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("e.g. A cat wearing a spacesuit") },
+                )
+            }
+
             Spacer(Modifier.weight(1f))
 
             if (uploadProgress != null) {
@@ -376,9 +413,14 @@ private fun WideHomeContent(
 
             ConnectionIndicator(health)
 
+            val canSubmit = imageUri != null &&
+                selectedPromptId != null &&
+                (selectedPromptId != "__custom__" || customPromptText.isNotBlank()) &&
+                state !is SubmitState.InFlight
+
             Button(
                 onClick = onSubmit,
-                enabled = imageUri != null && selectedPromptId != null && state !is SubmitState.InFlight,
+                enabled = canSubmit,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(if (state is SubmitState.InFlight) "Submitting…" else "Generate")

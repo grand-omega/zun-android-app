@@ -27,6 +27,7 @@ interface FluxApi {
     suspend fun submitJob(
         @Part image: MultipartBody.Part,
         @Part("prompt_id") promptId: RequestBody,
+        @Part("custom_prompt") customPrompt: RequestBody? = null,
     ): JobCreatedResponse
 
     @GET("api/jobs/{id}")

@@ -37,6 +37,7 @@ class RealJobRepository(
     override suspend fun submitJob(
         inputUri: Uri,
         promptId: String,
+        customPrompt: String?,
         onUploadProgress: ((Float) -> Unit)?,
     ): JobCreatedResponse {
         val file = prepareImageForUpload(context, inputUri)
@@ -55,6 +56,7 @@ class RealJobRepository(
                 finalBody,
             )
         val promptPart = promptId.toRequestBody("text/plain".toMediaType())
+        val customPromptPart = customPrompt?.toRequestBody("text/plain".toMediaType())
 
         var attempt = 0
         val maxAttempts = 3
@@ -63,8 +65,7 @@ class RealJobRepository(
         try {
             while (attempt < maxAttempts) {
                 try {
-                    val response = api.submitJob(imagePart, promptPart)
-                    return response
+                    return api.submitJob(imagePart, promptPart, customPromptPart)
                 } catch (e: IOException) {
                     attempt++
                     lastError = e

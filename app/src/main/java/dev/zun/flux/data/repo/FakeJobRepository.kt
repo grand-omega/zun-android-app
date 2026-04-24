@@ -26,6 +26,7 @@ class FakeJobRepository(
         val inputUri: Uri,
         val promptId: String,
         val promptLabel: String,
+        val customPrompt: String?,
         val createdAt: Long,
     )
 
@@ -51,6 +52,7 @@ class FakeJobRepository(
     override suspend fun submitJob(
         inputUri: Uri,
         promptId: String,
+        customPrompt: String?,
         onUploadProgress: ((Float) -> Unit)?,
     ): JobCreatedResponse {
         // Simulate upload progress
@@ -69,10 +71,11 @@ class FakeJobRepository(
                 "oil-painting" -> "Oil painting"
                 "pixel-art" -> "Pixel art"
                 "sketch" -> "Pencil sketch"
+                "__custom__" -> customPrompt ?: "Custom Prompt"
                 else -> promptId
             }
         // Save createdAt in SECONDS
-        entries[id] = Entry(id, inputUri, promptId, label, System.currentTimeMillis() / 1000)
+        entries[id] = Entry(id, inputUri, promptId, label, customPrompt, System.currentTimeMillis() / 1000)
         updates.value++
         return JobCreatedResponse(job_id = id)
     }
@@ -99,6 +102,7 @@ class FakeJobRepository(
             status = status,
             prompt_id = entry.promptId,
             prompt_label = entry.promptLabel,
+            custom_prompt = entry.customPrompt,
             progress = progress,
             error = null,
             created_at = entry.createdAt,
@@ -132,6 +136,7 @@ class FakeJobRepository(
                     id = entry.id,
                     prompt_id = entry.promptId,
                     prompt_label = entry.promptLabel,
+                    custom_prompt = entry.customPrompt,
                     created_at = entry.createdAt,
                     duration_seconds = ((queuedDurationMs + runningDurationMs) / 1000).toInt(),
                 )
