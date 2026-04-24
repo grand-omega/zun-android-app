@@ -211,8 +211,7 @@ class RealJobRepository(
 
     override fun resultModel(jobId: String): Any? = buildUrlOrNull("/api/v1/jobs/$jobId/result")
 
-    private fun buildUrlOrNull(path: String): String? =
-        settingsManager.serverUrl?.takeUnless { it.isBlank() }?.let { "$it$path" }
+    private fun buildUrlOrNull(path: String): String? = settingsManager.serverUrl?.takeUnless { it.isBlank() }?.let { "$it$path" }
 
     private companion object {
         val TEXT_PLAIN = "text/plain".toMediaType()

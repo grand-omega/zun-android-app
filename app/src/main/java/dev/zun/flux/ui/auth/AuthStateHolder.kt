@@ -6,19 +6,24 @@ import androidx.compose.runtime.setValue
 import dev.zun.flux.data.repo.SettingsManager
 
 class AuthStateHolder(private val settingsManager: SettingsManager) {
-    private var lastAuthTime = 0L
 
-    var isAuthed by mutableStateOf(false)
+    var isAuthed by mutableStateOf(withinGraceWindow())
         private set
 
     fun markAuthed() {
+        settingsManager.lastAuthTimestamp = System.currentTimeMillis()
         isAuthed = true
-        lastAuthTime = System.currentTimeMillis()
     }
 
     fun checkLock() {
-        if (System.currentTimeMillis() - lastAuthTime > settingsManager.lockoutDurationMs) {
+        if (!withinGraceWindow()) {
             isAuthed = false
         }
+    }
+
+    private fun withinGraceWindow(): Boolean {
+        val last = settingsManager.lastAuthTimestamp
+        if (last == 0L) return false
+        return System.currentTimeMillis() - last <= settingsManager.lockoutDurationMs
     }
 }

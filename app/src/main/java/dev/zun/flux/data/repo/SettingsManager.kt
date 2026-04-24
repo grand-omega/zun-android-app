@@ -33,6 +33,16 @@ class SettingsManager(context: Context) {
         get() = prefs.getString(KEY_API_TOKEN, null)
         set(value) = prefs.edit().putString(KEY_API_TOKEN, value).apply()
 
+    /**
+     * Wall-clock millis of the most recent successful biometric unlock. Persisted so
+     * the [lockoutDurationMs] grace window survives process death — Android often kills
+     * the app while the Photo Picker (or any heavyweight foreground activity) is on
+     * top, and an in-memory timestamp would fall back to 0 and re-prompt every time.
+     */
+    var lastAuthTimestamp: Long
+        get() = prefs.getLong(KEY_LAST_AUTH_TIMESTAMP, 0L)
+        set(value) = prefs.edit().putLong(KEY_LAST_AUTH_TIMESTAMP, value).apply()
+
     val isConfigured: Boolean
         get() = !serverUrl.isNullOrBlank() && !apiToken.isNullOrBlank()
 
@@ -40,5 +50,6 @@ class SettingsManager(context: Context) {
         private const val KEY_LOCKOUT_DURATION = "lockout_duration_ms"
         private const val KEY_SERVER_URL = "server_url"
         private const val KEY_API_TOKEN = "api_token"
+        private const val KEY_LAST_AUTH_TIMESTAMP = "last_auth_timestamp"
     }
 }
