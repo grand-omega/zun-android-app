@@ -36,6 +36,7 @@ class FakeJobRepository(
     )
 
     private val entries = ConcurrentHashMap<String, Entry>()
+    private val cancelledIds = ConcurrentHashMap.newKeySet<String>()
     private val updates = MutableStateFlow(0)
     private val nextInputId = AtomicInteger(1)
 
@@ -109,9 +110,11 @@ class FakeJobRepository(
 
     override suspend fun getJob(jobId: String): JobStatusDto {
         val entry = entries[jobId] ?: error("Unknown fake job: $jobId")
+        val isCancelled = cancelledIds.contains(jobId)
         val elapsedSeconds = (System.currentTimeMillis() / 1000) - entry.createdAt
         val status =
             when {
+                isCancelled -> "cancelled"
                 elapsedSeconds < (queuedDurationMs / 1000) -> "queued"
                 elapsedSeconds < ((queuedDurationMs + runningDurationMs) / 1000) -> "running"
                 else -> "done"
@@ -189,7 +192,7 @@ class FakeJobRepository(
     }
 
     override suspend fun cancelJob(jobId: String) {
-        entries.remove(jobId)
+        cancelledIds.add(jobId)
         updates.value++
     }
 

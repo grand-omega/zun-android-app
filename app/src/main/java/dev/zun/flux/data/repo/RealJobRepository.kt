@@ -200,13 +200,19 @@ class RealJobRepository(
         }
     }
 
-    override fun inputModel(inputId: Int?): Any? = inputId?.let { "${settingsManager.serverUrl}/api/v1/inputs/$it/file" }
+    override fun inputModel(inputId: Int?): Any? {
+        if (inputId == null) return null
+        return buildUrlOrNull("/api/v1/inputs/$inputId/file")
+    }
 
-    override fun thumbModel(jobId: String): Any = "${settingsManager.serverUrl}/api/v1/jobs/$jobId/thumb"
+    override fun thumbModel(jobId: String): Any? = buildUrlOrNull("/api/v1/jobs/$jobId/thumb")
 
-    override fun previewModel(jobId: String): Any = "${settingsManager.serverUrl}/api/v1/jobs/$jobId/preview"
+    override fun previewModel(jobId: String): Any? = buildUrlOrNull("/api/v1/jobs/$jobId/preview")
 
-    override fun resultModel(jobId: String): Any = "${settingsManager.serverUrl}/api/v1/jobs/$jobId/result"
+    override fun resultModel(jobId: String): Any? = buildUrlOrNull("/api/v1/jobs/$jobId/result")
+
+    private fun buildUrlOrNull(path: String): String? =
+        settingsManager.serverUrl?.takeUnless { it.isBlank() }?.let { "$it$path" }
 
     private companion object {
         val TEXT_PLAIN = "text/plain".toMediaType()
