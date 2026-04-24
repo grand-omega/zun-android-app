@@ -40,7 +40,7 @@
         errorLine1="kotlin = &quot;2.3.20&quot;"
         errorLine2="         ~~~~~~~~">
         <location
-            file="$HOME/Desktop/zun-android-app/gradle/libs.versions.toml"
+            file="../gradle/libs.versions.toml"
             line="3"
             column="10"/>
     </issue>
@@ -51,7 +51,7 @@
         errorLine1="kotlin = &quot;2.3.20&quot;"
         errorLine2="         ~~~~~~~~">
         <location
-            file="$HOME/Desktop/zun-android-app/gradle/libs.versions.toml"
+            file="../gradle/libs.versions.toml"
             line="3"
             column="10"/>
     </issue>
@@ -62,7 +62,7 @@
         errorLine1="kotlin = &quot;2.3.20&quot;"
         errorLine2="         ~~~~~~~~">
         <location
-            file="$HOME/Desktop/zun-android-app/gradle/libs.versions.toml"
+            file="../gradle/libs.versions.toml"
             line="3"
             column="10"/>
     </issue>
@@ -73,7 +73,7 @@
         errorLine1="okhttp = &quot;4.12.0&quot;"
         errorLine2="         ~~~~~~~~">
         <location
-            file="$HOME/Desktop/zun-android-app/gradle/libs.versions.toml"
+            file="../gradle/libs.versions.toml"
             line="12"
             column="10"/>
     </issue>
@@ -84,7 +84,7 @@
         errorLine1="okhttp = &quot;4.12.0&quot;"
         errorLine2="         ~~~~~~~~">
         <location
-            file="$HOME/Desktop/zun-android-app/gradle/libs.versions.toml"
+            file="../gradle/libs.versions.toml"
             line="12"
             column="10"/>
     </issue>
@@ -95,7 +95,7 @@
         errorLine1="kotlinxSerialization = &quot;1.9.0&quot;"
         errorLine2="                       ~~~~~~~">
         <location
-            file="$HOME/Desktop/zun-android-app/gradle/libs.versions.toml"
+            file="../gradle/libs.versions.toml"
             line="13"
             column="24"/>
     </issue>
@@ -106,7 +106,7 @@
         errorLine1="spotless = &quot;7.0.4&quot;"
         errorLine2="           ~~~~~~~">
         <location
-            file="$HOME/Desktop/zun-android-app/gradle/libs.versions.toml"
+            file="../gradle/libs.versions.toml"
             line="19"
             column="12"/>
     </issue>

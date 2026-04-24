@@ -79,9 +79,10 @@ fun prepareImageForUpload(
 }
 
 /**
- * Copies the source URI's bytes into a stable file in [Context.cacheDir] and returns
- * a `file://` URI to it. Survives navigation and revoked PhotoPicker permissions, so
- * the same image can be re-submitted later without re-picking.
+ * Copies the source URI's bytes into a private cache file in [Context.cacheDir] and
+ * returns a `file://` URI to it. The filename is time-based, so each call produces a
+ * distinct copy. Survives navigation and revoked PhotoPicker permissions for the
+ * duration of the current selection.
  *
  * If [sourceUri] already points at a file under our own cacheDir, it is returned as-is.
  */
@@ -115,7 +116,7 @@ fun sha256Hex(file: File): String {
             digest.update(buffer, 0, read)
         }
     }
-    return digest.digest().joinToString("") { "%02x".format(it) }
+    return digest.digest().joinToString("") { "%02x".format(it.toInt() and 0xff) }
 }
 
 private fun getRotationDegrees(exif: ExifInterface): Int = when (exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)) {
