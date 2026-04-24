@@ -89,6 +89,11 @@ interface FluxApi {
         @Path("id") id: String,
     )
 
+    @POST("api/v1/jobs/{id}/cancel")
+    suspend fun cancelJob(
+        @Path("id") id: String,
+    )
+
     // --- Inputs (addressable) ---
 
     @GET("api/v1/inputs/{id}")

@@ -79,6 +79,28 @@ fun prepareImageForUpload(
 }
 
 /**
+ * Copies the source URI's bytes into a stable file in [Context.cacheDir] and returns
+ * a `file://` URI to it. Survives navigation and revoked PhotoPicker permissions, so
+ * the same image can be re-submitted later without re-picking.
+ *
+ * If [sourceUri] already points at a file under our own cacheDir, it is returned as-is.
+ */
+fun cacheInputLocally(context: Context, sourceUri: Uri): Uri {
+    if (sourceUri.scheme == "file") {
+        val path = sourceUri.path
+        if (path != null && path.startsWith(context.cacheDir.absolutePath)) {
+            return sourceUri
+        }
+    }
+    val outFile = File(context.cacheDir, "input_${System.currentTimeMillis()}.jpg")
+    context.contentResolver.openInputStream(sourceUri).use { input ->
+        requireNotNull(input) { "Failed to open input stream for $sourceUri" }
+        outFile.outputStream().use { output -> input.copyTo(output) }
+    }
+    return Uri.fromFile(outFile)
+}
+
+/**
  * SHA-256 of the file's exact bytes, lowercase hex.
  * Must be computed on the same bytes that will be uploaded — the server re-hashes
  * and rejects submissions whose `input_sha256` doesn't match the multipart payload.
