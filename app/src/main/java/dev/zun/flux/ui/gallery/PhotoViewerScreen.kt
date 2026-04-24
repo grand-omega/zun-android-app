@@ -50,6 +50,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
@@ -59,7 +60,6 @@ import dev.zun.flux.util.saveToPictures
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
-import java.util.Locale
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -318,9 +318,10 @@ private fun JobDetailsSheet(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 DetailRow("Job ID", job.id, isMonospace = true)
+                val locale = LocalLocale.current.platformLocale
                 DetailRow(
                     "Created",
-                    SimpleDateFormat("MMM d, yyyy · HH:mm", Locale.getDefault()).format(Date(job.created_at * 1000)),
+                    SimpleDateFormat("MMM d, yyyy · HH:mm", locale).format(Date(job.created_at * 1000)),
                 )
                 job.duration_seconds?.let {
                     DetailRow("Duration", "${it}s")
