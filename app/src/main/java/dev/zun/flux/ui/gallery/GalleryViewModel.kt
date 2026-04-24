@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.zun.flux.data.api.JobSummaryDto
+import dev.zun.flux.data.api.PromptDto
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.util.saveToPictures
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,6 +25,10 @@ class GalleryViewModel(
         repository.getJobsFlow()
             .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
+    val prompts: StateFlow<List<PromptDto>> =
+        repository.promptsState
+            .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
     val isSelectionMode: StateFlow<Boolean> =
         _selectedIds.map { it.isNotEmpty() }
             .stateIn(viewModelScope, SharingStarted.Eagerly, false)
@@ -36,6 +41,10 @@ class GalleryViewModel(
 
     private val _eventMessage = MutableStateFlow<String?>(null)
     val eventMessage: StateFlow<String?> = _eventMessage.asStateFlow()
+
+    /** Non-empty while a soft-delete snackbar is showing. */
+    private val _pendingUndo = MutableStateFlow<Set<String>?>(null)
+    val pendingUndo: StateFlow<Set<String>?> = _pendingUndo.asStateFlow()
 
     init {
         refresh()
@@ -64,6 +73,7 @@ class GalleryViewModel(
 
     fun deleteSelected() {
         val ids = _selectedIds.value
+        if (ids.isEmpty()) return
         viewModelScope.launch {
             ids.forEach { id ->
                 try {
@@ -72,7 +82,25 @@ class GalleryViewModel(
                 }
             }
             clearSelection()
+            _pendingUndo.value = ids
         }
+    }
+
+    fun undoDelete(ids: Set<String>) {
+        viewModelScope.launch {
+            ids.forEach { id ->
+                try {
+                    repository.restoreJob(id)
+                } catch (_: Throwable) {
+                }
+            }
+            _pendingUndo.value = null
+            _eventMessage.value = "Restored ${ids.size} generation${if (ids.size == 1) "" else "s"}"
+        }
+    }
+
+    fun clearPendingUndo() {
+        _pendingUndo.value = null
     }
 
     fun saveSelected(context: Context) {
@@ -105,7 +133,6 @@ class GalleryViewModel(
             try {
                 repository.deleteJob(jobId)
             } catch (_: Throwable) {
-                // Error handling handled by UI if needed
             }
         }
     }

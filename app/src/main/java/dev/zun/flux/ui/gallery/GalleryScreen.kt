@@ -54,8 +54,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import dev.zun.flux.data.api.JobSummaryDto
+import dev.zun.flux.data.api.PromptDto
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.util.formatTimestamp
+import dev.zun.flux.util.resolvePromptLabel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,9 +68,11 @@ fun GalleryScreen(
     onBack: () -> Unit,
 ) {
     val jobs by viewModel.jobs.collectAsStateWithLifecycle()
+    val prompts by viewModel.prompts.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val isSaving by viewModel.isSaving.collectAsStateWithLifecycle()
     val eventMessage by viewModel.eventMessage.collectAsStateWithLifecycle()
+    val pendingUndo by viewModel.pendingUndo.collectAsStateWithLifecycle()
     val selectedIds by viewModel.selectedIds.collectAsStateWithLifecycle()
     val isSelectionMode by viewModel.isSelectionMode.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -80,6 +84,20 @@ fun GalleryScreen(
         eventMessage?.let {
             snackbarHostState.showSnackbar(it)
             viewModel.clearEventMessage()
+        }
+    }
+
+    LaunchedEffect(pendingUndo) {
+        val undo = pendingUndo ?: return@LaunchedEffect
+        val result = snackbarHostState.showSnackbar(
+            message = "Deleted ${undo.size} generation${if (undo.size == 1) "" else "s"}",
+            actionLabel = "Undo",
+            duration = androidx.compose.material3.SnackbarDuration.Short,
+        )
+        if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+            viewModel.undoDelete(undo)
+        } else {
+            viewModel.clearPendingUndo()
         }
     }
 
@@ -157,6 +175,7 @@ fun GalleryScreen(
                             val isSelected = selectedIds.contains(job.id)
                             JobThumbnail(
                                 job = job,
+                                prompts = prompts,
                                 model = repository.thumbModel(job.id),
                                 isSelected = isSelected,
                                 isSelectionMode = isSelectionMode,
@@ -184,7 +203,7 @@ fun GalleryScreen(
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
             title = { Text("Delete selected?") },
-            text = { Text("This will permanently remove ${selectedIds.size} generations from your history and the server.") },
+            text = { Text("Removes ${selectedIds.size} generations. You can undo within 30 days.") },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -208,6 +227,7 @@ fun GalleryScreen(
 @Composable
 private fun JobThumbnail(
     job: JobSummaryDto,
+    prompts: List<PromptDto>,
     model: Any?,
     isSelected: Boolean,
     isSelectionMode: Boolean,
@@ -255,7 +275,7 @@ private fun JobThumbnail(
 
             if (!isSelectionMode) {
                 Text(
-                    text = job.prompt_label ?: job.prompt_id,
+                    text = resolvePromptLabel(prompts, job.prompt_id, job.prompt_text),
                     style = MaterialTheme.typography.labelSmall,
                     color = Color.White,
                     modifier =

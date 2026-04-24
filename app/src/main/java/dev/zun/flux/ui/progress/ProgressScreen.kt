@@ -50,6 +50,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.work.WorkManager
 import coil3.compose.AsyncImage
 import dev.zun.flux.data.repo.JobRepository
+import dev.zun.flux.util.resolvePromptLabel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -74,7 +75,9 @@ fun ProgressScreen(
             },
         )
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val inputModel = remember(jobId) { repository.inputModel(jobId) }
+    val prompts by repository.promptsState.collectAsStateWithLifecycle()
+    val currentDto = (state as? PollState.Running)?.dto ?: (state as? PollState.Done)?.dto
+    val inputModel = remember(currentDto?.input_id) { repository.inputModel(currentDto?.input_id) }
     val haptic = LocalHapticFeedback.current
 
     LaunchedEffect(jobId) { viewModel.start(jobId) }
@@ -170,7 +173,7 @@ fun ProgressScreen(
                             modifier = Modifier.padding(16.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            MetadataRow("Prompt", dto.prompt_label ?: dto.prompt_id)
+                            MetadataRow("Prompt", resolvePromptLabel(prompts, dto.prompt_id, dto.prompt_text))
                             MetadataRow("Job ID", dto.id, isMonospace = true)
                         }
                     }
