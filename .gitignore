@@ -30,3 +30,6 @@ keystore.properties
 # OS
 .DS_Store
 Thumbs.db
+
+# Claude Code session artifacts
+.claude/
