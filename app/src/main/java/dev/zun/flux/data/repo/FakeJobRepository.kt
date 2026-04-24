@@ -3,15 +3,19 @@ package dev.zun.flux.data.repo
 import android.net.Uri
 import dev.zun.flux.data.api.HealthResponse
 import dev.zun.flux.data.api.JobCreatedResponse
+import dev.zun.flux.data.api.JobListResponse
 import dev.zun.flux.data.api.JobStatusDto
 import dev.zun.flux.data.api.JobSummaryDto
 import dev.zun.flux.data.api.PromptDto
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * In-memory mock. Simulates job progression as a function of elapsed time:
@@ -24,14 +28,27 @@ class FakeJobRepository(
     private data class Entry(
         val id: String,
         val inputUri: Uri,
-        val promptId: String,
-        val promptLabel: String,
-        val customPrompt: String?,
+        val inputId: Int,
+        val promptId: Long?,
+        val promptText: String?,
+        val workflow: String?,
         val createdAt: Long,
     )
 
     private val entries = ConcurrentHashMap<String, Entry>()
     private val updates = MutableStateFlow(0)
+    private val nextInputId = AtomicInteger(1)
+
+    private val fakePrompts = listOf(
+        PromptDto(1L, "Ghibli style", "Classic Studio Ghibli aesthetic", workflow = "flux2_klein_edit"),
+        PromptDto(2L, "Cyberpunk", "Neon lights and futuristic grit", workflow = "flux2_klein_edit"),
+        PromptDto(3L, "Oil painting", "Rich textures and brushstrokes", workflow = "flux2_klein_edit"),
+        PromptDto(4L, "Pixel art", "Retro 16-bit look", workflow = "flux2_klein_edit"),
+        PromptDto(5L, "Pencil sketch", "Hand-drawn graphite style", workflow = "flux2_klein_edit"),
+    )
+
+    private val _promptsState = MutableStateFlow<List<PromptDto>>(emptyList())
+    override val promptsState: StateFlow<List<PromptDto>> = _promptsState.asStateFlow()
 
     override suspend fun health(): HealthResponse {
         delay(300)
@@ -40,22 +57,17 @@ class FakeJobRepository(
 
     override suspend fun listPrompts(): List<PromptDto> {
         delay(500)
-        return listOf(
-            PromptDto("ghibli", "Ghibli style", "Classic Studio Ghibli aesthetic"),
-            PromptDto("cyberpunk", "Cyberpunk", "Neon lights and futuristic grit"),
-            PromptDto("oil-painting", "Oil painting", "Rich textures and brushstrokes"),
-            PromptDto("pixel-art", "Pixel art", "Retro 16-bit look"),
-            PromptDto("sketch", "Pencil sketch", "Hand-drawn graphite style"),
-        )
+        _promptsState.value = fakePrompts
+        return fakePrompts
     }
 
     override suspend fun submitJob(
         inputUri: Uri,
-        promptId: String,
-        customPrompt: String?,
+        promptId: Long?,
+        promptText: String?,
+        workflow: String?,
         onUploadProgress: ((Float) -> Unit)?,
     ): JobCreatedResponse {
-        // Simulate upload progress
         if (onUploadProgress != null) {
             for (i in 1..10) {
                 delay(100)
@@ -64,20 +76,18 @@ class FakeJobRepository(
         }
         delay(400)
         val id = "fake-${UUID.randomUUID().toString().take(8)}"
-        val label =
-            when (promptId) {
-                "ghibli" -> "Ghibli style"
-                "cyberpunk" -> "Cyberpunk"
-                "oil-painting" -> "Oil painting"
-                "pixel-art" -> "Pixel art"
-                "sketch" -> "Pencil sketch"
-                "__custom__" -> customPrompt ?: "Custom Prompt"
-                else -> promptId
-            }
-        // Save createdAt in SECONDS
-        entries[id] = Entry(id, inputUri, promptId, label, customPrompt, System.currentTimeMillis() / 1000)
+        val inputId = nextInputId.getAndIncrement()
+        entries[id] = Entry(
+            id = id,
+            inputUri = inputUri,
+            inputId = inputId,
+            promptId = promptId,
+            promptText = promptText,
+            workflow = workflow ?: fakePrompts.firstOrNull { it.id == promptId }?.workflow,
+            createdAt = System.currentTimeMillis() / 1000,
+        )
         updates.value++
-        return JobCreatedResponse(job_id = id)
+        return JobCreatedResponse(job_id = id, input_id = inputId)
     }
 
     override suspend fun getJob(jobId: String): JobStatusDto {
@@ -100,14 +110,16 @@ class FakeJobRepository(
         return JobStatusDto(
             id = jobId,
             status = status,
+            input_id = entry.inputId,
             prompt_id = entry.promptId,
-            prompt_label = entry.promptLabel,
-            custom_prompt = entry.customPrompt,
+            prompt_text = entry.promptText,
+            workflow = entry.workflow,
+            seed = null,
             progress = progress,
             error = null,
             created_at = entry.createdAt,
-            completed_at =
-            if (status == "done") {
+            started_at = if (status != "queued") entry.createdAt + (queuedDurationMs / 1000) else null,
+            completed_at = if (status == "done") {
                 entry.createdAt + (queuedDurationMs + runningDurationMs) / 1000
             } else {
                 null
@@ -116,31 +128,37 @@ class FakeJobRepository(
     }
 
     override suspend fun listJobs(
-        status: String,
+        status: String?,
         limit: Int,
-        before: Long?,
-    ): List<JobSummaryDto> {
+        cursor: String?,
+        inputId: Int?,
+    ): JobListResponse {
         delay(600)
         val nowSeconds = System.currentTimeMillis() / 1000
-        return entries.values
+        val items = entries.values
             .filter { entry ->
                 val elapsedSeconds = nowSeconds - entry.createdAt
                 val isDone = elapsedSeconds >= (queuedDurationMs + runningDurationMs) / 1000
-                (status == "done" && isDone) || (status != "done")
+                status == null || (status == "done" && isDone) || (status != "done")
             }.filter { entry ->
-                before == null || entry.createdAt < before
+                inputId == null || entry.inputId == inputId
             }.sortedByDescending { it.createdAt }
             .take(limit)
             .map { entry ->
                 JobSummaryDto(
                     id = entry.id,
+                    status = "done",
+                    input_id = entry.inputId,
                     prompt_id = entry.promptId,
-                    prompt_label = entry.promptLabel,
-                    custom_prompt = entry.customPrompt,
+                    prompt_text = entry.promptText,
+                    workflow = entry.workflow,
+                    seed = null,
                     created_at = entry.createdAt,
+                    completed_at = entry.createdAt + (queuedDurationMs + runningDurationMs) / 1000,
                     duration_seconds = ((queuedDurationMs + runningDurationMs) / 1000).toInt(),
                 )
             }
+        return JobListResponse(items = items, next_cursor = null)
     }
 
     override suspend fun deleteJob(jobId: String) {
@@ -149,8 +167,12 @@ class FakeJobRepository(
         updates.value++
     }
 
+    override suspend fun restoreJob(jobId: String) {
+        // Fake doesn't model soft delete
+    }
+
     override fun getJobsFlow(): Flow<List<JobSummaryDto>> = updates.map {
-        listJobs(status = "done", limit = 100, before = null)
+        listJobs(status = "done", limit = 100, cursor = null, inputId = null).items
     }
 
     override fun getJobFlow(jobId: String): Flow<JobStatusDto?> = updates.map {
@@ -165,7 +187,9 @@ class FakeJobRepository(
         // No-op for fake
     }
 
-    override fun inputModel(jobId: String): Any? = entries[jobId]?.inputUri
+    override fun inputModel(inputId: Int?): Any? = inputId?.let { id ->
+        entries.values.firstOrNull { it.inputId == id }?.inputUri
+    }
 
     override fun thumbModel(jobId: String): Any? = entries[jobId]?.inputUri
 

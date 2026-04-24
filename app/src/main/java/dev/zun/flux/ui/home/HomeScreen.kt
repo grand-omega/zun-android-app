@@ -87,7 +87,7 @@ fun HomeScreen(
     val haptic = LocalHapticFeedback.current
 
     var imageUri by rememberSaveable { mutableStateOf<Uri?>(null) }
-    var selectedPromptId by rememberSaveable { mutableStateOf<String?>(null) }
+    var selectedPromptId by rememberSaveable { mutableStateOf<Long?>(null) }
     var customPromptText by rememberSaveable { mutableStateOf("") }
 
     LaunchedEffect(capturedUri) {
@@ -153,9 +153,8 @@ fun HomeScreen(
                     onSubmit = {
                         val uri = imageUri ?: return@WideHomeContent
                         val promptId = selectedPromptId ?: return@WideHomeContent
-                        val cp = if (promptId == "__custom__") customPromptText else null
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        viewModel.submit(uri, promptId, cp)
+                        viewModel.submit(uri, promptId, customPromptText)
                     },
                 )
             } else {
@@ -179,9 +178,8 @@ fun HomeScreen(
                     onSubmit = {
                         val uri = imageUri ?: return@CompactHomeContent
                         val promptId = selectedPromptId ?: return@CompactHomeContent
-                        val cp = if (promptId == "__custom__") customPromptText else null
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        viewModel.submit(uri, promptId, cp)
+                        viewModel.submit(uri, promptId, customPromptText)
                     },
                 )
             }
@@ -195,7 +193,7 @@ private fun CompactHomeContent(
     modifier: Modifier = Modifier,
     imageUri: Uri?,
     prompts: List<PromptDto>,
-    selectedPromptId: String?,
+    selectedPromptId: Long?,
     customPromptText: String,
     onCustomPromptChange: (String) -> Unit,
     state: SubmitState,
@@ -203,7 +201,7 @@ private fun CompactHomeContent(
     uploadProgress: Float?,
     onTakePhoto: () -> Unit,
     onPickGallery: () -> Unit,
-    onSelectPrompt: (String) -> Unit,
+    onSelectPrompt: (Long) -> Unit,
     onSubmit: () -> Unit,
 ) {
     Column(
@@ -266,7 +264,7 @@ private fun CompactHomeContent(
             }
         }
 
-        if (selectedPromptId == "__custom__") {
+        if (selectedPromptId == CUSTOM_PROMPT_ID) {
             OutlinedTextField(
                 value = customPromptText,
                 onValueChange = onCustomPromptChange,
@@ -296,7 +294,7 @@ private fun CompactHomeContent(
 
         val canSubmit = imageUri != null &&
             selectedPromptId != null &&
-            (selectedPromptId != "__custom__" || customPromptText.isNotBlank()) &&
+            (selectedPromptId != CUSTOM_PROMPT_ID || customPromptText.isNotBlank()) &&
             state !is SubmitState.InFlight
 
         Button(
@@ -320,7 +318,7 @@ private fun WideHomeContent(
     modifier: Modifier = Modifier,
     imageUri: Uri?,
     prompts: List<PromptDto>,
-    selectedPromptId: String?,
+    selectedPromptId: Long?,
     customPromptText: String,
     onCustomPromptChange: (String) -> Unit,
     state: SubmitState,
@@ -328,7 +326,7 @@ private fun WideHomeContent(
     uploadProgress: Float?,
     onTakePhoto: () -> Unit,
     onPickGallery: () -> Unit,
-    onSelectPrompt: (String) -> Unit,
+    onSelectPrompt: (Long) -> Unit,
     onSubmit: () -> Unit,
 ) {
     Row(
@@ -385,7 +383,7 @@ private fun WideHomeContent(
                 }
             }
 
-            if (selectedPromptId == "__custom__") {
+            if (selectedPromptId == CUSTOM_PROMPT_ID) {
                 OutlinedTextField(
                     value = customPromptText,
                     onValueChange = onCustomPromptChange,
@@ -415,7 +413,7 @@ private fun WideHomeContent(
 
             val canSubmit = imageUri != null &&
                 selectedPromptId != null &&
-                (selectedPromptId != "__custom__" || customPromptText.isNotBlank()) &&
+                (selectedPromptId != CUSTOM_PROMPT_ID || customPromptText.isNotBlank()) &&
                 state !is SubmitState.InFlight
 
             Button(

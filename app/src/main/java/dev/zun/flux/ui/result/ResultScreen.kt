@@ -35,6 +35,7 @@ import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -61,7 +62,10 @@ fun ResultScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val inputModel = remember(jobId) { repository.inputModel(jobId) }
+    val jobDto by produceState<dev.zun.flux.data.api.JobStatusDto?>(null, jobId) {
+        repository.getJobFlow(jobId).collect { value = it }
+    }
+    val inputModel = remember(jobDto?.input_id) { repository.inputModel(jobDto?.input_id) }
     val resultModel = remember(jobId) { repository.resultModel(jobId) }
 
     var saving by remember { mutableStateOf(false) }

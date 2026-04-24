@@ -11,6 +11,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+/** Sentinel for the synthetic "Write your own…" tile. Never sent to the server. */
+const val CUSTOM_PROMPT_ID: Long = -1L
+
+/** Default workflow for free-text submissions when the user writes a custom prompt. */
+private const val DEFAULT_CUSTOM_WORKFLOW = "flux2_klein_edit"
+
 sealed interface SubmitState {
     data object Idle : SubmitState
 
@@ -65,13 +71,12 @@ class HomeViewModel(
                     emptyList()
                 }
 
-            // Add a virtual "Custom Prompt" entry if it doesn't exist
-            val customEntry = PromptDto("__custom__", "Write your own...", "Enter a custom text prompt")
-            _prompts.value = if (fetched.none { it.id == "__custom__" }) {
-                fetched + customEntry
-            } else {
-                fetched
-            }
+            val customEntry = PromptDto(
+                id = CUSTOM_PROMPT_ID,
+                label = "Write your own...",
+                description = "Enter a custom text prompt",
+            )
+            _prompts.value = fetched + customEntry
         }
     }
 
@@ -79,7 +84,7 @@ class HomeViewModel(
         viewModelScope.launch {
             while (true) {
                 performHealthCheck()
-                delay(10_000) // Check every 10s
+                delay(10_000)
             }
         }
     }
@@ -113,8 +118,8 @@ class HomeViewModel(
 
     fun submit(
         inputUri: Uri,
-        promptId: String,
-        customPrompt: String? = null,
+        selectedPromptId: Long,
+        customPromptText: String,
     ) {
         if (_state.value is SubmitState.InFlight) return
         _state.value = SubmitState.InFlight
@@ -122,10 +127,20 @@ class HomeViewModel(
         viewModelScope.launch {
             _state.value =
                 try {
-                    val resp =
-                        repository.submitJob(inputUri, promptId, customPrompt) { progress ->
-                            _uploadProgress.value = progress
-                        }
+                    val resp = if (selectedPromptId == CUSTOM_PROMPT_ID) {
+                        repository.submitJob(
+                            inputUri = inputUri,
+                            promptText = customPromptText,
+                            workflow = DEFAULT_CUSTOM_WORKFLOW,
+                            onUploadProgress = { progress -> _uploadProgress.value = progress },
+                        )
+                    } else {
+                        repository.submitJob(
+                            inputUri = inputUri,
+                            promptId = selectedPromptId,
+                            onUploadProgress = { progress -> _uploadProgress.value = progress },
+                        )
+                    }
                     SubmitState.Done(resp.job_id)
                 } catch (t: Throwable) {
                     SubmitState.Failed(t.message ?: t::class.simpleName.orEmpty())
