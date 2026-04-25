@@ -77,9 +77,18 @@ interface JobRepository {
     /**
      * Downloads an existing server-side input into private cache and returns a
      * `file://` Uri. Used to re-pick a recently-uploaded image without going
-     * through the system photo picker.
+     * through the system photo picker. Filename is deterministic per input id,
+     * so repeated calls return the same Uri (no duplicate downloads, and
+     * caller-side equality checks naturally dedupe).
      */
     suspend fun downloadInputToCache(inputId: Int): Uri
+
+    /**
+     * The Uri that [downloadInputToCache] would return for [inputId], without
+     * actually downloading. Lets the UI show "already selected" state without
+     * triggering a fetch.
+     */
+    fun recentInputUri(inputId: Int): Uri
 
     suspend fun syncHistory()
 
