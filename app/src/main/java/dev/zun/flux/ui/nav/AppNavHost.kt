@@ -55,6 +55,9 @@ fun AppNavHost(
                 onJobSubmitted = { jobId ->
                     nav.navigate(Routes.progress(jobId))
                 },
+                onBatchSubmitted = {
+                    nav.navigate(Routes.GALLERY)
+                },
             )
         }
         composable(Routes.SETUP) {

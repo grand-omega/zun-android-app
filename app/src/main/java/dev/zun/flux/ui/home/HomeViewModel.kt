@@ -27,8 +27,13 @@ sealed interface SubmitState {
 
     data class Done(val jobId: String) : SubmitState
 
+    data class DoneBatch(val submitted: Int, val failed: Int) : SubmitState
+
     data class Failed(val message: String) : SubmitState
 }
+
+/** Progress through a batch submit: "Uploading [current] of [total]". */
+data class BatchProgress(val current: Int, val total: Int)
 
 sealed interface HealthState {
     data object Checking : HealthState
@@ -56,6 +61,9 @@ class HomeViewModel(
 
     private val _uploadProgress = MutableStateFlow<Float?>(null)
     val uploadProgress: StateFlow<Float?> = _uploadProgress.asStateFlow()
+
+    private val _batchProgress = MutableStateFlow<BatchProgress?>(null)
+    val batchProgress: StateFlow<BatchProgress?> = _batchProgress.asStateFlow()
 
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
@@ -126,30 +134,31 @@ class HomeViewModel(
     }
 
     fun submit(
-        inputUri: Uri,
+        inputUris: List<Uri>,
         selectedPromptId: Long,
         customPromptText: String,
     ) {
         if (_state.value is SubmitState.InFlight) return
+        if (inputUris.isEmpty()) return
+
+        if (inputUris.size == 1) {
+            submitSingle(inputUris[0], selectedPromptId, customPromptText)
+        } else {
+            submitBatch(inputUris, selectedPromptId, customPromptText)
+        }
+    }
+
+    private fun submitSingle(
+        inputUri: Uri,
+        selectedPromptId: Long,
+        customPromptText: String,
+    ) {
         _state.value = SubmitState.InFlight
         _uploadProgress.value = 0f
         viewModelScope.launch {
             _state.value =
                 try {
-                    val resp = if (selectedPromptId == CUSTOM_PROMPT_ID) {
-                        repository.submitJob(
-                            inputUri = inputUri,
-                            promptText = customPromptText,
-                            workflow = DEFAULT_CUSTOM_WORKFLOW,
-                            onUploadProgress = { progress -> _uploadProgress.value = progress },
-                        )
-                    } else {
-                        repository.submitJob(
-                            inputUri = inputUri,
-                            promptId = selectedPromptId,
-                            onUploadProgress = { progress -> _uploadProgress.value = progress },
-                        )
-                    }
+                    val resp = submitOne(inputUri, selectedPromptId, customPromptText)
                     SubmitState.Done(resp.job_id)
                 } catch (t: Throwable) {
                     SubmitState.Failed(t.message ?: t::class.simpleName.orEmpty())
@@ -157,6 +166,56 @@ class HomeViewModel(
                     _uploadProgress.value = null
                 }
         }
+    }
+
+    private fun submitBatch(
+        inputUris: List<Uri>,
+        selectedPromptId: Long,
+        customPromptText: String,
+    ) {
+        _state.value = SubmitState.InFlight
+        _uploadProgress.value = 0f
+        _batchProgress.value = BatchProgress(current = 1, total = inputUris.size)
+        viewModelScope.launch {
+            var submitted = 0
+            var failed = 0
+            inputUris.forEachIndexed { index, uri ->
+                _batchProgress.value = BatchProgress(current = index + 1, total = inputUris.size)
+                _uploadProgress.value = 0f
+                try {
+                    submitOne(uri, selectedPromptId, customPromptText)
+                    submitted++
+                } catch (_: Throwable) {
+                    failed++
+                }
+            }
+            _uploadProgress.value = null
+            _batchProgress.value = null
+            _state.value = if (submitted == 0) {
+                SubmitState.Failed("All $failed uploads failed")
+            } else {
+                SubmitState.DoneBatch(submitted = submitted, failed = failed)
+            }
+        }
+    }
+
+    private suspend fun submitOne(
+        inputUri: Uri,
+        selectedPromptId: Long,
+        customPromptText: String,
+    ) = if (selectedPromptId == CUSTOM_PROMPT_ID) {
+        repository.submitJob(
+            inputUri = inputUri,
+            promptText = customPromptText,
+            workflow = DEFAULT_CUSTOM_WORKFLOW,
+            onUploadProgress = { progress -> _uploadProgress.value = progress },
+        )
+    } else {
+        repository.submitJob(
+            inputUri = inputUri,
+            promptId = selectedPromptId,
+            onUploadProgress = { progress -> _uploadProgress.value = progress },
+        )
     }
 
     fun acknowledgeDone() {
