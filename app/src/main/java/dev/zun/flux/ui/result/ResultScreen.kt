@@ -19,6 +19,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -29,10 +30,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.windowsizeclass.WindowSizeClass
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -44,12 +47,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.zun.flux.data.repo.JobRepository
+import dev.zun.flux.util.resolvePromptLabel
 import dev.zun.flux.util.saveToPictures
 import dev.zun.flux.util.shareImage
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -70,6 +77,9 @@ fun ResultScreen(
     val resultModel = remember(jobId) { repository.resultModel(jobId) }
 
     var saving by remember { mutableStateOf(false) }
+    var showMenu by remember { mutableStateOf(false) }
+    var showDetails by remember { mutableStateOf(false) }
+    val prompts by repository.promptsState.collectAsState()
     val isWide = windowSizeClass.widthSizeClass >= WindowWidthSizeClass.Medium
 
     Scaffold(
@@ -82,7 +92,6 @@ fun ResultScreen(
                     }
                 },
                 actions = {
-                    var showMenu by remember { mutableStateOf(false) }
                     IconButton(onClick = { showMenu = true }) {
                         Icon(Icons.Default.MoreVert, contentDescription = "More")
                     }
@@ -91,21 +100,21 @@ fun ResultScreen(
                             text = { Text("View details") },
                             onClick = {
                                 showMenu = false
-                                /* Placeholder for detail navigation */
-                            },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Copy job ID") },
-                            onClick = {
-                                showMenu = false
-                                /* Placeholder for copy */
+                                showDetails = true
                             },
                         )
                         DropdownMenuItem(
                             text = { Text("Delete") },
                             onClick = {
                                 showMenu = false
-                                /* Placeholder for delete */
+                                scope.launch {
+                                    try {
+                                        repository.deleteJob(jobId)
+                                        onBack()
+                                    } catch (t: Throwable) {
+                                        Toast.makeText(context, "Delete failed: ${t.message}", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
                             },
                         )
                     }
@@ -181,8 +190,6 @@ fun ResultScreen(
                 }
             }
 
-            Text("Job id: $jobId", style = MaterialTheme.typography.bodySmall)
-
             Button(
                 onClick = {
                     val src = resultModel ?: return@Button
@@ -244,6 +251,31 @@ fun ResultScreen(
                 }
             }
         }
+    }
+
+    if (showDetails) {
+        val dto = jobDto
+        val locale = LocalLocale.current.platformLocale
+        AlertDialog(
+            onDismissRequest = { showDetails = false },
+            title = { Text("Details") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (dto != null) {
+                        Text("Prompt: ${resolvePromptLabel(prompts, dto.prompt_id, dto.prompt_text)}")
+                        Text("Created: ${SimpleDateFormat("MMM d, yyyy · HH:mm", locale).format(Date(dto.created_at * 1000))}")
+                        val started = dto.started_at
+                        val completed = dto.completed_at
+                        if (started != null && completed != null) {
+                            Text("Duration: ${completed - started}s")
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showDetails = false }) { Text("Close") }
+            },
+        )
     }
 }
 

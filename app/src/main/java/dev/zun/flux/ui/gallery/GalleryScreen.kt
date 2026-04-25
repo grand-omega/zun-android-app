@@ -73,6 +73,7 @@ fun GalleryScreen(
     val isSaving by viewModel.isSaving.collectAsStateWithLifecycle()
     val eventMessage by viewModel.eventMessage.collectAsStateWithLifecycle()
     val pendingUndo by viewModel.pendingUndo.collectAsStateWithLifecycle()
+    val postSaveDelete by viewModel.postSaveDelete.collectAsStateWithLifecycle()
     val selectedIds by viewModel.selectedIds.collectAsStateWithLifecycle()
     val isSelectionMode by viewModel.isSelectionMode.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -217,6 +218,30 @@ fun GalleryScreen(
             dismissButton = {
                 TextButton(onClick = { showDeleteConfirm = false }) {
                     Text("Cancel")
+                }
+            },
+        )
+    }
+
+    postSaveDelete?.let { savedIds ->
+        val n = savedIds.size
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissPostSaveDelete() },
+            title = { Text("Remove from app?") },
+            text = {
+                Text(
+                    "Saved $n image${if (n == 1) "" else "s"} to your gallery. " +
+                        "Remove ${if (n == 1) "it" else "them"} from the app to free up space?",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.confirmPostSaveDelete() }) {
+                    Text("Remove", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.dismissPostSaveDelete() }) {
+                    Text("Keep")
                 }
             },
         )

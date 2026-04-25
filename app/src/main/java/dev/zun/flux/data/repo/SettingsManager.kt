@@ -22,7 +22,7 @@ class SettingsManager(context: Context) {
     )
 
     var lockoutDurationMs: Long
-        get() = prefs.getLong(KEY_LOCKOUT_DURATION, 60_000L)
+        get() = prefs.getLong(KEY_LOCKOUT_DURATION, 300_000L)
         set(value) = prefs.edit().putLong(KEY_LOCKOUT_DURATION, value).apply()
 
     var serverUrl: String?
