@@ -185,6 +185,23 @@ class RealJobRepository(
 
     override fun getJobFlow(jobId: String): Flow<JobStatusDto?> = dao.getJobByIdFlow(jobId).map { it?.toStatusDto() }
 
+    override fun recentInputIds(limit: Int): Flow<List<Int>> = dao.getAllJobs().map { entities ->
+        entities.asSequence()
+            .mapNotNull { it.inputId }
+            .distinct()
+            .take(limit)
+            .toList()
+    }
+
+    override suspend fun downloadInputToCache(inputId: Int): Uri {
+        val body = api.downloadInputFile(inputId)
+        val outFile = java.io.File(context.cacheDir, "input_${System.currentTimeMillis()}.jpg")
+        body.byteStream().use { input ->
+            outFile.outputStream().use { output -> input.copyTo(output) }
+        }
+        return Uri.fromFile(outFile)
+    }
+
     override suspend fun syncHistory() {
         try {
             val resp = api.listJobs(status = "done", limit = 100)

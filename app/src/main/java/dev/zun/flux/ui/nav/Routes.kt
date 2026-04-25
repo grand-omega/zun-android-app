@@ -8,8 +8,11 @@ object Routes {
     const val SETTINGS = "settings"
     const val PROGRESS = "progress/{jobId}"
     const val RESULT = "result/{jobId}"
+    const val BATCH_PROGRESS = "batch/{jobIds}"
 
     fun progress(jobId: String) = "progress/$jobId"
 
     fun result(jobId: String) = "result/$jobId"
+
+    fun batch(jobIds: List<String>) = "batch/${jobIds.joinToString(",")}"
 }

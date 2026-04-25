@@ -2,6 +2,7 @@ package dev.zun.flux.data.api
 
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
+import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
@@ -12,6 +13,7 @@ import retrofit2.http.POST
 import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
+import retrofit2.http.Streaming
 
 /**
  * The v2 wire contract (all paths under `/api/v1/`).
@@ -100,4 +102,10 @@ interface FluxApi {
     suspend fun getInput(
         @Path("id") id: Int,
     ): InputMetadata
+
+    @Streaming
+    @GET("api/v1/inputs/{id}/file")
+    suspend fun downloadInputFile(
+        @Path("id") id: Int,
+    ): ResponseBody
 }
