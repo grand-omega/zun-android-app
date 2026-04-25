@@ -140,9 +140,12 @@ fun PhotoViewerScreen(
                     shouldReset = pagerState.currentPage != page,
                 )
 
-                // Context Menu for Long Press (only in standard mode)
+                // Context Menu for Long Press (only in standard mode).
+                // Gate on currentPage so only the visible page's menu opens —
+                // otherwise every pre-composed page renders a popup that can
+                // capture taps and act on the wrong job.
                 DropdownMenu(
-                    expanded = showContextMenu,
+                    expanded = showContextMenu && page == pagerState.currentPage,
                     onDismissRequest = { showContextMenu = false },
                 ) {
                     DropdownMenuItem(
@@ -323,7 +326,6 @@ private fun JobDetailsSheet(
                 modifier = Modifier.padding(top = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                DetailRow("Job ID", job.id, isMonospace = true)
                 val locale = LocalLocale.current.platformLocale
                 DetailRow(
                     "Created",

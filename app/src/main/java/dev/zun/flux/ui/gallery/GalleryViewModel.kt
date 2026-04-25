@@ -46,6 +46,10 @@ class GalleryViewModel(
     private val _pendingUndo = MutableStateFlow<Set<String>?>(null)
     val pendingUndo: StateFlow<Set<String>?> = _pendingUndo.asStateFlow()
 
+    /** Non-null when a "remove from app after save?" dialog should show. */
+    private val _postSaveDelete = MutableStateFlow<Set<String>?>(null)
+    val postSaveDelete: StateFlow<Set<String>?> = _postSaveDelete.asStateFlow()
+
     init {
         refresh()
     }
@@ -109,19 +113,41 @@ class GalleryViewModel(
 
         viewModelScope.launch {
             _isSaving.value = true
-            var savedCount = 0
+            val savedIds = mutableSetOf<String>()
             ids.forEach { id ->
                 try {
                     val model = repository.resultModel(id) ?: return@forEach
                     saveToPictures(context, model, "flux-$id.jpg")
-                    savedCount++
+                    savedIds += id
                 } catch (_: Throwable) {
                 }
             }
             clearSelection()
             _isSaving.value = false
-            _eventMessage.value = "Saved $savedCount images to Pictures"
+            if (savedIds.isNotEmpty()) {
+                _postSaveDelete.value = savedIds
+            } else {
+                _eventMessage.value = "No images saved"
+            }
         }
+    }
+
+    fun confirmPostSaveDelete() {
+        val ids = _postSaveDelete.value ?: return
+        _postSaveDelete.value = null
+        viewModelScope.launch {
+            ids.forEach { id ->
+                try {
+                    repository.deleteJob(id)
+                } catch (_: Throwable) {
+                }
+            }
+            _pendingUndo.value = ids
+        }
+    }
+
+    fun dismissPostSaveDelete() {
+        _postSaveDelete.value = null
     }
 
     fun clearEventMessage() {
