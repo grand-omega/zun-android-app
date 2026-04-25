@@ -5,7 +5,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,14 +21,20 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -76,10 +84,13 @@ fun GalleryScreen(
     val postSaveDelete by viewModel.postSaveDelete.collectAsStateWithLifecycle()
     val selectedIds by viewModel.selectedIds.collectAsStateWithLifecycle()
     val isSelectionMode by viewModel.isSelectionMode.collectAsStateWithLifecycle()
+    val tagFilter by viewModel.tagFilter.collectAsStateWithLifecycle()
+    val availableTags by viewModel.availableTags.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     val snackbarHostState = remember { SnackbarHostState() }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var showFilterMenu by remember { mutableStateOf(false) }
 
     LaunchedEffect(eventMessage) {
         eventMessage?.let {
@@ -134,65 +145,115 @@ fun GalleryScreen(
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                         }
                     },
+                    actions = {
+                        Box {
+                            IconButton(onClick = { showFilterMenu = true }) {
+                                Icon(Icons.Default.FilterList, contentDescription = "Filter by tag")
+                            }
+                            DropdownMenu(
+                                expanded = showFilterMenu,
+                                onDismissRequest = { showFilterMenu = false },
+                            ) {
+                                availableTags.forEach { option ->
+                                    val isSelected = option.filter == tagFilter
+                                    DropdownMenuItem(
+                                        text = { Text("${option.label} · ${option.count}") },
+                                        leadingIcon = if (isSelected) {
+                                            { Icon(Icons.Default.Check, contentDescription = null) }
+                                        } else {
+                                            null
+                                        },
+                                        onClick = {
+                                            viewModel.setTagFilter(option.filter)
+                                            showFilterMenu = false
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                    },
                 )
             }
         },
     ) { inner ->
-        PullToRefreshBox(
-            isRefreshing = isLoading,
-            onRefresh = { viewModel.refresh() },
-            modifier = Modifier.padding(inner),
-        ) {
-            if (jobs.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    if (isLoading) {
-                        CircularProgressIndicator()
-                    } else {
-                        Text("No generations yet")
-                    }
-                }
-            } else {
-                val groupedJobs =
-                    remember(jobs) {
-                        jobs.groupBy { formatTimestamp(it.created_at) }
-                    }
-
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = 110.dp),
-                    contentPadding = PaddingValues(16.dp),
-                    modifier = Modifier.fillMaxSize(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+        Column(modifier = Modifier.padding(inner)) {
+            if (tagFilter != TagFilter.All && !isSelectionMode) {
+                val activeLabel = availableTags.firstOrNull { it.filter == tagFilter }?.label
+                    ?: "Filtered"
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
                 ) {
-                    groupedJobs.forEach { (date, items) ->
-                        item(span = { GridItemSpan(maxLineSpan) }) {
-                            Text(
-                                text = date,
-                                style = MaterialTheme.typography.titleMedium,
-                                modifier = Modifier.padding(vertical = 8.dp),
+                    AssistChip(
+                        onClick = { viewModel.setTagFilter(TagFilter.All) },
+                        label = { Text("Showing: $activeLabel") },
+                        trailingIcon = {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = "Clear filter",
+                                modifier = Modifier.size(AssistChipDefaults.IconSize),
                             )
+                        },
+                    )
+                }
+            }
+            PullToRefreshBox(
+                isRefreshing = isLoading,
+                onRefresh = { viewModel.refresh() },
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                if (jobs.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        when {
+                            isLoading -> CircularProgressIndicator()
+                            tagFilter != TagFilter.All -> Text("No generations match this tag")
+                            else -> Text("No generations yet")
                         }
-                        items(items, key = { it.id }) { job ->
-                            val isSelected = selectedIds.contains(job.id)
-                            JobThumbnail(
-                                job = job,
-                                prompts = prompts,
-                                model = repository.thumbModel(job.id),
-                                isSelected = isSelected,
-                                isSelectionMode = isSelectionMode,
-                                onClick = {
-                                    if (isSelectionMode) {
-                                        viewModel.toggleSelection(job.id)
-                                    } else {
-                                        onJobClick(job.id)
-                                    }
-                                },
-                                onLongClick = {
-                                    if (!isSelectionMode) {
-                                        viewModel.toggleSelection(job.id)
-                                    }
-                                },
-                            )
+                    }
+                } else {
+                    val groupedJobs =
+                        remember(jobs) {
+                            jobs.groupBy { formatTimestamp(it.created_at) }
+                        }
+
+                    LazyVerticalGrid(
+                        columns = GridCells.Adaptive(minSize = 110.dp),
+                        contentPadding = PaddingValues(16.dp),
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        groupedJobs.forEach { (date, items) ->
+                            item(span = { GridItemSpan(maxLineSpan) }) {
+                                Text(
+                                    text = date,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    modifier = Modifier.padding(vertical = 8.dp),
+                                )
+                            }
+                            items(items, key = { it.id }) { job ->
+                                val isSelected = selectedIds.contains(job.id)
+                                JobThumbnail(
+                                    job = job,
+                                    prompts = prompts,
+                                    model = repository.thumbModel(job.id),
+                                    isSelected = isSelected,
+                                    isSelectionMode = isSelectionMode,
+                                    onClick = {
+                                        if (isSelectionMode) {
+                                            viewModel.toggleSelection(job.id)
+                                        } else {
+                                            onJobClick(job.id)
+                                        }
+                                    },
+                                    onLongClick = {
+                                        if (!isSelectionMode) {
+                                            viewModel.toggleSelection(job.id)
+                                        }
+                                    },
+                                )
+                            }
                         }
                     }
                 }
