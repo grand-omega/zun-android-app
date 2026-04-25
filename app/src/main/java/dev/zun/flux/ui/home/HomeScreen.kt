@@ -21,16 +21,21 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -59,6 +64,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -93,6 +100,7 @@ fun HomeScreen(
     onGalleryClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onJobSubmitted: (String) -> Unit,
+    onBatchSubmitted: () -> Unit,
 ) {
     val viewModel: HomeViewModel =
         viewModel(
@@ -106,10 +114,11 @@ fun HomeScreen(
     val health by viewModel.health.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val uploadProgress by viewModel.uploadProgress.collectAsStateWithLifecycle()
+    val batchProgress by viewModel.batchProgress.collectAsStateWithLifecycle()
     val haptic = LocalHapticFeedback.current
     val snackbarHostState = remember { SnackbarHostState() }
 
-    var imageUri by rememberSaveable { mutableStateOf<Uri?>(null) }
+    var imageUris by rememberSaveable(stateSaver = UriListSaver) { mutableStateOf<List<Uri>>(emptyList()) }
     var selectedPromptId by rememberSaveable { mutableStateOf<Long?>(null) }
     var customPromptText by rememberSaveable { mutableStateOf("") }
     var deleteMode by rememberSaveable { mutableStateOf(false) }
@@ -117,12 +126,29 @@ fun HomeScreen(
     var saveDialogLabel by rememberSaveable { mutableStateOf("") }
 
     val context = androidx.compose.ui.platform.LocalContext.current
+    val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
+
+    val appendUris: (List<Uri>) -> Unit = { newUris ->
+        coroutineScope.launch {
+            val remaining = MAX_BATCH_IMAGES - imageUris.size
+            if (remaining <= 0) {
+                snackbarHostState.showSnackbar("Limit is $MAX_BATCH_IMAGES images")
+                return@launch
+            }
+            val toAdd = newUris.filter { it !in imageUris }.take(remaining)
+            val cached = withContext(Dispatchers.IO) {
+                toAdd.map { uri -> runCatching { cacheInputLocally(context, uri) }.getOrDefault(uri) }
+            }
+            imageUris = imageUris + cached
+            if (newUris.size > toAdd.size) {
+                snackbarHostState.showSnackbar("Capped at $MAX_BATCH_IMAGES images")
+            }
+        }
+    }
 
     LaunchedEffect(capturedUri) {
         val src = capturedUri ?: return@LaunchedEffect
-        imageUri = withContext(Dispatchers.IO) {
-            runCatching { cacheInputLocally(context, src) }.getOrDefault(src)
-        }
+        appendUris(listOf(src))
     }
 
     LaunchedEffect(Unit) {
@@ -147,25 +173,51 @@ fun HomeScreen(
         }
     }
 
-    val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
-    val picker =
+    val pickerSingle =
         rememberLauncherForActivityResult(
             ActivityResultContracts.PickVisualMedia(),
         ) { uri ->
-            if (uri != null) {
-                coroutineScope.launch {
-                    imageUri = withContext(Dispatchers.IO) {
-                        runCatching { cacheInputLocally(context, uri) }.getOrDefault(uri)
-                    }
-                }
-            }
+            if (uri != null) appendUris(listOf(uri))
         }
+    val pickerMulti =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.PickMultipleVisualMedia(MAX_BATCH_IMAGES),
+        ) { uris ->
+            if (uris.isNotEmpty()) appendUris(uris)
+        }
+    val launchPicker: () -> Unit = {
+        val remaining = MAX_BATCH_IMAGES - imageUris.size
+        when {
+            remaining <= 0 -> coroutineScope.launch {
+                snackbarHostState.showSnackbar("Limit is $MAX_BATCH_IMAGES images")
+            }
+            remaining == 1 -> pickerSingle.launch(
+                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+            )
+            else -> pickerMulti.launch(
+                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+            )
+        }
+    }
 
     LaunchedEffect(state) {
-        val s = state
-        if (s is SubmitState.Done) {
-            viewModel.acknowledgeDone()
-            onJobSubmitted(s.jobId)
+        when (val s = state) {
+            is SubmitState.Done -> {
+                viewModel.acknowledgeDone()
+                imageUris = emptyList()
+                onJobSubmitted(s.jobId)
+            }
+            is SubmitState.DoneBatch -> {
+                viewModel.acknowledgeDone()
+                imageUris = emptyList()
+                if (s.failed > 0) {
+                    snackbarHostState.showSnackbar(
+                        "${s.submitted} submitted, ${s.failed} failed",
+                    )
+                }
+                onBatchSubmitted()
+            }
+            else -> Unit
         }
     }
 
@@ -206,17 +258,19 @@ fun HomeScreen(
                 .then(exitModifier),
         ) {
             val onSubmit: () -> Unit = {
-                val uri = imageUri
                 val promptId = selectedPromptId
-                if (uri != null && promptId != null) {
+                if (imageUris.isNotEmpty() && promptId != null) {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    viewModel.submit(uri, promptId, customPromptText)
+                    viewModel.submit(imageUris, promptId, customPromptText)
                 }
+            }
+            val onRemoveImage: (Uri) -> Unit = { uri ->
+                imageUris = imageUris - uri
             }
 
             if (isWide) {
                 WideHomeContent(
-                    imageUri = imageUri,
+                    imageUris = imageUris,
                     prompts = prompts,
                     selectedPromptId = selectedPromptId,
                     customPromptText = customPromptText,
@@ -235,18 +289,16 @@ fun HomeScreen(
                     state = state,
                     health = health,
                     uploadProgress = uploadProgress,
+                    batchProgress = batchProgress,
                     onTakePhoto = onTakePhoto,
-                    onPickGallery = {
-                        picker.launch(
-                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-                        )
-                    },
+                    onPickGallery = launchPicker,
+                    onRemoveImage = onRemoveImage,
                     onSelectPrompt = { selectedPromptId = it },
                     onSubmit = onSubmit,
                 )
             } else {
                 CompactHomeContent(
-                    imageUri = imageUri,
+                    imageUris = imageUris,
                     prompts = prompts,
                     selectedPromptId = selectedPromptId,
                     customPromptText = customPromptText,
@@ -265,12 +317,10 @@ fun HomeScreen(
                     state = state,
                     health = health,
                     uploadProgress = uploadProgress,
+                    batchProgress = batchProgress,
                     onTakePhoto = onTakePhoto,
-                    onPickGallery = {
-                        picker.launch(
-                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-                        )
-                    },
+                    onPickGallery = launchPicker,
+                    onRemoveImage = onRemoveImage,
                     onSelectPrompt = { selectedPromptId = it },
                     onSubmit = onSubmit,
                 )
@@ -323,7 +373,7 @@ fun HomeScreen(
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun CompactHomeContent(
-    imageUri: Uri?,
+    imageUris: List<Uri>,
     prompts: List<PromptDto>,
     selectedPromptId: Long?,
     customPromptText: String,
@@ -336,8 +386,10 @@ private fun CompactHomeContent(
     state: SubmitState,
     health: HealthState,
     uploadProgress: Float?,
+    batchProgress: BatchProgress?,
     onTakePhoto: () -> Unit,
     onPickGallery: () -> Unit,
+    onRemoveImage: (Uri) -> Unit,
     onSelectPrompt: (Long) -> Unit,
     onSubmit: () -> Unit,
 ) {
@@ -361,27 +413,12 @@ private fun CompactHomeContent(
             }
         }
 
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(220.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (imageUri == null) {
-                Text(
-                    "No image selected",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.secondary,
-                )
-            } else {
-                AsyncImage(
-                    model = imageUri,
-                    contentDescription = null,
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
-        }
+        ImagePreviewArea(
+            imageUris = imageUris,
+            singleHeight = 220.dp,
+            onAddMore = onPickGallery,
+            onRemove = onRemoveImage,
+        )
 
         PromptPickerSection(
             prompts = prompts,
@@ -398,23 +435,11 @@ private fun CompactHomeContent(
 
         Spacer(Modifier.weight(1f))
 
-        if (uploadProgress != null) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = "Uploading… ${(uploadProgress * 100).toInt()}%",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                LinearProgressIndicator(
-                    progress = { uploadProgress },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-        }
+        UploadProgressSection(uploadProgress = uploadProgress, batchProgress = batchProgress)
 
         ConnectionIndicator(health)
 
-        val canSubmit = imageUri != null &&
+        val canSubmit = imageUris.isNotEmpty() &&
             selectedPromptId != null &&
             (selectedPromptId != CUSTOM_PROMPT_ID || customPromptText.isNotBlank()) &&
             state !is SubmitState.InFlight
@@ -424,7 +449,7 @@ private fun CompactHomeContent(
             enabled = canSubmit,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text(if (state is SubmitState.InFlight) "Submitting…" else "Generate")
+            Text(submitButtonLabel(state, imageUris.size))
         }
 
         val failure = state as? SubmitState.Failed
@@ -437,7 +462,7 @@ private fun CompactHomeContent(
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun WideHomeContent(
-    imageUri: Uri?,
+    imageUris: List<Uri>,
     prompts: List<PromptDto>,
     selectedPromptId: Long?,
     customPromptText: String,
@@ -450,8 +475,10 @@ private fun WideHomeContent(
     state: SubmitState,
     health: HealthState,
     uploadProgress: Float?,
+    batchProgress: BatchProgress?,
     onTakePhoto: () -> Unit,
     onPickGallery: () -> Unit,
+    onRemoveImage: (Uri) -> Unit,
     onSelectPrompt: (Long) -> Unit,
     onSubmit: () -> Unit,
 ) {
@@ -476,25 +503,12 @@ private fun WideHomeContent(
                 }
             }
 
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (imageUri == null) {
-                    Text(
-                        "No image selected",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.secondary,
-                    )
-                } else {
-                    AsyncImage(
-                        model = imageUri,
-                        contentDescription = null,
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
-            }
+            ImagePreviewArea(
+                imageUris = imageUris,
+                singleHeight = null,
+                onAddMore = onPickGallery,
+                onRemove = onRemoveImage,
+            )
         }
 
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -513,23 +527,11 @@ private fun WideHomeContent(
 
             Spacer(Modifier.weight(1f))
 
-            if (uploadProgress != null) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
-                        text = "Uploading… ${(uploadProgress * 100).toInt()}%",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                    LinearProgressIndicator(
-                        progress = { uploadProgress },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-            }
+            UploadProgressSection(uploadProgress = uploadProgress, batchProgress = batchProgress)
 
             ConnectionIndicator(health)
 
-            val canSubmit = imageUri != null &&
+            val canSubmit = imageUris.isNotEmpty() &&
                 selectedPromptId != null &&
                 (selectedPromptId != CUSTOM_PROMPT_ID || customPromptText.isNotBlank()) &&
                 state !is SubmitState.InFlight
@@ -539,7 +541,7 @@ private fun WideHomeContent(
                 enabled = canSubmit,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text(if (state is SubmitState.InFlight) "Submitting…" else "Generate")
+                Text(submitButtonLabel(state, imageUris.size))
             }
 
             val failure = state as? SubmitState.Failed
@@ -694,6 +696,170 @@ private fun PromptChip(
                     contentDescription = "Delete prompt",
                     tint = MaterialTheme.colorScheme.onError,
                     modifier = Modifier.size(14.dp),
+                )
+            }
+        }
+    }
+}
+
+private const val MAX_BATCH_IMAGES = 20
+
+private val UriListSaver: Saver<List<Uri>, Any> = listSaver(
+    save = { it.toList() },
+    restore = { it },
+)
+
+private fun submitButtonLabel(state: SubmitState, count: Int): String = when {
+    state is SubmitState.InFlight -> "Submitting…"
+    count > 1 -> "Generate $count"
+    else -> "Generate"
+}
+
+@Composable
+private fun UploadProgressSection(
+    uploadProgress: Float?,
+    batchProgress: BatchProgress?,
+) {
+    if (uploadProgress == null && batchProgress == null) return
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        val label = buildString {
+            if (batchProgress != null) {
+                append("Uploading ${batchProgress.current} of ${batchProgress.total}")
+                if (uploadProgress != null) append(" · ${(uploadProgress * 100).toInt()}%")
+            } else if (uploadProgress != null) {
+                append("Uploading… ${(uploadProgress * 100).toInt()}%")
+            }
+        }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        if (uploadProgress != null) {
+            LinearProgressIndicator(
+                progress = { uploadProgress },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ImagePreviewArea(
+    imageUris: List<Uri>,
+    singleHeight: androidx.compose.ui.unit.Dp?,
+    onAddMore: () -> Unit,
+    onRemove: (Uri) -> Unit,
+) {
+    when {
+        imageUris.isEmpty() -> {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .let { if (singleHeight != null) it.height(singleHeight) else it.heightIn(min = 220.dp) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    "No image selected",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.secondary,
+                )
+            }
+        }
+        imageUris.size == 1 -> {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .let { if (singleHeight != null) it.height(singleHeight) else it.heightIn(min = 220.dp) },
+                contentAlignment = Alignment.Center,
+            ) {
+                AsyncImage(
+                    model = imageUris[0],
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
+        else -> {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "${imageUris.size} images · same prompt",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.secondary,
+                )
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(imageUris, key = { it.toString() }) { uri ->
+                        ImageThumb(uri = uri, onRemove = { onRemove(uri) })
+                    }
+                    if (imageUris.size < MAX_BATCH_IMAGES) {
+                        item(key = "__add_more__") {
+                            AddMoreTile(onClick = onAddMore)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ImageThumb(uri: Uri, onRemove: () -> Unit) {
+    Box(modifier = Modifier.size(96.dp)) {
+        AsyncImage(
+            model = uri,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(RoundedCornerShape(8.dp)),
+        )
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .offset(x = 4.dp, y = (-4).dp)
+                .size(22.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.7f))
+                .combinedClickable(onClick = onRemove, onLongClick = {}),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = "Remove image",
+                tint = Color.White,
+                modifier = Modifier.size(14.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun AddMoreTile(onClick: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        modifier = Modifier
+            .size(96.dp)
+            .combinedClickable(onClick = onClick, onLongClick = {}),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Add more images",
+                    tint = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = "Add more",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
             }
         }
