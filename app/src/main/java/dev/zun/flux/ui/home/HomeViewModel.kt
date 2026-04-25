@@ -27,7 +27,7 @@ sealed interface SubmitState {
 
     data class Done(val jobId: String) : SubmitState
 
-    data class DoneBatch(val submitted: Int, val failed: Int) : SubmitState
+    data class DoneBatch(val submittedIds: List<String>, val failed: Int) : SubmitState
 
     data class Failed(val message: String) : SubmitState
 }
@@ -177,24 +177,24 @@ class HomeViewModel(
         _uploadProgress.value = 0f
         _batchProgress.value = BatchProgress(current = 1, total = inputUris.size)
         viewModelScope.launch {
-            var submitted = 0
+            val submittedIds = mutableListOf<String>()
             var failed = 0
             inputUris.forEachIndexed { index, uri ->
                 _batchProgress.value = BatchProgress(current = index + 1, total = inputUris.size)
                 _uploadProgress.value = 0f
                 try {
-                    submitOne(uri, selectedPromptId, customPromptText)
-                    submitted++
+                    val resp = submitOne(uri, selectedPromptId, customPromptText)
+                    submittedIds += resp.job_id
                 } catch (_: Throwable) {
                     failed++
                 }
             }
             _uploadProgress.value = null
             _batchProgress.value = null
-            _state.value = if (submitted == 0) {
+            _state.value = if (submittedIds.isEmpty()) {
                 SubmitState.Failed("All $failed uploads failed")
             } else {
-                SubmitState.DoneBatch(submitted = submitted, failed = failed)
+                SubmitState.DoneBatch(submittedIds = submittedIds, failed = failed)
             }
         }
     }

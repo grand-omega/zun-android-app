@@ -212,6 +212,19 @@ class FakeJobRepository(
         // No-op for fake
     }
 
+    override fun recentInputIds(limit: Int): Flow<List<Int>> = updates.map {
+        entries.values.sortedByDescending { it.createdAt }
+            .map { it.inputId }
+            .distinct()
+            .take(limit)
+    }
+
+    override suspend fun downloadInputToCache(inputId: Int): Uri {
+        delay(200)
+        return entries.values.firstOrNull { it.inputId == inputId }?.inputUri
+            ?: error("Unknown fake input: $inputId")
+    }
+
     override fun inputModel(inputId: Int?): Any? = inputId?.let { id ->
         entries.values.firstOrNull { it.inputId == id }?.inputUri
     }

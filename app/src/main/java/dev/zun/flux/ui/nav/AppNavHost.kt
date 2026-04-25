@@ -16,6 +16,7 @@ import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.ui.capture.CameraScreen
 import dev.zun.flux.ui.gallery.GalleryScaffold
 import dev.zun.flux.ui.home.HomeScreen
+import dev.zun.flux.ui.progress.BatchProgressScreen
 import dev.zun.flux.ui.progress.ProgressScreen
 import dev.zun.flux.ui.result.ResultScreen
 import dev.zun.flux.ui.settings.SettingsScreen
@@ -55,8 +56,8 @@ fun AppNavHost(
                 onJobSubmitted = { jobId ->
                     nav.navigate(Routes.progress(jobId))
                 },
-                onBatchSubmitted = {
-                    nav.navigate(Routes.GALLERY)
+                onBatchSubmitted = { jobIds ->
+                    nav.navigate(Routes.batch(jobIds))
                 },
             )
         }
@@ -111,6 +112,17 @@ fun AppNavHost(
                 repository = repository,
                 windowSizeClass = windowSizeClass,
                 onTryAnotherPrompt = { nav.popBackStack(Routes.HOME, inclusive = false) },
+                onBack = { nav.popBackStack() },
+            )
+        }
+        composable(Routes.BATCH_PROGRESS) { entry ->
+            val jobIds = entry.arguments?.getString("jobIds").orEmpty()
+                .split(",")
+                .filter { it.isNotEmpty() }
+            BatchProgressScreen(
+                jobIds = jobIds,
+                repository = repository,
+                onViewResult = { id -> nav.navigate(Routes.result(id)) },
                 onBack = { nav.popBackStack(Routes.HOME, inclusive = false) },
             )
         }

@@ -71,6 +71,16 @@ interface JobRepository {
 
     fun getJobFlow(jobId: String): Flow<JobStatusDto?>
 
+    /** Most-recent-first distinct input_ids derived from local job history. */
+    fun recentInputIds(limit: Int): Flow<List<Int>>
+
+    /**
+     * Downloads an existing server-side input into private cache and returns a
+     * `file://` Uri. Used to re-pick a recently-uploaded image without going
+     * through the system photo picker.
+     */
+    suspend fun downloadInputToCache(inputId: Int): Uri
+
     suspend fun syncHistory()
 
     /** Anything Coil can load. Null when [inputId] is null or we have no server URL. */

@@ -100,7 +100,7 @@ fun HomeScreen(
     onGalleryClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onJobSubmitted: (String) -> Unit,
-    onBatchSubmitted: () -> Unit,
+    onBatchSubmitted: (List<String>) -> Unit,
 ) {
     val viewModel: HomeViewModel =
         viewModel(
@@ -115,6 +115,8 @@ fun HomeScreen(
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val uploadProgress by viewModel.uploadProgress.collectAsStateWithLifecycle()
     val batchProgress by viewModel.batchProgress.collectAsStateWithLifecycle()
+    val recentInputIds by remember { repository.recentInputIds(3) }
+        .collectAsStateWithLifecycle(initialValue = emptyList())
     val haptic = LocalHapticFeedback.current
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -212,10 +214,10 @@ fun HomeScreen(
                 imageUris = emptyList()
                 if (s.failed > 0) {
                     snackbarHostState.showSnackbar(
-                        "${s.submitted} submitted, ${s.failed} failed",
+                        "${s.submittedIds.size} submitted, ${s.failed} failed",
                     )
                 }
-                onBatchSubmitted()
+                onBatchSubmitted(s.submittedIds)
             }
             else -> Unit
         }
@@ -267,6 +269,25 @@ fun HomeScreen(
             val onRemoveImage: (Uri) -> Unit = { uri ->
                 imageUris = imageUris - uri
             }
+            var isFetchingRecent by remember { mutableStateOf(false) }
+            val onPickRecent: (Int) -> Unit = { inputId ->
+                if (!isFetchingRecent) {
+                    coroutineScope.launch {
+                        isFetchingRecent = true
+                        try {
+                            val uri = withContext(Dispatchers.IO) {
+                                repository.downloadInputToCache(inputId)
+                            }
+                            appendUris(listOf(uri))
+                        } catch (_: Throwable) {
+                            snackbarHostState.showSnackbar("Couldn't load that image")
+                        } finally {
+                            isFetchingRecent = false
+                        }
+                    }
+                }
+            }
+            val recents = recentInputIds.map { id -> id to repository.inputModel(id) }
 
             if (isWide) {
                 WideHomeContent(
@@ -295,6 +316,9 @@ fun HomeScreen(
                     onRemoveImage = onRemoveImage,
                     onSelectPrompt = { selectedPromptId = it },
                     onSubmit = onSubmit,
+                    recents = recents,
+                    isFetchingRecent = isFetchingRecent,
+                    onPickRecent = onPickRecent,
                 )
             } else {
                 CompactHomeContent(
@@ -323,6 +347,9 @@ fun HomeScreen(
                     onRemoveImage = onRemoveImage,
                     onSelectPrompt = { selectedPromptId = it },
                     onSubmit = onSubmit,
+                    recents = recents,
+                    isFetchingRecent = isFetchingRecent,
+                    onPickRecent = onPickRecent,
                 )
             }
         }
@@ -392,6 +419,9 @@ private fun CompactHomeContent(
     onRemoveImage: (Uri) -> Unit,
     onSelectPrompt: (Long) -> Unit,
     onSubmit: () -> Unit,
+    recents: List<Pair<Int, Any?>>,
+    isFetchingRecent: Boolean,
+    onPickRecent: (Int) -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -412,6 +442,12 @@ private fun CompactHomeContent(
                 Text("From gallery")
             }
         }
+
+        RecentInputsRow(
+            recents = recents,
+            enabled = !isFetchingRecent,
+            onTap = onPickRecent,
+        )
 
         ImagePreviewArea(
             imageUris = imageUris,
@@ -481,6 +517,9 @@ private fun WideHomeContent(
     onRemoveImage: (Uri) -> Unit,
     onSelectPrompt: (Long) -> Unit,
     onSubmit: () -> Unit,
+    recents: List<Pair<Int, Any?>>,
+    isFetchingRecent: Boolean,
+    onPickRecent: (Int) -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -502,6 +541,12 @@ private fun WideHomeContent(
                     Text("From gallery")
                 }
             }
+
+            RecentInputsRow(
+                recents = recents,
+                enabled = !isFetchingRecent,
+                onTap = onPickRecent,
+            )
 
             ImagePreviewArea(
                 imageUris = imageUris,
@@ -740,6 +785,40 @@ private fun UploadProgressSection(
                 progress = { uploadProgress },
                 modifier = Modifier.fillMaxWidth(),
             )
+        }
+    }
+}
+
+@Composable
+private fun RecentInputsRow(
+    recents: List<Pair<Int, Any?>>,
+    enabled: Boolean,
+    onTap: (Int) -> Unit,
+) {
+    if (recents.isEmpty()) return
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            "Recent uploads",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.secondary,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            recents.forEach { (id, model) ->
+                AsyncImage(
+                    model = model,
+                    contentDescription = "Recent upload",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .combinedClickable(
+                            enabled = enabled,
+                            onClick = { onTap(id) },
+                            onLongClick = {},
+                        ),
+                )
+            }
         }
     }
 }
