@@ -272,22 +272,31 @@ fun HomeScreen(
             var isFetchingRecent by remember { mutableStateOf(false) }
             val onPickRecent: (Int) -> Unit = { inputId ->
                 if (!isFetchingRecent) {
-                    coroutineScope.launch {
-                        isFetchingRecent = true
-                        try {
-                            val uri = withContext(Dispatchers.IO) {
-                                repository.downloadInputToCache(inputId)
+                    val expectedUri = repository.recentInputUri(inputId)
+                    if (expectedUri in imageUris) {
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar("Already in your selection")
+                        }
+                    } else {
+                        coroutineScope.launch {
+                            isFetchingRecent = true
+                            try {
+                                val uri = withContext(Dispatchers.IO) {
+                                    repository.downloadInputToCache(inputId)
+                                }
+                                appendUris(listOf(uri))
+                            } catch (_: Throwable) {
+                                snackbarHostState.showSnackbar("Couldn't load that image")
+                            } finally {
+                                isFetchingRecent = false
                             }
-                            appendUris(listOf(uri))
-                        } catch (_: Throwable) {
-                            snackbarHostState.showSnackbar("Couldn't load that image")
-                        } finally {
-                            isFetchingRecent = false
                         }
                     }
                 }
             }
-            val recents = recentInputIds.map { id -> id to repository.inputModel(id) }
+            val recents = recentInputIds.map { id ->
+                Triple(id, repository.inputModel(id), repository.recentInputUri(id) in imageUris)
+            }
 
             if (isWide) {
                 WideHomeContent(
@@ -419,7 +428,7 @@ private fun CompactHomeContent(
     onRemoveImage: (Uri) -> Unit,
     onSelectPrompt: (Long) -> Unit,
     onSubmit: () -> Unit,
-    recents: List<Pair<Int, Any?>>,
+    recents: List<Triple<Int, Any?, Boolean>>,
     isFetchingRecent: Boolean,
     onPickRecent: (Int) -> Unit,
 ) {
@@ -517,7 +526,7 @@ private fun WideHomeContent(
     onRemoveImage: (Uri) -> Unit,
     onSelectPrompt: (Long) -> Unit,
     onSubmit: () -> Unit,
-    recents: List<Pair<Int, Any?>>,
+    recents: List<Triple<Int, Any?, Boolean>>,
     isFetchingRecent: Boolean,
     onPickRecent: (Int) -> Unit,
 ) {
@@ -791,7 +800,7 @@ private fun UploadProgressSection(
 
 @Composable
 private fun RecentInputsRow(
-    recents: List<Pair<Int, Any?>>,
+    recents: List<Triple<Int, Any?, Boolean>>,
     enabled: Boolean,
     onTap: (Int) -> Unit,
 ) {
@@ -803,21 +812,38 @@ private fun RecentInputsRow(
             color = MaterialTheme.colorScheme.secondary,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            recents.forEach { (id, model) ->
-                AsyncImage(
-                    model = model,
-                    contentDescription = "Recent upload",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(64.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .combinedClickable(
-                            enabled = enabled,
-                            onClick = { onTap(id) },
-                            onLongClick = {},
-                        ),
-                )
+            recents.forEach { (id, model, selected) ->
+                Box(modifier = Modifier.size(64.dp)) {
+                    AsyncImage(
+                        model = model,
+                        contentDescription = "Recent upload",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .combinedClickable(
+                                enabled = enabled,
+                                onClick = { onTap(id) },
+                                onLongClick = {},
+                            ),
+                    )
+                    if (selected) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color.Black.copy(alpha = 0.45f)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "Already selected",
+                                tint = Color.White,
+                            )
+                        }
+                    }
+                }
             }
         }
     }
