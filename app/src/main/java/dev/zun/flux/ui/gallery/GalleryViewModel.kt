@@ -11,9 +11,24 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+
+/** What the user is filtering the gallery by. */
+sealed interface TagFilter {
+    data object All : TagFilter
+    data class ByPromptId(val promptId: Long) : TagFilter
+    data object Custom : TagFilter
+}
+
+/** A choice in the tag-filter dropdown. */
+data class TagOption(
+    val filter: TagFilter,
+    val label: String,
+    val count: Int,
+)
 
 class GalleryViewModel(
     private val repository: JobRepository,
@@ -21,13 +36,52 @@ class GalleryViewModel(
     private val _selectedIds = MutableStateFlow<Set<String>>(emptySet())
     val selectedIds: StateFlow<Set<String>> = _selectedIds.asStateFlow()
 
-    val jobs: StateFlow<List<JobSummaryDto>> =
+    private val allJobs: StateFlow<List<JobSummaryDto>> =
         repository.getJobsFlow()
             .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     val prompts: StateFlow<List<PromptDto>> =
         repository.promptsState
             .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    private val _tagFilter = MutableStateFlow<TagFilter>(TagFilter.All)
+    val tagFilter: StateFlow<TagFilter> = _tagFilter.asStateFlow()
+
+    /** Jobs visible to the user — already filtered by [tagFilter]. */
+    val jobs: StateFlow<List<JobSummaryDto>> =
+        combine(allJobs, _tagFilter) { all, filter ->
+            when (filter) {
+                TagFilter.All -> all
+                is TagFilter.ByPromptId -> all.filter { it.prompt_id == filter.promptId }
+                TagFilter.Custom -> all.filter { it.prompt_id == null && it.prompt_text != null }
+            }
+        }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    /** Tag choices to show in the filter dropdown. */
+    val availableTags: StateFlow<List<TagOption>> =
+        combine(allJobs, prompts) { all, ps ->
+            buildList {
+                add(TagOption(TagFilter.All, "All", all.size))
+                all.asSequence()
+                    .mapNotNull { it.prompt_id }
+                    .groupingBy { it }
+                    .eachCount()
+                    .entries
+                    .sortedByDescending { it.value }
+                    .forEach { (id, count) ->
+                        val label = ps.firstOrNull { it.id == id }?.label ?: "Unknown prompt"
+                        add(TagOption(TagFilter.ByPromptId(id), label, count))
+                    }
+                val customCount = all.count { it.prompt_id == null && it.prompt_text != null }
+                if (customCount > 0) {
+                    add(TagOption(TagFilter.Custom, "Custom prompts", customCount))
+                }
+            }
+        }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    fun setTagFilter(filter: TagFilter) {
+        _tagFilter.value = filter
+    }
 
     val isSelectionMode: StateFlow<Boolean> =
         _selectedIds.map { it.isNotEmpty() }
