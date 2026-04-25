@@ -85,6 +85,7 @@ fun PhotoViewerScreen(
         )
 
     var showDetails by remember { mutableStateOf(false) }
+    var showOriginalInput by remember { mutableStateOf(false) }
     var showContextMenu by remember { mutableStateOf(false) }
     var showUI by remember { mutableStateOf(true) }
 
@@ -155,6 +156,15 @@ fun PhotoViewerScreen(
                             showDetails = true
                         },
                     )
+                    if (job.input_id != null) {
+                        DropdownMenuItem(
+                            text = { Text("View original input") },
+                            onClick = {
+                                showContextMenu = false
+                                showOriginalInput = true
+                            },
+                        )
+                    }
                     DropdownMenuItem(
                         text = { Text("Save to photos") },
                         onClick = {
@@ -201,6 +211,47 @@ fun PhotoViewerScreen(
                             onClose = { showDetails = false },
                         )
                     }
+                }
+            }
+
+            // Original Input Overlay
+            if (showOriginalInput) {
+                val currentJob = jobs.getOrNull(pagerState.currentPage)
+                val inputId = currentJob?.input_id
+                if (inputId != null) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.92f))
+                            .combinedClickable(
+                                onClick = { showOriginalInput = false },
+                                onLongClick = {},
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        AsyncImage(
+                            model = repository.inputModel(inputId),
+                            contentDescription = "Original input",
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                        Surface(
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .padding(top = 16.dp),
+                            color = Color.Black.copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(16.dp),
+                        ) {
+                            Text(
+                                text = "Original input · tap to close",
+                                color = Color.White,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                style = MaterialTheme.typography.labelMedium,
+                            )
+                        }
+                    }
+                } else {
+                    showOriginalInput = false
                 }
             }
 
