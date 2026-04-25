@@ -194,13 +194,19 @@ class RealJobRepository(
     }
 
     override suspend fun downloadInputToCache(inputId: Int): Uri {
-        val body = api.downloadInputFile(inputId)
-        val outFile = java.io.File(context.cacheDir, "input_${System.currentTimeMillis()}.jpg")
-        body.byteStream().use { input ->
-            outFile.outputStream().use { output -> input.copyTo(output) }
+        val outFile = recentInputCacheFile(inputId)
+        if (!outFile.exists() || outFile.length() == 0L) {
+            val body = api.downloadInputFile(inputId)
+            body.byteStream().use { input ->
+                outFile.outputStream().use { output -> input.copyTo(output) }
+            }
         }
         return Uri.fromFile(outFile)
     }
+
+    override fun recentInputUri(inputId: Int): Uri = Uri.fromFile(recentInputCacheFile(inputId))
+
+    private fun recentInputCacheFile(inputId: Int): java.io.File = java.io.File(context.cacheDir, "input_recent_$inputId.jpg")
 
     override suspend fun syncHistory() {
         try {
