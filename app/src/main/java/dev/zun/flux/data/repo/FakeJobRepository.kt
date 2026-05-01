@@ -212,6 +212,10 @@ class FakeJobRepository(
         // No-op for fake
     }
 
+    override suspend fun syncPendingDeletes() {
+        // No-op for fake
+    }
+
     override fun recentInputIds(limit: Int): Flow<List<Int>> = updates.map {
         entries.values.sortedByDescending { it.createdAt }
             .map { it.inputId }

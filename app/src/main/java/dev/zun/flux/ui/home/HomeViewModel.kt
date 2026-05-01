@@ -3,6 +3,7 @@ package dev.zun.flux.ui.home
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.zun.flux.data.api.JobCreatedResponse
 import dev.zun.flux.data.api.PromptDto
 import dev.zun.flux.data.repo.JobRepository
 import kotlinx.coroutines.channels.Channel
@@ -19,6 +20,7 @@ const val CUSTOM_PROMPT_ID: Long = -1L
 
 /** Default workflow for free-text submissions when the user writes a custom prompt. */
 private const val DEFAULT_CUSTOM_WORKFLOW = "flux2_klein_edit"
+private const val TRY_HARDER_WORKFLOW = "flux2_klein_9b_kv_edit"
 
 sealed interface SubmitState {
     data object Idle : SubmitState
@@ -137,14 +139,15 @@ class HomeViewModel(
         inputUris: List<Uri>,
         selectedPromptId: Long,
         customPromptText: String,
+        tryHarder: Boolean,
     ) {
         if (_state.value is SubmitState.InFlight) return
         if (inputUris.isEmpty()) return
 
         if (inputUris.size == 1) {
-            submitSingle(inputUris[0], selectedPromptId, customPromptText)
+            submitSingle(inputUris[0], selectedPromptId, customPromptText, tryHarder)
         } else {
-            submitBatch(inputUris, selectedPromptId, customPromptText)
+            submitBatch(inputUris, selectedPromptId, customPromptText, tryHarder)
         }
     }
 
@@ -152,13 +155,14 @@ class HomeViewModel(
         inputUri: Uri,
         selectedPromptId: Long,
         customPromptText: String,
+        tryHarder: Boolean,
     ) {
         _state.value = SubmitState.InFlight
         _uploadProgress.value = 0f
         viewModelScope.launch {
             _state.value =
                 try {
-                    val resp = submitOne(inputUri, selectedPromptId, customPromptText)
+                    val resp = submitOne(inputUri, selectedPromptId, customPromptText, tryHarder)
                     SubmitState.Done(resp.job_id)
                 } catch (t: Throwable) {
                     SubmitState.Failed(t.message ?: t::class.simpleName.orEmpty())
@@ -172,6 +176,7 @@ class HomeViewModel(
         inputUris: List<Uri>,
         selectedPromptId: Long,
         customPromptText: String,
+        tryHarder: Boolean,
     ) {
         _state.value = SubmitState.InFlight
         _uploadProgress.value = 0f
@@ -183,7 +188,7 @@ class HomeViewModel(
                 _batchProgress.value = BatchProgress(current = index + 1, total = inputUris.size)
                 _uploadProgress.value = 0f
                 try {
-                    val resp = submitOne(uri, selectedPromptId, customPromptText)
+                    val resp = submitOne(uri, selectedPromptId, customPromptText, tryHarder)
                     submittedIds += resp.job_id
                 } catch (_: Throwable) {
                     failed++
@@ -203,19 +208,24 @@ class HomeViewModel(
         inputUri: Uri,
         selectedPromptId: Long,
         customPromptText: String,
-    ) = if (selectedPromptId == CUSTOM_PROMPT_ID) {
-        repository.submitJob(
-            inputUri = inputUri,
-            promptText = customPromptText,
-            workflow = DEFAULT_CUSTOM_WORKFLOW,
-            onUploadProgress = { progress -> _uploadProgress.value = progress },
-        )
-    } else {
-        repository.submitJob(
-            inputUri = inputUri,
-            promptId = selectedPromptId,
-            onUploadProgress = { progress -> _uploadProgress.value = progress },
-        )
+        tryHarder: Boolean,
+    ): JobCreatedResponse {
+        val workflow = if (tryHarder) TRY_HARDER_WORKFLOW else DEFAULT_CUSTOM_WORKFLOW
+        return if (selectedPromptId == CUSTOM_PROMPT_ID) {
+            repository.submitJob(
+                inputUri = inputUri,
+                promptText = customPromptText,
+                workflow = workflow,
+                onUploadProgress = { progress -> _uploadProgress.value = progress },
+            )
+        } else {
+            repository.submitJob(
+                inputUri = inputUri,
+                promptId = selectedPromptId,
+                workflow = workflow,
+                onUploadProgress = { progress -> _uploadProgress.value = progress },
+            )
+        }
     }
 
     fun acknowledgeDone() {

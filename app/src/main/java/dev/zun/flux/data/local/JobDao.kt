@@ -11,8 +11,26 @@ interface JobDao {
     @Query("SELECT * FROM jobs ORDER BY createdAt DESC")
     fun getAllJobs(): Flow<List<JobEntity>>
 
+    @Query(
+        """
+        SELECT * FROM jobs
+        WHERE id NOT IN (SELECT jobId FROM pending_deletes)
+        ORDER BY createdAt DESC
+        """,
+    )
+    fun getVisibleJobs(): Flow<List<JobEntity>>
+
     @Query("SELECT * FROM jobs WHERE id = :jobId")
     suspend fun getJobById(jobId: String): JobEntity?
+
+    @Query(
+        """
+        SELECT * FROM jobs
+        WHERE id = :jobId
+        AND id NOT IN (SELECT jobId FROM pending_deletes)
+        """,
+    )
+    fun getVisibleJobByIdFlow(jobId: String): Flow<JobEntity?>
 
     @Query("SELECT * FROM jobs WHERE id = :jobId")
     fun getJobByIdFlow(jobId: String): Flow<JobEntity?>
@@ -25,4 +43,16 @@ interface JobDao {
 
     @Query("DELETE FROM jobs WHERE id = :jobId")
     suspend fun deleteJobById(jobId: String)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPendingDelete(pendingDelete: PendingDeleteEntity)
+
+    @Query("DELETE FROM pending_deletes WHERE jobId = :jobId")
+    suspend fun deletePendingDelete(jobId: String)
+
+    @Query("SELECT * FROM pending_deletes ORDER BY createdAt ASC")
+    suspend fun getPendingDeletes(): List<PendingDeleteEntity>
+
+    @Query("SELECT jobId FROM pending_deletes")
+    suspend fun getPendingDeleteIds(): List<String>
 }

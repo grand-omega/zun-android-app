@@ -36,7 +36,8 @@ fun SetupScreen(
     onSuccess: () -> Unit,
 ) {
     val settings = app.settingsManager
-    var url by remember { mutableStateOf(settings.serverUrl ?: "http://") }
+    var lanUrl by remember { mutableStateOf(settings.lanUrl ?: "http://") }
+    var tailscaleUrl by remember { mutableStateOf(settings.tailscaleUrl ?: "http://") }
     var token by remember { mutableStateOf(settings.apiToken ?: "") }
 
     var isTesting by remember { mutableStateOf(false) }
@@ -69,13 +70,28 @@ fun SetupScreen(
             )
 
             OutlinedTextField(
-                value = url,
+                value = lanUrl,
                 onValueChange = {
-                    url = it
+                    lanUrl = it
                     error = null
                 },
-                label = { Text("Server URL") },
+                label = { Text("LAN URL (used at home)") },
                 placeholder = { Text("http://192.168.1.15:8080") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                isError = error != null,
+            )
+
+            Spacer(Modifier.height(16.dp))
+
+            OutlinedTextField(
+                value = tailscaleUrl,
+                onValueChange = {
+                    tailscaleUrl = it
+                    error = null
+                },
+                label = { Text("Tailscale URL (used away)") },
+                placeholder = { Text("http://100.x.y.z:8080") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 isError = error != null,
@@ -112,17 +128,18 @@ fun SetupScreen(
                     error = null
                     scope.launch {
                         try {
-                            // 1. Save temporarily to test
-                            settings.serverUrl = url.trim().removeSuffix("/")
+                            val lan = lanUrl.trim().removeSuffix("/").takeIf { it.isNotBlank() && it != "http://" }
+                            val ts = tailscaleUrl.trim().removeSuffix("/").takeIf { it.isNotBlank() && it != "http://" }
+                            settings.lanUrl = lan
+                            settings.tailscaleUrl = ts
                             settings.apiToken = token.trim()
 
-                            // 2. Rebuild repo to point to new URL
-                            app.rebuildRepository()
+                            // Pick LAN if reachable, else Tailscale; updates serverUrl + rebuilds repo.
+                            app.networkResolver.refreshNow()
 
-                            // 3. Validate Token & Connectivity (listPrompts requires Auth)
+                            // Validate token & connectivity (listPrompts requires auth).
                             app.repository.listPrompts()
 
-                            // 4. Success!
                             onSuccess()
                         } catch (t: Throwable) {
                             error =
@@ -137,7 +154,7 @@ fun SetupScreen(
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = !isTesting && url.isNotBlank() && token.isNotBlank(),
+                enabled = !isTesting && (lanUrl.isNotBlank() || tailscaleUrl.isNotBlank()) && token.isNotBlank(),
             ) {
                 if (isTesting) {
                     CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp), color = MaterialTheme.colorScheme.onPrimary)

@@ -13,9 +13,11 @@ import dev.zun.flux.data.api.NeedUploadResponse
 import dev.zun.flux.data.api.ProgressRequestBody
 import dev.zun.flux.data.api.PromptDto
 import dev.zun.flux.data.local.AppDatabase
+import dev.zun.flux.data.local.PendingDeleteEntity
 import dev.zun.flux.data.local.toEntity
 import dev.zun.flux.data.local.toStatusDto
 import dev.zun.flux.data.local.toSummaryDto
+import dev.zun.flux.data.worker.DeleteSyncWorker
 import dev.zun.flux.util.prepareImageForUpload
 import dev.zun.flux.util.sha256Hex
 import kotlinx.coroutines.delay
@@ -29,6 +31,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import retrofit2.HttpException
 import java.io.IOException
 
 class RealJobRepository(
@@ -158,19 +161,23 @@ class RealJobRepository(
         inputId: Int?,
     ): JobListResponse {
         val resp = api.listJobs(status, limit, cursor, inputId)
-        dao.insertJobs(resp.items.map { it.toEntity() })
+        val pendingDeleteIds = dao.getPendingDeleteIds().toSet()
+        dao.insertJobs(resp.items.filterNot { it.id in pendingDeleteIds }.map { it.toEntity() })
         return resp
     }
 
     override suspend fun deleteJob(jobId: String) {
-        api.deleteJob(jobId)
-        dao.deleteJobById(jobId)
+        dao.insertPendingDelete(PendingDeleteEntity(jobId = jobId, createdAt = System.currentTimeMillis()))
+        DeleteSyncWorker.enqueue(context)
     }
 
     override suspend fun restoreJob(jobId: String) {
-        api.restoreJob(jobId)
-        // Repopulate local copy from server.
-        runCatching { getJob(jobId) }
+        dao.deletePendingDelete(jobId)
+        runCatching {
+            api.restoreJob(jobId)
+            // Repopulate local copy from server.
+            getJob(jobId)
+        }
     }
 
     override suspend fun cancelJob(jobId: String) {
@@ -179,13 +186,13 @@ class RealJobRepository(
         runCatching { getJob(jobId) }
     }
 
-    override fun getJobsFlow(): Flow<List<JobSummaryDto>> = dao.getAllJobs().map { entities ->
+    override fun getJobsFlow(): Flow<List<JobSummaryDto>> = dao.getVisibleJobs().map { entities ->
         entities.filter { it.status == "done" }.map { it.toSummaryDto() }
     }
 
-    override fun getJobFlow(jobId: String): Flow<JobStatusDto?> = dao.getJobByIdFlow(jobId).map { it?.toStatusDto() }
+    override fun getJobFlow(jobId: String): Flow<JobStatusDto?> = dao.getVisibleJobByIdFlow(jobId).map { it?.toStatusDto() }
 
-    override fun recentInputIds(limit: Int): Flow<List<Int>> = dao.getAllJobs().map { entities ->
+    override fun recentInputIds(limit: Int): Flow<List<Int>> = dao.getVisibleJobs().map { entities ->
         entities.asSequence()
             .mapNotNull { it.inputId }
             .distinct()
@@ -209,9 +216,11 @@ class RealJobRepository(
     private fun recentInputCacheFile(inputId: Int): java.io.File = java.io.File(context.cacheDir, "input_recent_$inputId.jpg")
 
     override suspend fun syncHistory() {
+        runCatching { syncPendingDeletes() }
         try {
             val resp = api.listJobs(status = "done", limit = 100)
-            dao.insertJobs(resp.items.map { it.toEntity() })
+            val pendingDeleteIds = dao.getPendingDeleteIds().toSet()
+            dao.insertJobs(resp.items.filterNot { it.id in pendingDeleteIds }.map { it.toEntity() })
         } catch (_: Exception) {
             // Ignore background sync errors
         }
@@ -220,6 +229,23 @@ class RealJobRepository(
             _promptsState.value = api.listPrompts().items
         } catch (_: Exception) {
             // Ignore
+        }
+    }
+
+    override suspend fun syncPendingDeletes() {
+        dao.getPendingDeletes().forEach { pendingDelete ->
+            try {
+                api.deleteJob(pendingDelete.jobId)
+                dao.deleteJobById(pendingDelete.jobId)
+                dao.deletePendingDelete(pendingDelete.jobId)
+            } catch (e: HttpException) {
+                if (e.code() == 404) {
+                    dao.deleteJobById(pendingDelete.jobId)
+                    dao.deletePendingDelete(pendingDelete.jobId)
+                } else {
+                    throw e
+                }
+            }
         }
     }
 

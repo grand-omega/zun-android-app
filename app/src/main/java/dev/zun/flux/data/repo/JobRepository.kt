@@ -92,6 +92,9 @@ interface JobRepository {
 
     suspend fun syncHistory()
 
+    /** Flushes locally queued server deletes. Safe to call from background workers. */
+    suspend fun syncPendingDeletes()
+
     /** Anything Coil can load. Null when [inputId] is null or we have no server URL. */
     fun inputModel(inputId: Int?): Any?
 

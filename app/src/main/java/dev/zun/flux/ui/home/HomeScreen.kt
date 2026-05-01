@@ -53,6 +53,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -126,6 +127,7 @@ fun HomeScreen(
     var deleteMode by rememberSaveable { mutableStateOf(false) }
     var showSaveDialog by rememberSaveable { mutableStateOf(false) }
     var saveDialogLabel by rememberSaveable { mutableStateOf("") }
+    var tryHarder by rememberSaveable { mutableStateOf(false) }
 
     val context = androidx.compose.ui.platform.LocalContext.current
     val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
@@ -263,7 +265,7 @@ fun HomeScreen(
                 val promptId = selectedPromptId
                 if (imageUris.isNotEmpty() && promptId != null) {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    viewModel.submit(imageUris, promptId, customPromptText)
+                    viewModel.submit(imageUris, promptId, customPromptText, tryHarder)
                 }
             }
             val onRemoveImage: (Uri) -> Unit = { uri ->
@@ -305,6 +307,8 @@ fun HomeScreen(
                     selectedPromptId = selectedPromptId,
                     customPromptText = customPromptText,
                     onCustomPromptChange = { customPromptText = it },
+                    tryHarder = tryHarder,
+                    onTryHarderChange = { tryHarder = it },
                     deleteMode = deleteMode,
                     onLongPressChip = { deleteMode = true },
                     onExitDeleteMode = { deleteMode = false },
@@ -336,6 +340,8 @@ fun HomeScreen(
                     selectedPromptId = selectedPromptId,
                     customPromptText = customPromptText,
                     onCustomPromptChange = { customPromptText = it },
+                    tryHarder = tryHarder,
+                    onTryHarderChange = { tryHarder = it },
                     deleteMode = deleteMode,
                     onLongPressChip = { deleteMode = true },
                     onExitDeleteMode = { deleteMode = false },
@@ -414,6 +420,8 @@ private fun CompactHomeContent(
     selectedPromptId: Long?,
     customPromptText: String,
     onCustomPromptChange: (String) -> Unit,
+    tryHarder: Boolean,
+    onTryHarderChange: (Boolean) -> Unit,
     deleteMode: Boolean,
     onLongPressChip: () -> Unit,
     onExitDeleteMode: () -> Unit,
@@ -470,6 +478,8 @@ private fun CompactHomeContent(
             selectedPromptId = selectedPromptId,
             customPromptText = customPromptText,
             onCustomPromptChange = onCustomPromptChange,
+            tryHarder = tryHarder,
+            onTryHarderChange = onTryHarderChange,
             deleteMode = deleteMode,
             onLongPressChip = onLongPressChip,
             onExitDeleteMode = onExitDeleteMode,
@@ -512,6 +522,8 @@ private fun WideHomeContent(
     selectedPromptId: Long?,
     customPromptText: String,
     onCustomPromptChange: (String) -> Unit,
+    tryHarder: Boolean,
+    onTryHarderChange: (Boolean) -> Unit,
     deleteMode: Boolean,
     onLongPressChip: () -> Unit,
     onExitDeleteMode: () -> Unit,
@@ -571,6 +583,8 @@ private fun WideHomeContent(
                 selectedPromptId = selectedPromptId,
                 customPromptText = customPromptText,
                 onCustomPromptChange = onCustomPromptChange,
+                tryHarder = tryHarder,
+                onTryHarderChange = onTryHarderChange,
                 deleteMode = deleteMode,
                 onLongPressChip = onLongPressChip,
                 onExitDeleteMode = onExitDeleteMode,
@@ -613,6 +627,8 @@ private fun PromptPickerSection(
     selectedPromptId: Long?,
     customPromptText: String,
     onCustomPromptChange: (String) -> Unit,
+    tryHarder: Boolean,
+    onTryHarderChange: (Boolean) -> Unit,
     deleteMode: Boolean,
     onLongPressChip: () -> Unit,
     onExitDeleteMode: () -> Unit,
@@ -680,6 +696,48 @@ private fun PromptPickerSection(
                         }
                     }
                 },
+            )
+        }
+
+        TryHarderToggle(
+            checked = tryHarder,
+            onCheckedChange = onTryHarderChange,
+        )
+    }
+}
+
+@Composable
+private fun TryHarderToggle(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        color = MaterialTheme.colorScheme.surface,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text("Try Harder", style = MaterialTheme.typography.labelLarge)
+                Text(
+                    text = "FLUX 2 klein 9B-KV",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.secondary,
+                )
+            }
+            Switch(
+                checked = checked,
+                onCheckedChange = onCheckedChange,
             )
         }
     }

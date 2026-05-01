@@ -45,7 +45,8 @@ fun SettingsScreen(
     val settingsManager = app.settingsManager
     var lockoutDuration by remember { mutableLongStateOf(settingsManager.lockoutDurationMs) }
 
-    var url by remember { mutableStateOf(settingsManager.serverUrl ?: "") }
+    var lanUrl by remember { mutableStateOf(settingsManager.lanUrl ?: "") }
+    var tailscaleUrl by remember { mutableStateOf(settingsManager.tailscaleUrl ?: "") }
     var token by remember { mutableStateOf(settingsManager.apiToken ?: "") }
 
     val lockoutOptions = listOf(
@@ -117,13 +118,25 @@ fun SettingsScreen(
 
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
-                    value = url,
+                    value = lanUrl,
                     onValueChange = {
-                        url = it
-                        settingsManager.serverUrl = it.trim().removeSuffix("/")
-                        app.rebuildRepository()
+                        lanUrl = it
+                        settingsManager.lanUrl = it.trim().removeSuffix("/").ifBlank { null }
+                        app.networkResolver.refresh()
                     },
-                    label = { Text("Server URL") },
+                    label = { Text("LAN URL (used at home)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+
+                OutlinedTextField(
+                    value = tailscaleUrl,
+                    onValueChange = {
+                        tailscaleUrl = it
+                        settingsManager.tailscaleUrl = it.trim().removeSuffix("/").ifBlank { null }
+                        app.networkResolver.refresh()
+                    },
+                    label = { Text("Tailscale URL (used away)") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                 )
@@ -150,7 +163,9 @@ fun SettingsScreen(
                 InfoRow("Version", BuildConfig.VERSION_NAME)
                 InfoRow("Build", BuildConfig.VERSION_CODE.toString())
                 InfoRow("Package", BuildConfig.APPLICATION_ID)
-                InfoRow("Server URL", settingsManager.serverUrl ?: "(not configured)", isMonospace = true)
+                InfoRow("Active URL", settingsManager.serverUrl ?: "(none)", isMonospace = true)
+                InfoRow("LAN URL", settingsManager.lanUrl ?: "(not set)", isMonospace = true)
+                InfoRow("Tailscale URL", settingsManager.tailscaleUrl ?: "(not set)", isMonospace = true)
             }
         }
     }

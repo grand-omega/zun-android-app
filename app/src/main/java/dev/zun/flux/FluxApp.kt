@@ -1,10 +1,13 @@
 package dev.zun.flux
 
 import android.app.Application
+import android.net.ConnectivityManager
+import android.net.Network
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import dev.zun.flux.data.api.FluxApi
+import dev.zun.flux.data.net.NetworkResolver
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.data.repo.RealJobRepository
 import dev.zun.flux.data.repo.SettingsManager
@@ -29,11 +32,15 @@ class FluxApp : Application() {
     lateinit var authStateHolder: AuthStateHolder
         private set
 
+    lateinit var networkResolver: NetworkResolver
+        private set
+
     override fun onCreate() {
         super.onCreate()
 
         settingsManager = SettingsManager(this)
         authStateHolder = AuthStateHolder(settingsManager)
+        networkResolver = NetworkResolver(settingsManager) { rebuildRepository() }
 
         // Interceptor that reads the current token from settings
         okHttpClient =
@@ -61,6 +68,14 @@ class FluxApp : Application() {
         }
 
         rebuildRepository()
+
+        // Re-pick LAN vs Tailscale on every default-network change.
+        val cm = getSystemService(ConnectivityManager::class.java)
+        cm?.registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) { networkResolver.refresh() }
+            override fun onLost(network: Network) { networkResolver.refresh() }
+        })
+        networkResolver.refresh()
     }
 
     /**

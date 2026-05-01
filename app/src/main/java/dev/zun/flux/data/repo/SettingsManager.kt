@@ -25,9 +25,31 @@ class SettingsManager(context: Context) {
         get() = prefs.getLong(KEY_LOCKOUT_DURATION, 300_000L)
         set(value) = prefs.edit().putLong(KEY_LOCKOUT_DURATION, value).apply()
 
+    /**
+     * The currently active base URL — written by NetworkResolver after probing.
+     * Retrofit's baseUrl and Coil image URLs both read this. Treat as read-only
+     * outside of NetworkResolver.
+     */
     var serverUrl: String?
         get() = prefs.getString(KEY_SERVER_URL, null)
         set(value) = prefs.edit().putString(KEY_SERVER_URL, value).apply()
+
+    var lanUrl: String?
+        get() {
+            val v = prefs.getString(KEY_LAN_URL, null)
+            if (v != null) return v
+            // One-time migration: legacy single-URL installs become LAN-only.
+            val legacy = prefs.getString(KEY_SERVER_URL, null)
+            if (!legacy.isNullOrBlank()) {
+                prefs.edit().putString(KEY_LAN_URL, legacy).apply()
+            }
+            return prefs.getString(KEY_LAN_URL, null)
+        }
+        set(value) = prefs.edit().putString(KEY_LAN_URL, value).apply()
+
+    var tailscaleUrl: String?
+        get() = prefs.getString(KEY_TAILSCALE_URL, null)
+        set(value) = prefs.edit().putString(KEY_TAILSCALE_URL, value).apply()
 
     var apiToken: String?
         get() = prefs.getString(KEY_API_TOKEN, null)
@@ -44,11 +66,13 @@ class SettingsManager(context: Context) {
         set(value) = prefs.edit().putLong(KEY_LAST_AUTH_TIMESTAMP, value).apply()
 
     val isConfigured: Boolean
-        get() = !serverUrl.isNullOrBlank() && !apiToken.isNullOrBlank()
+        get() = (!lanUrl.isNullOrBlank() || !tailscaleUrl.isNullOrBlank()) && !apiToken.isNullOrBlank()
 
     companion object {
         private const val KEY_LOCKOUT_DURATION = "lockout_duration_ms"
         private const val KEY_SERVER_URL = "server_url"
+        private const val KEY_LAN_URL = "lan_url"
+        private const val KEY_TAILSCALE_URL = "tailscale_url"
         private const val KEY_API_TOKEN = "api_token"
         private const val KEY_LAST_AUTH_TIMESTAMP = "last_auth_timestamp"
     }
