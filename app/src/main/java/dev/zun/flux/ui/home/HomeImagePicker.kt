@@ -63,6 +63,7 @@ fun ImageHero(
             onTakePhoto = onTakePhoto,
             onPickRecent = onPickRecent,
         )
+
         imageUris.size == 1 -> Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -77,6 +78,7 @@ fun ImageHero(
                 modifier = Modifier.fillMaxSize(),
             )
         }
+
         else -> Column(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(8.dp),

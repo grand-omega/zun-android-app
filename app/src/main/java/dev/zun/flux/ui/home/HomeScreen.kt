@@ -180,9 +180,11 @@ fun HomeScreen(
             remaining <= 0 -> coroutineScope.launch {
                 snackbarHostState.showSnackbar("Limit is $MAX_BATCH_IMAGES images")
             }
+
             remaining == 1 -> pickerSingle.launch(
                 PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
             )
+
             else -> pickerMulti.launch(
                 PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
             )
@@ -195,6 +197,7 @@ fun HomeScreen(
                 viewModel.acknowledgeDone()
                 onJobSubmitted(s.jobId)
             }
+
             is SubmitState.DoneBatch -> {
                 viewModel.acknowledgeDone()
                 if (s.failed > 0) {
@@ -204,6 +207,7 @@ fun HomeScreen(
                 }
                 onBatchSubmitted(s.submittedIds)
             }
+
             else -> Unit
         }
     }
@@ -426,9 +430,11 @@ private fun HomeContent(
     val selectedLabel = remember(prompts, selectedPromptId, customPromptText) {
         when (val id = selectedPromptId) {
             null -> null
+
             CUSTOM_PROMPT_ID -> customPromptText.trim().takeIf { it.isNotBlank() }?.let {
                 if (it.length <= 40) it else it.take(37) + "…"
             }
+
             else -> prompts.firstOrNull { it.id == id }?.label
         }
     }

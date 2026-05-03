@@ -142,10 +142,15 @@ class HomeViewModel(
         ConnectionDiagnosis.Reachable -> HealthState.ServiceDown(
             "Server port is reachable, but /health did not respond. The service may be starting or unhealthy.",
         )
+
         ConnectionDiagnosis.NoServerUrl -> HealthState.NetworkError("No active server URL")
+
         is ConnectionDiagnosis.InvalidUrl -> HealthState.NetworkError(message)
+
         is ConnectionDiagnosis.ServiceNotListening -> HealthState.ServiceDown(message)
+
         is ConnectionDiagnosis.HostUnreachable -> HealthState.HostUnreachable(message)
+
         is ConnectionDiagnosis.Unknown -> HealthState.NetworkError(message)
     }
 

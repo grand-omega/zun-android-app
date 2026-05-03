@@ -52,14 +52,15 @@ suspend fun saveToPictures(
                     input.copyTo(out)
                 }
             }
+
             is String -> {
                 if (okHttpClient != null) {
                     val request = Request.Builder().url(source).build()
                     okHttpClient.newCall(request).execute().use { response ->
                         if (!response.isSuccessful) error("Failed to download image: ${response.code}")
-                        response.body?.byteStream()?.use { input ->
+                        response.body.byteStream().use { input ->
                             input.copyTo(out)
-                        } ?: error("Empty response body")
+                        }
                     }
                 } else {
                     URL(source).openStream().use { input ->
@@ -67,6 +68,7 @@ suspend fun saveToPictures(
                     }
                 }
             }
+
             else -> error("Unsupported source type: ${source::class.java}")
         }
     }

@@ -220,6 +220,7 @@ private fun BatchTile(
                     modifier = Modifier.size(28.dp),
                     strokeWidth = 2.dp,
                 )
+
                 is PollState.Running -> {
                     val pct = s.dto.progress?.let { (it * 100).toInt() }
                     if (pct != null) {
@@ -237,21 +238,25 @@ private fun BatchTile(
                         )
                     }
                 }
+
                 is PollState.Failed -> CornerBadge(
                     color = MaterialTheme.colorScheme.error,
                     icon = Icons.Default.Close,
                     description = "Failed",
                 )
+
                 PollState.Deleted -> CornerBadge(
                     color = Color.DarkGray,
                     icon = Icons.Default.Close,
                     description = "Deleted",
                 )
+
                 PollState.Cancelled -> CornerBadge(
                     color = Color.DarkGray,
                     icon = Icons.Default.Close,
                     description = "Cancelled",
                 )
+
                 is PollState.Done -> Unit // handled above
             }
         }
@@ -401,6 +406,7 @@ private fun BatchPage(
                         "Starting…",
                         style = MaterialTheme.typography.titleMedium,
                     )
+
                     is PollState.Running -> {
                         AssistChip(
                             onClick = {},
@@ -422,16 +428,20 @@ private fun BatchPage(
                             )
                         }
                     }
+
                     is PollState.Done -> Text("Done", style = MaterialTheme.typography.titleMedium)
+
                     is PollState.Failed -> {
                         Text("Failed: ${s.message}", color = MaterialTheme.colorScheme.error)
                         Button(onClick = { viewModel.retry(jobId) }) { Text("Retry") }
                     }
+
                     PollState.Deleted -> Text(
                         text = "Deleted",
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.secondary,
                     )
+
                     PollState.Cancelled -> Text(
                         text = "Cancelled",
                         style = MaterialTheme.typography.titleMedium,
@@ -449,13 +459,16 @@ private fun BatchPage(
                 ) {
                     Text("View result")
                 }
+
                 PollState.Starting, is PollState.Running -> OutlinedButton(
                     onClick = { viewModel.cancelJob(jobId) },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text("Cancel")
                 }
+
                 PollState.Deleted -> Unit
+
                 else -> Unit
             }
         }

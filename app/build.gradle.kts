@@ -11,6 +11,7 @@ plugins {
 android {
     namespace = "dev.zun.flux"
     compileSdk = 36
+    compileSdkMinor = 1
 
     defaultConfig {
         applicationId = "dev.zun.flux"

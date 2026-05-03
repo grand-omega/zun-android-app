@@ -42,7 +42,9 @@ class NetworkResolver(
                 lan != null -> lan to ActiveRoute.LAN
                 else -> null
             }
+
             ConnectionMode.LAN_ONLY -> lan?.let { it to ActiveRoute.LAN }
+
             ConnectionMode.TAILSCALE_ONLY -> ts?.let { it to ActiveRoute.TAILSCALE }
         } ?: return@withLock
 

@@ -65,10 +65,12 @@ class MainActivity : FragmentActivity() {
         promptBiometric { result ->
             when (result) {
                 BiometricResult.Success -> auth.markAuthed()
+
                 BiometricResult.Unavailable -> {
                     Log.i(TAG, "Biometric hardware unavailable or unsupported. Skipping gate.")
                     auth.markAuthed()
                 }
+
                 is BiometricResult.Error -> {
                     Log.e(TAG, "Biometric error: ${result.message}")
                     // In a real app, maybe show a toast or exit if it's a hard error

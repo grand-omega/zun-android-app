@@ -23,6 +23,7 @@ suspend fun shareImage(context: Context, source: Any) {
                 source
             }
         }
+
         is String -> {
             // Download remote image to cache first to share it
             withContext(Dispatchers.IO) {
@@ -31,11 +32,11 @@ suspend fun shareImage(context: Context, source: Any) {
                     val request = Request.Builder().url(source).build()
                     okHttpClient.newCall(request).execute().use { response ->
                         if (!response.isSuccessful) error("Failed to download image: ${response.code}")
-                        response.body?.byteStream()?.use { input ->
+                        response.body.byteStream().use { input ->
                             file.outputStream().use { output ->
                                 input.copyTo(output)
                             }
-                        } ?: error("Empty response body")
+                        }
                     }
                 } else {
                     URL(source).openStream().use { input ->
@@ -47,6 +48,7 @@ suspend fun shareImage(context: Context, source: Any) {
                 FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
             }
         }
+
         else -> return
     }
 
@@ -88,6 +90,7 @@ private suspend fun shareableUri(context: Context, source: Any): Uri? {
                 source
             }
         }
+
         is String -> {
             withContext(Dispatchers.IO) {
                 val file = File(context.cacheDir, "share_${System.currentTimeMillis()}_${source.hashCode()}.jpg")
@@ -95,11 +98,11 @@ private suspend fun shareableUri(context: Context, source: Any): Uri? {
                     val request = Request.Builder().url(source).build()
                     okHttpClient.newCall(request).execute().use { response ->
                         if (!response.isSuccessful) error("Failed to download image: ${response.code}")
-                        response.body?.byteStream()?.use { input ->
+                        response.body.byteStream().use { input ->
                             file.outputStream().use { output ->
                                 input.copyTo(output)
                             }
-                        } ?: error("Empty response body")
+                        }
                     }
                 } else {
                     URL(source).openStream().use { input ->
@@ -111,6 +114,7 @@ private suspend fun shareableUri(context: Context, source: Any): Uri? {
                 FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
             }
         }
+
         else -> null
     }
 }
