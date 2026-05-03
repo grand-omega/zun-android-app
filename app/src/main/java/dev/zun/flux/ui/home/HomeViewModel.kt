@@ -20,7 +20,7 @@ const val CUSTOM_PROMPT_ID: Long = -1L
 
 /** Default workflow for free-text submissions when the user writes a custom prompt. */
 private const val DEFAULT_CUSTOM_WORKFLOW = "flux2_klein_edit"
-private const val TRY_HARDER_WORKFLOW = "flux2_klein_9b_kv_edit"
+private const val TRY_HARDER_WORKFLOW = "flux2_klein_9b_kv_experimental"
 
 sealed interface SubmitState {
     data object Idle : SubmitState

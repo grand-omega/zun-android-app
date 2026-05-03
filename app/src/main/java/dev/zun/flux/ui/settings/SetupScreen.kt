@@ -9,9 +9,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -25,6 +30,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import dev.zun.flux.FluxApp
 import kotlinx.coroutines.launch
@@ -42,6 +49,7 @@ fun SetupScreen(
 
     var isTesting by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var tokenVisible by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     Scaffold(
@@ -109,6 +117,23 @@ fun SetupScreen(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 isError = error != null,
+                visualTransformation = if (tokenVisible) {
+                    VisualTransformation.None
+                } else {
+                    PasswordVisualTransformation()
+                },
+                trailingIcon = {
+                    IconButton(onClick = { tokenVisible = !tokenVisible }) {
+                        Icon(
+                            imageVector = if (tokenVisible) {
+                                Icons.Default.VisibilityOff
+                            } else {
+                                Icons.Default.Visibility
+                            },
+                            contentDescription = if (tokenVisible) "Hide token" else "Show token",
+                        )
+                    }
+                },
             )
 
             if (error != null) {

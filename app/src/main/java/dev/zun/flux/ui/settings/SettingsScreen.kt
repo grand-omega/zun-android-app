@@ -12,6 +12,8 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -32,6 +34,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import dev.zun.flux.BuildConfig
 import dev.zun.flux.FluxApp
@@ -48,6 +52,7 @@ fun SettingsScreen(
     var lanUrl by remember { mutableStateOf(settingsManager.lanUrl ?: "") }
     var tailscaleUrl by remember { mutableStateOf(settingsManager.tailscaleUrl ?: "") }
     var token by remember { mutableStateOf(settingsManager.apiToken ?: "") }
+    var tokenVisible by remember { mutableStateOf(false) }
 
     val lockoutOptions = listOf(
         0L to "Always lock",
@@ -151,6 +156,23 @@ fun SettingsScreen(
                     label = { Text("API Token") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
+                    visualTransformation = if (tokenVisible) {
+                        VisualTransformation.None
+                    } else {
+                        PasswordVisualTransformation()
+                    },
+                    trailingIcon = {
+                        IconButton(onClick = { tokenVisible = !tokenVisible }) {
+                            Icon(
+                                imageVector = if (tokenVisible) {
+                                    Icons.Default.VisibilityOff
+                                } else {
+                                    Icons.Default.Visibility
+                                },
+                                contentDescription = if (tokenVisible) "Hide token" else "Show token",
+                            )
+                        }
+                    },
                 )
             }
 

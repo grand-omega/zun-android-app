@@ -13,6 +13,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -300,73 +301,39 @@ fun HomeScreen(
                 Triple(id, repository.inputModel(id), repository.recentInputUri(id) in imageUris)
             }
 
-            if (isWide) {
-                WideHomeContent(
-                    imageUris = imageUris,
-                    prompts = prompts,
-                    selectedPromptId = selectedPromptId,
-                    customPromptText = customPromptText,
-                    onCustomPromptChange = { customPromptText = it },
-                    tryHarder = tryHarder,
-                    onTryHarderChange = { tryHarder = it },
-                    deleteMode = deleteMode,
-                    onLongPressChip = { deleteMode = true },
-                    onExitDeleteMode = { deleteMode = false },
-                    onDeletePrompt = { id ->
-                        viewModel.deletePrompt(id)
-                        if (selectedPromptId == id) selectedPromptId = null
-                    },
-                    onSavePromptClick = {
-                        saveDialogLabel = ""
-                        showSaveDialog = true
-                    },
-                    state = state,
-                    health = health,
-                    uploadProgress = uploadProgress,
-                    batchProgress = batchProgress,
-                    onTakePhoto = onTakePhoto,
-                    onPickGallery = launchPicker,
-                    onRemoveImage = onRemoveImage,
-                    onSelectPrompt = { selectedPromptId = it },
-                    onSubmit = onSubmit,
-                    recents = recents,
-                    isFetchingRecent = isFetchingRecent,
-                    onPickRecent = onPickRecent,
-                )
-            } else {
-                CompactHomeContent(
-                    imageUris = imageUris,
-                    prompts = prompts,
-                    selectedPromptId = selectedPromptId,
-                    customPromptText = customPromptText,
-                    onCustomPromptChange = { customPromptText = it },
-                    tryHarder = tryHarder,
-                    onTryHarderChange = { tryHarder = it },
-                    deleteMode = deleteMode,
-                    onLongPressChip = { deleteMode = true },
-                    onExitDeleteMode = { deleteMode = false },
-                    onDeletePrompt = { id ->
-                        viewModel.deletePrompt(id)
-                        if (selectedPromptId == id) selectedPromptId = null
-                    },
-                    onSavePromptClick = {
-                        saveDialogLabel = ""
-                        showSaveDialog = true
-                    },
-                    state = state,
-                    health = health,
-                    uploadProgress = uploadProgress,
-                    batchProgress = batchProgress,
-                    onTakePhoto = onTakePhoto,
-                    onPickGallery = launchPicker,
-                    onRemoveImage = onRemoveImage,
-                    onSelectPrompt = { selectedPromptId = it },
-                    onSubmit = onSubmit,
-                    recents = recents,
-                    isFetchingRecent = isFetchingRecent,
-                    onPickRecent = onPickRecent,
-                )
-            }
+            HomeContent(
+                isWide = isWide,
+                imageUris = imageUris,
+                prompts = prompts,
+                selectedPromptId = selectedPromptId,
+                customPromptText = customPromptText,
+                onCustomPromptChange = { customPromptText = it },
+                tryHarder = tryHarder,
+                onTryHarderChange = { tryHarder = it },
+                deleteMode = deleteMode,
+                onLongPressChip = { deleteMode = true },
+                onExitDeleteMode = { deleteMode = false },
+                onDeletePrompt = { id ->
+                    viewModel.deletePrompt(id)
+                    if (selectedPromptId == id) selectedPromptId = null
+                },
+                onSavePromptClick = {
+                    saveDialogLabel = ""
+                    showSaveDialog = true
+                },
+                state = state,
+                health = health,
+                uploadProgress = uploadProgress,
+                batchProgress = batchProgress,
+                onTakePhoto = onTakePhoto,
+                onPickGallery = launchPicker,
+                onRemoveImage = onRemoveImage,
+                onSelectPrompt = { selectedPromptId = it },
+                onSubmit = onSubmit,
+                recents = recents,
+                isFetchingRecent = isFetchingRecent,
+                onPickRecent = onPickRecent,
+            )
         }
     }
 
@@ -414,7 +381,8 @@ fun HomeScreen(
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
-private fun CompactHomeContent(
+private fun HomeContent(
+    isWide: Boolean,
     imageUris: List<Uri>,
     prompts: List<PromptDto>,
     selectedPromptId: Long?,
@@ -440,13 +408,7 @@ private fun CompactHomeContent(
     isFetchingRecent: Boolean,
     onPickRecent: (Int) -> Unit,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
+    val sourceBlock: @Composable ColumnScope.() -> Unit = {
         Text("Image source", style = MaterialTheme.typography.labelLarge)
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -468,11 +430,13 @@ private fun CompactHomeContent(
 
         ImagePreviewArea(
             imageUris = imageUris,
-            singleHeight = 220.dp,
+            singleHeight = if (isWide) null else 220.dp,
             onAddMore = onPickGallery,
             onRemove = onRemoveImage,
         )
+    }
 
+    val promptBlock: @Composable ColumnScope.() -> Unit = {
         PromptPickerSection(
             prompts = prompts,
             selectedPromptId = selectedPromptId,
@@ -512,110 +476,36 @@ private fun CompactHomeContent(
             Text("Submit failed: ${failure.message}", color = MaterialTheme.colorScheme.error)
         }
     }
-}
 
-@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
-@Composable
-private fun WideHomeContent(
-    imageUris: List<Uri>,
-    prompts: List<PromptDto>,
-    selectedPromptId: Long?,
-    customPromptText: String,
-    onCustomPromptChange: (String) -> Unit,
-    tryHarder: Boolean,
-    onTryHarderChange: (Boolean) -> Unit,
-    deleteMode: Boolean,
-    onLongPressChip: () -> Unit,
-    onExitDeleteMode: () -> Unit,
-    onDeletePrompt: (Long) -> Unit,
-    onSavePromptClick: () -> Unit,
-    state: SubmitState,
-    health: HealthState,
-    uploadProgress: Float?,
-    batchProgress: BatchProgress?,
-    onTakePhoto: () -> Unit,
-    onPickGallery: () -> Unit,
-    onRemoveImage: (Uri) -> Unit,
-    onSelectPrompt: (Long) -> Unit,
-    onSubmit: () -> Unit,
-    recents: List<Triple<Int, Any?, Boolean>>,
-    isFetchingRecent: Boolean,
-    onPickRecent: (Int) -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(24.dp),
-        horizontalArrangement = Arrangement.spacedBy(24.dp),
-    ) {
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text("Image source", style = MaterialTheme.typography.labelLarge)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                OutlinedButton(onClick = onTakePhoto, modifier = Modifier.weight(1f)) {
-                    Text("Take photo")
-                }
-                OutlinedButton(onClick = onPickGallery, modifier = Modifier.weight(1f)) {
-                    Text("From gallery")
-                }
-            }
-
-            RecentInputsRow(
-                recents = recents,
-                enabled = !isFetchingRecent,
-                onTap = onPickRecent,
+    if (isWide) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(24.dp),
+            horizontalArrangement = Arrangement.spacedBy(24.dp),
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                content = sourceBlock,
             )
-
-            ImagePreviewArea(
-                imageUris = imageUris,
-                singleHeight = null,
-                onAddMore = onPickGallery,
-                onRemove = onRemoveImage,
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                content = promptBlock,
             )
         }
-
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            PromptPickerSection(
-                prompts = prompts,
-                selectedPromptId = selectedPromptId,
-                customPromptText = customPromptText,
-                onCustomPromptChange = onCustomPromptChange,
-                tryHarder = tryHarder,
-                onTryHarderChange = onTryHarderChange,
-                deleteMode = deleteMode,
-                onLongPressChip = onLongPressChip,
-                onExitDeleteMode = onExitDeleteMode,
-                onDeletePrompt = onDeletePrompt,
-                onSavePromptClick = onSavePromptClick,
-                onSelectPrompt = onSelectPrompt,
-            )
-
-            Spacer(Modifier.weight(1f))
-
-            UploadProgressSection(uploadProgress = uploadProgress, batchProgress = batchProgress)
-
-            ConnectionIndicator(health)
-
-            val canSubmit = imageUris.isNotEmpty() &&
-                selectedPromptId != null &&
-                (selectedPromptId != CUSTOM_PROMPT_ID || customPromptText.isNotBlank()) &&
-                state !is SubmitState.InFlight
-
-            Button(
-                onClick = onSubmit,
-                enabled = canSubmit,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(submitButtonLabel(state, imageUris.size))
-            }
-
-            val failure = state as? SubmitState.Failed
-            if (failure != null) {
-                Text("Submit failed: ${failure.message}", color = MaterialTheme.colorScheme.error)
-            }
+    } else {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            sourceBlock()
+            promptBlock()
         }
     }
 }

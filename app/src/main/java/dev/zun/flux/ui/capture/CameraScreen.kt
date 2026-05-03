@@ -14,7 +14,6 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.lifecycle.awaitInstance
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,8 +22,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
@@ -128,7 +125,6 @@ private fun CameraContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(
@@ -137,13 +133,12 @@ private fun CameraContent(
             ) {
                 Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
             }
-            Text("Take photo", color = Color.White, style = MaterialTheme.typography.titleMedium)
-            IconButton(
-                onClick = { /* Spec says forward arrow to gallery as alternative */ },
-                colors = IconButtonDefaults.iconButtonColors(containerColor = Color.Black.copy(alpha = 0.5f)),
-            ) {
-                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Gallery", tint = Color.White)
-            }
+            Text(
+                "Take photo",
+                color = Color.White,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(start = 16.dp),
+            )
         }
 
         // Bottom bar
@@ -153,18 +148,6 @@ private fun CameraContent(
                 .padding(bottom = 48.dp)
                 .fillMaxWidth(),
         ) {
-            // Gallery shortcut (Left)
-            IconButton(
-                onClick = { /* Spec says shortcut to gallery */ },
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .padding(start = 32.dp)
-                    .size(48.dp),
-                colors = IconButtonDefaults.iconButtonColors(containerColor = Color.Black.copy(alpha = 0.5f)),
-            ) {
-                Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Gallery", tint = Color.White)
-            }
-
             // Shutter button (Center)
             IconButton(
                 onClick = {

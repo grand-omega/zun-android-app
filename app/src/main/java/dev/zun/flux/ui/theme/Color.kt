@@ -13,3 +13,12 @@ val TextTertiary = Color(0xFF9A9A9A)
 val TextInfo = Color(0xFF185FA5)
 val TextSuccess = Color(0xFF1D9E75)
 val TextDanger = Color(0xFFA32D2D)
+
+// Dark-mode neutrals. Three steps so background / surface / surfaceVariant
+// give cards and sheets enough contrast to read as elevated, without breaking
+// the flat-minimal philosophy.
+val DarkBackground = Color(0xFF121212)
+val DarkSurface = Color(0xFF1C1C1C)
+val DarkSurfaceVariant = Color(0xFF262626)
+val DarkOnSurfaceVariant = Color(0xFFBDBDBD)
+val DarkOutline = Color(0xFF3A3A3A)

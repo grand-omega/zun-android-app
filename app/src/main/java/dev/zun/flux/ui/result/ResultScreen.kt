@@ -9,10 +9,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -37,6 +33,7 @@ import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -51,6 +48,7 @@ import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.zun.flux.data.repo.JobRepository
+import dev.zun.flux.ui.gallery.BeforeAfterSlider
 import dev.zun.flux.util.resolvePromptLabel
 import dev.zun.flux.util.saveToPictures
 import dev.zun.flux.util.shareImage
@@ -147,46 +145,19 @@ fun ResultScreen(
                     )
                 }
             } else {
-                val pagerState = rememberPagerState(pageCount = { 2 })
-                Column(
-                    modifier = Modifier.weight(1f),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    HorizontalPager(
-                        state = pagerState,
-                        modifier = Modifier.weight(1f).fillMaxWidth(),
-                    ) { page ->
-                        if (page == 0) {
-                            CompareImage(model = inputModel, label = "Before")
-                        } else {
-                            CompareImage(model = previewModel, label = "After")
-                        }
+                var sliderProgress by remember { mutableFloatStateOf(0.5f) }
+                Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                    if (inputModel != null) {
+                        BeforeAfterSlider(
+                            beforeModel = inputModel,
+                            afterModel = previewModel,
+                            progress = sliderProgress,
+                            onProgressChange = { sliderProgress = it },
+                        )
+                    } else {
+                        // No input image (e.g. text-only generation) — just show the result.
+                        CompareImage(model = previewModel, label = "After", modifier = Modifier.fillMaxSize())
                     }
-
-                    // Pager indicators
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        repeat(2) { index ->
-                            val color =
-                                if (pagerState.currentPage == index) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.outlineVariant
-                                }
-                            Box(
-                                modifier = Modifier
-                                    .size(8.dp)
-                                    .background(color, CircleShape),
-                            )
-                        }
-                    }
-                    Text(
-                        text = "Swipe to compare",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.secondary,
-                    )
                 }
             }
 

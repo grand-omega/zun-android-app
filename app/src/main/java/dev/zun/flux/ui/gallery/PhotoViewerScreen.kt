@@ -86,6 +86,7 @@ fun PhotoViewerScreen(
 
     var showDetails by remember { mutableStateOf(false) }
     var showOriginalInput by remember { mutableStateOf(false) }
+    var showCompare by remember { mutableStateOf(false) }
     var showContextMenu by remember { mutableStateOf(false) }
     var showUI by remember { mutableStateOf(true) }
 
@@ -162,6 +163,13 @@ fun PhotoViewerScreen(
                             onClick = {
                                 showContextMenu = false
                                 showOriginalInput = true
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Compare before/after") },
+                            onClick = {
+                                showContextMenu = false
+                                showCompare = true
                             },
                         )
                     }
@@ -252,6 +260,21 @@ fun PhotoViewerScreen(
                     }
                 } else {
                     showOriginalInput = false
+                }
+            }
+
+            // Compare Before/After Overlay
+            if (showCompare) {
+                val currentJob = jobs.getOrNull(pagerState.currentPage)
+                val inputId = currentJob?.input_id
+                if (currentJob != null && inputId != null) {
+                    CompareOverlay(
+                        beforeModel = repository.inputModel(inputId),
+                        afterModel = repository.previewModel(currentJob.id),
+                        onDismiss = { showCompare = false },
+                    )
+                } else {
+                    showCompare = false
                 }
             }
 
