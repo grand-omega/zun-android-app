@@ -56,6 +56,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -100,6 +101,7 @@ fun GalleryScreen(
     val pendingUndo by viewModel.pendingUndo.collectAsStateWithLifecycle()
     val postSaveDelete by viewModel.postSaveDelete.collectAsStateWithLifecycle()
     val selectedIds by viewModel.selectedIds.collectAsStateWithLifecycle()
+    val latestSelectedIds by rememberUpdatedState(selectedIds)
     val isSelectionMode by viewModel.isSelectionMode.collectAsStateWithLifecycle()
     val tagFilter by viewModel.tagFilter.collectAsStateWithLifecycle()
     val availableTags by viewModel.availableTags.collectAsStateWithLifecycle()
@@ -298,38 +300,6 @@ fun GalleryScreen(
                             .onGloballyPositioned { coords ->
                                 boxOriginInRoot = coords.positionInRoot()
                                 viewportHeight = coords.size.height.toFloat()
-                            }
-                            .pointerInput(jobs) {
-                                detectDragGesturesAfterLongPress(
-                                    onDragStart = { local ->
-                                        pointerLocal = local
-                                        val root = boxOriginInRoot + local
-                                        pointerRoot = root
-                                        val hitIdx = hitTest(root)
-                                        if (hitIdx >= 0) {
-                                            val hitId = jobs[hitIdx].id
-                                            baseSelection = selectedIds
-                                            dragMode = if (hitId in baseSelection) {
-                                                DragMode.Remove
-                                            } else {
-                                                DragMode.Add
-                                            }
-                                            anchorIndex = hitIdx
-                                            applyRange(hitIdx)
-                                        }
-                                    },
-                                    onDrag = { change, _ ->
-                                        if (anchorIndex == null) return@detectDragGesturesAfterLongPress
-                                        val local = change.position
-                                        pointerLocal = local
-                                        val root = boxOriginInRoot + local
-                                        pointerRoot = root
-                                        val idx = hitTest(root)
-                                        if (idx >= 0) applyRange(idx)
-                                    },
-                                    onDragEnd = { anchorIndex = null },
-                                    onDragCancel = { anchorIndex = null },
-                                )
                             },
                     ) {
                         LazyVerticalGrid(
@@ -350,10 +320,45 @@ fun GalleryScreen(
                                 }
                                 items(items, key = { it.id }) { job ->
                                     val isSelected = selectedIds.contains(job.id)
+                                    val jobIndex = jobs.indexOfFirst { it.id == job.id }
                                     JobThumbnail(
-                                        modifier = Modifier.onGloballyPositioned { coords ->
-                                            tileBounds[job.id] = coords.boundsInRoot()
-                                        },
+                                        modifier = Modifier
+                                            .onGloballyPositioned { coords ->
+                                                tileBounds[job.id] = coords.boundsInRoot()
+                                            }
+                                            .pointerInput(job.id, jobIndex) {
+                                                detectDragGesturesAfterLongPress(
+                                                    onDragStart = { local ->
+                                                        if (jobIndex < 0) return@detectDragGesturesAfterLongPress
+                                                        val tileBoundsForJob = tileBounds[job.id]
+                                                            ?: return@detectDragGesturesAfterLongPress
+                                                        val root = tileBoundsForJob.topLeft + local
+                                                        pointerRoot = root
+                                                        pointerLocal = root - boxOriginInRoot
+                                                        baseSelection = latestSelectedIds
+                                                        dragMode = if (job.id in baseSelection) {
+                                                            DragMode.Remove
+                                                        } else {
+                                                            DragMode.Add
+                                                        }
+                                                        anchorIndex = jobIndex
+                                                        applyRange(jobIndex)
+                                                    },
+                                                    onDrag = { change, _ ->
+                                                        if (anchorIndex == null) return@detectDragGesturesAfterLongPress
+                                                        val tileBoundsForJob = tileBounds[job.id]
+                                                            ?: return@detectDragGesturesAfterLongPress
+                                                        val root = tileBoundsForJob.topLeft + change.position
+                                                        pointerRoot = root
+                                                        pointerLocal = root - boxOriginInRoot
+                                                        val idx = hitTest(root)
+                                                        if (idx >= 0) applyRange(idx)
+                                                        change.consume()
+                                                    },
+                                                    onDragEnd = { anchorIndex = null },
+                                                    onDragCancel = { anchorIndex = null },
+                                                )
+                                            },
                                         job = job,
                                         prompts = prompts,
                                         model = repository.thumbModel(job.id),
@@ -443,7 +448,6 @@ private fun JobThumbnail(
             .clip(RoundedCornerShape(8.dp))
             .combinedClickable(
                 onClick = onClick,
-                onLongClick = {},
             ),
         colors =
         CardDefaults.cardColors(
