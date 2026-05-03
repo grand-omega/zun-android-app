@@ -62,7 +62,10 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
@@ -105,6 +108,7 @@ fun HomeScreen(
     val recentInputIds by remember { repository.recentInputIds(3) }
         .collectAsStateWithLifecycle(initialValue = emptyList())
     val haptic = LocalHapticFeedback.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val snackbarHostState = remember { SnackbarHostState() }
 
     var showSaveDialog by rememberSaveable { mutableStateOf(false) }
@@ -149,6 +153,12 @@ fun HomeScreen(
     LaunchedEffect(Unit) {
         viewModel.promptErrors.collect { message ->
             snackbarHostState.showOne(message)
+        }
+    }
+
+    LaunchedEffect(lifecycleOwner, viewModel) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            viewModel.runHealthChecks()
         }
     }
 

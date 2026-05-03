@@ -42,7 +42,7 @@ class HomeViewModelTest {
     @Before
     fun setUp() {
         repository = RecordingRepository()
-        viewModel = HomeViewModel(repository, healthChecksEnabled = false)
+        viewModel = HomeViewModel(repository)
     }
 
     @Test

@@ -89,10 +89,12 @@ data class JobListResponse(
 )
 
 val JobStatusDto.effectivePromptId: Long?
-    get() = source_prompt_id ?: prompt_id
+    get() = effectivePromptId(source_prompt_id, prompt_id)
 
 val JobSummaryDto.effectivePromptId: Long?
-    get() = source_prompt_id ?: prompt_id
+    get() = effectivePromptId(source_prompt_id, prompt_id)
+
+private fun effectivePromptId(sourcePromptId: Long?, legacyPromptId: Long?): Long? = sourcePromptId ?: legacyPromptId
 
 @Serializable
 data class InputMetadata(
