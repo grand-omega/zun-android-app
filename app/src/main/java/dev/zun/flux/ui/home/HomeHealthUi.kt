@@ -28,8 +28,11 @@ fun HealthDot(health: HealthState) {
 @Composable
 fun healthColor(health: HealthState): Color = when (health) {
     HealthState.Checking -> MaterialTheme.colorScheme.outlineVariant
+
     HealthState.Connected -> Color(0xFF1D9E75)
+
     is HealthState.ServiceDown -> Color(0xFFE0A800)
+
     HealthState.Unauthorized,
     is HealthState.HostUnreachable,
     is HealthState.NetworkError,

@@ -128,7 +128,9 @@ class FakeJobRepository(
                 "running" ->
                     ((elapsedSeconds * 1000 - queuedDurationMs).toFloat() / runningDurationMs)
                         .coerceIn(0f, 1f)
+
                 "done" -> 1f
+
                 else -> null
             }
         return JobStatusDto(

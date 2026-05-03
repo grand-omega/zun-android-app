@@ -134,6 +134,7 @@ fun ProgressScreen(
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     when (val s = state) {
                         PollState.Starting -> Text("Starting…", style = MaterialTheme.typography.titleMedium)
+
                         is PollState.Running -> {
                             AssistChip(
                                 onClick = {},
@@ -155,18 +156,22 @@ fun ProgressScreen(
                                 )
                             }
                         }
+
                         is PollState.Done -> Text("Done", style = MaterialTheme.typography.titleMedium)
+
                         is PollState.Failed -> {
                             Text("Failed: ${s.message}", color = MaterialTheme.colorScheme.error)
                             Button(onClick = { viewModel.retry(jobId) }) {
                                 Text("Retry")
                             }
                         }
+
                         PollState.Deleted -> Text(
                             text = "Deleted",
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.secondary,
                         )
+
                         PollState.Cancelled -> Text(
                             text = "Cancelled",
                             style = MaterialTheme.typography.titleMedium,

@@ -118,9 +118,11 @@ fun ResultScreen(
 
     val promptLabel = when (val id = selectedPromptId) {
         null -> jobDto?.let { resolvePromptLabel(prompts, it.effectivePromptId, it.prompt_text) } ?: "Loading…"
+
         CUSTOM_PROMPT_ID -> customPromptText.trim().takeIf { it.isNotBlank() }?.let {
             if (it.length <= 64) it else it.take(61) + "…"
         } ?: "Write your own..."
+
         else -> prompts.firstOrNull { it.id == id }?.label
             ?: jobDto?.let { resolvePromptLabel(prompts, it.effectivePromptId, it.prompt_text) }
             ?: "Choose a prompt"
