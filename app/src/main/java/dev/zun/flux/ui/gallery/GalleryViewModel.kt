@@ -8,6 +8,7 @@ import dev.zun.flux.data.api.PromptDto
 import dev.zun.flux.data.api.effectivePromptId
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.util.saveToPictures
+import dev.zun.flux.util.shareImages
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -93,6 +94,9 @@ class GalleryViewModel(
 
     private val _isSaving = MutableStateFlow(false)
     val isSaving: StateFlow<Boolean> = _isSaving.asStateFlow()
+
+    private val _isSharing = MutableStateFlow(false)
+    val isSharing: StateFlow<Boolean> = _isSharing.asStateFlow()
 
     private val _eventMessage = MutableStateFlow<String?>(null)
     val eventMessage: StateFlow<String?> = _eventMessage.asStateFlow()
@@ -193,6 +197,28 @@ class GalleryViewModel(
         }
     }
 
+    fun shareSelected(context: Context) {
+        val ids = _selectedIds.value
+        if (ids.isEmpty()) return
+
+        viewModelScope.launch {
+            _isSharing.value = true
+            try {
+                val models = ids.mapNotNull { id -> repository.resultModel(id) }
+                if (models.isNotEmpty()) {
+                    shareImages(context, models)
+                    clearSelection()
+                } else {
+                    _eventMessage.value = "No images to share"
+                }
+            } catch (t: Throwable) {
+                _eventMessage.value = "Share failed: ${t.message}"
+            } finally {
+                _isSharing.value = false
+            }
+        }
+    }
+
     fun confirmPostSaveDelete() {
         val ids = _postSaveDelete.value ?: return
         _postSaveDelete.value = null
@@ -219,6 +245,7 @@ class GalleryViewModel(
         viewModelScope.launch {
             try {
                 repository.deleteJob(jobId)
+                _pendingUndo.value = setOf(jobId)
             } catch (_: Throwable) {
             }
         }

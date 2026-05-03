@@ -55,4 +55,10 @@ interface JobDao {
 
     @Query("SELECT jobId FROM pending_deletes")
     suspend fun getPendingDeleteIds(): List<String>
+
+    @Query("SELECT jobId FROM pending_deletes")
+    fun getPendingDeleteIdsFlow(): Flow<List<String>>
+
+    @Query("SELECT EXISTS(SELECT 1 FROM pending_deletes WHERE jobId = :jobId)")
+    suspend fun isPendingDelete(jobId: String): Boolean
 }

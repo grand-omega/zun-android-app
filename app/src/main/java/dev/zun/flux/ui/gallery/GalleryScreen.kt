@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
@@ -91,11 +92,13 @@ fun GalleryScreen(
     viewModel: GalleryViewModel,
     onJobClick: (String) -> Unit,
     onBack: () -> Unit,
+    showUndoSnackbars: Boolean = true,
 ) {
     val jobs by viewModel.jobs.collectAsStateWithLifecycle()
     val prompts by viewModel.prompts.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val isSaving by viewModel.isSaving.collectAsStateWithLifecycle()
+    val isSharing by viewModel.isSharing.collectAsStateWithLifecycle()
     val eventMessage by viewModel.eventMessage.collectAsStateWithLifecycle()
     val pendingUndo by viewModel.pendingUndo.collectAsStateWithLifecycle()
     val postSaveDelete by viewModel.postSaveDelete.collectAsStateWithLifecycle()
@@ -122,7 +125,8 @@ fun GalleryScreen(
         }
     }
 
-    LaunchedEffect(pendingUndo) {
+    LaunchedEffect(pendingUndo, showUndoSnackbars) {
+        if (!showUndoSnackbars) return@LaunchedEffect
         val undo = pendingUndo ?: return@LaunchedEffect
         val result = snackbarHostState.showSnackbar(
             message = "Deleted ${undo.size} generation${if (undo.size == 1) "" else "s"}",
@@ -148,14 +152,27 @@ fun GalleryScreen(
                         }
                     },
                     actions = {
-                        IconButton(onClick = { viewModel.saveSelected(context) }, enabled = !isSaving) {
+                        IconButton(
+                            onClick = { viewModel.saveSelected(context) },
+                            enabled = !isSaving && !isSharing,
+                        ) {
                             if (isSaving) {
                                 CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                             } else {
                                 Icon(Icons.Default.Download, contentDescription = "Save selected")
                             }
                         }
-                        IconButton(onClick = { showDeleteConfirm = true }, enabled = !isSaving) {
+                        IconButton(
+                            onClick = { viewModel.shareSelected(context) },
+                            enabled = !isSaving && !isSharing,
+                        ) {
+                            if (isSharing) {
+                                CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                            } else {
+                                Icon(Icons.Default.Share, contentDescription = "Share selected")
+                            }
+                        }
+                        IconButton(onClick = { showDeleteConfirm = true }, enabled = !isSaving && !isSharing) {
                             Icon(Icons.Default.Delete, contentDescription = "Delete selected")
                         }
                     },

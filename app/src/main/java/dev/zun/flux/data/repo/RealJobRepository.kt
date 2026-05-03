@@ -20,7 +20,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import retrofit2.HttpException
 
 class RealJobRepository(
@@ -35,6 +37,7 @@ class RealJobRepository(
 
     private val _promptsState = MutableStateFlow<List<PromptDto>>(emptyList())
     override val promptsState: StateFlow<List<PromptDto>> = _promptsState.asStateFlow()
+    private val localDeletedIds = MutableStateFlow<Set<String>>(emptySet())
 
     override suspend fun health(): HealthResponse = api.health()
 
@@ -74,8 +77,13 @@ class RealJobRepository(
     )
 
     override suspend fun getJob(jobId: String): JobStatusDto {
+        if (jobId in localDeletedIds.value || dao.isPendingDelete(jobId)) {
+            error("Job was deleted")
+        }
         val job = api.getJob(jobId)
-        dao.insertJob(job.toEntity())
+        if (jobId !in localDeletedIds.value && !dao.isPendingDelete(jobId)) {
+            dao.insertJob(job.toEntity())
+        }
         return job
     }
 
@@ -86,17 +94,20 @@ class RealJobRepository(
         inputId: Int?,
     ): JobListResponse {
         val resp = api.listJobs(status, limit, cursor, inputId)
-        val pendingDeleteIds = dao.getPendingDeleteIds().toSet()
-        dao.insertJobs(resp.items.filterNot { it.id in pendingDeleteIds }.map { it.toEntity() })
+        val hiddenIds = dao.getPendingDeleteIds().toSet() + localDeletedIds.value
+        dao.insertJobs(resp.items.filterNot { it.id in hiddenIds }.map { it.toEntity() })
         return resp
     }
 
     override suspend fun deleteJob(jobId: String) {
+        localDeletedIds.update { it + jobId }
         dao.insertPendingDelete(PendingDeleteEntity(jobId = jobId, createdAt = System.currentTimeMillis()))
+        dao.deleteJobById(jobId)
         DeleteSyncWorker.enqueue(context)
     }
 
     override suspend fun restoreJob(jobId: String) {
+        localDeletedIds.update { it - jobId }
         dao.deletePendingDelete(jobId)
         runCatching {
             api.restoreJob(jobId)
@@ -117,6 +128,13 @@ class RealJobRepository(
 
     override fun getJobFlow(jobId: String): Flow<JobStatusDto?> = dao.getVisibleJobByIdFlow(jobId).map { it?.toStatusDto() }
 
+    override fun deletedJobIds(): Flow<Set<String>> = combine(
+        dao.getPendingDeleteIdsFlow(),
+        localDeletedIds,
+    ) { pendingIds, deletedIds ->
+        pendingIds.toSet() + deletedIds
+    }
+
     override fun recentInputIds(limit: Int): Flow<List<Int>> = dao.getVisibleJobs().map { entities ->
         entities.asSequence()
             .mapNotNull { it.inputId }
@@ -133,8 +151,8 @@ class RealJobRepository(
         runCatching { syncPendingDeletes() }
         try {
             val resp = api.listJobs(status = "done", limit = 100)
-            val pendingDeleteIds = dao.getPendingDeleteIds().toSet()
-            dao.insertJobs(resp.items.filterNot { it.id in pendingDeleteIds }.map { it.toEntity() })
+            val hiddenIds = dao.getPendingDeleteIds().toSet() + localDeletedIds.value
+            dao.insertJobs(resp.items.filterNot { it.id in hiddenIds }.map { it.toEntity() })
         } catch (_: Exception) {
             // Ignore background sync errors
         }

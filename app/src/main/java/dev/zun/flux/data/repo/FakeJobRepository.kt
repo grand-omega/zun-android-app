@@ -37,6 +37,7 @@ class FakeJobRepository(
 
     private val entries = ConcurrentHashMap<String, Entry>()
     private val cancelledIds = ConcurrentHashMap.newKeySet<String>()
+    private val deletedIds = ConcurrentHashMap.newKeySet<String>()
     private val updates = MutableStateFlow(0)
     private val nextInputId = AtomicInteger(1)
 
@@ -111,6 +112,7 @@ class FakeJobRepository(
     }
 
     override suspend fun getJob(jobId: String): JobStatusDto {
+        if (deletedIds.contains(jobId)) error("Job was deleted")
         val entry = entries[jobId] ?: error("Unknown fake job: $jobId")
         val isCancelled = cancelledIds.contains(jobId)
         val elapsedSeconds = (System.currentTimeMillis() / 1000) - entry.createdAt
@@ -187,12 +189,15 @@ class FakeJobRepository(
 
     override suspend fun deleteJob(jobId: String) {
         delay(300)
+        deletedIds.add(jobId)
         entries.remove(jobId)
         updates.value++
     }
 
     override suspend fun restoreJob(jobId: String) {
         // Fake doesn't model soft delete
+        deletedIds.remove(jobId)
+        updates.value++
     }
 
     override suspend fun cancelJob(jobId: String) {
@@ -211,6 +216,8 @@ class FakeJobRepository(
             null
         }
     }
+
+    override fun deletedJobIds(): Flow<Set<String>> = updates.map { deletedIds.toSet() }
 
     override suspend fun syncHistory() {
         // No-op for fake

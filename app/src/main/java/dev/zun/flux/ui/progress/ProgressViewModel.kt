@@ -15,6 +15,7 @@ sealed interface PollState {
     data object Starting : PollState
     data class Running(val dto: JobStatusDto) : PollState
     data class Done(val dto: JobStatusDto) : PollState
+    data object Deleted : PollState
     data class Failed(val message: String) : PollState
     data object Cancelled : PollState
 }
@@ -26,6 +27,7 @@ class ProgressViewModel(
     val state: StateFlow<PollState> = _state.asStateFlow()
 
     private var observeJob: Job? = null
+    private var observeDeletes: Job? = null
     private var pollJob: Job? = null
 
     fun start(jobId: String) {
@@ -35,13 +37,24 @@ class ProgressViewModel(
             // Observe local DB for UI updates.
             observeJob = viewModelScope.launch {
                 repository.getJobFlow(jobId).collect { job ->
-                    if (job != null) {
-                        _state.value = when (job.status) {
-                            "done" -> PollState.Done(job)
-                            "failed" -> PollState.Failed(job.error ?: "Job failed")
-                            "cancelled" -> PollState.Cancelled
-                            else -> PollState.Running(job)
-                        }
+                    _state.value = when {
+                        job == null && _state.value !is PollState.Starting -> PollState.Deleted
+                        job == null -> PollState.Starting
+                        job.status == "done" -> PollState.Done(job)
+                        job.status == "failed" -> PollState.Failed(job.error ?: "Job failed")
+                        job.status == "cancelled" -> PollState.Cancelled
+                        else -> PollState.Running(job)
+                    }
+                }
+            }
+        }
+
+        if (observeDeletes?.isActive != true) {
+            observeDeletes = viewModelScope.launch {
+                repository.deletedJobIds().collect { deletedIds ->
+                    if (jobId in deletedIds) {
+                        _state.value = PollState.Deleted
+                        pollJob?.cancel()
                     }
                 }
             }
@@ -57,7 +70,11 @@ class ProgressViewModel(
                         return@launch
                     }
                 } catch (t: Throwable) {
-                    _state.value = PollState.Failed(t.message ?: "Failed to check job status")
+                    _state.value = if (_state.value is PollState.Deleted) {
+                        PollState.Deleted
+                    } else {
+                        PollState.Failed(t.message ?: "Failed to check job status")
+                    }
                     return@launch
                 }
                 delay(5000)

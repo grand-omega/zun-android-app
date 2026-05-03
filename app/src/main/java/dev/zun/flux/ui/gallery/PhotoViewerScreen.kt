@@ -1,5 +1,6 @@
 package dev.zun.flux.ui.gallery
 
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -36,6 +37,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -70,7 +73,9 @@ import dev.zun.flux.data.api.effectivePromptId
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.util.resolvePromptLabel
 import dev.zun.flux.util.saveToPictures
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 
@@ -80,6 +85,7 @@ fun PhotoViewerScreen(
     initialJobId: String,
     viewModel: GalleryViewModel,
     repository: JobRepository,
+    onUseInput: (Uri) -> Unit,
     onBack: () -> Unit,
 ) {
     val jobs by viewModel.jobs.collectAsState()
@@ -96,19 +102,36 @@ fun PhotoViewerScreen(
         )
 
     var showDetails by remember { mutableStateOf(false) }
-    var showOriginalInput by remember { mutableStateOf(false) }
     var showCompare by remember { mutableStateOf(false) }
     var showUI by remember { mutableStateOf(true) }
     var zoomedPage by remember { mutableStateOf<String?>(null) }
+    var selectingInput by remember { mutableStateOf(false) }
+    val pendingUndo by viewModel.pendingUndo.collectAsState()
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     val currentJob = jobs.getOrNull(pagerState.currentPage)
     val hasInput = currentJob?.input_id != null
 
+    LaunchedEffect(pendingUndo) {
+        val undo = pendingUndo ?: return@LaunchedEffect
+        val result = snackbarHostState.showSnackbar(
+            message = "Deleted ${undo.size} generation${if (undo.size == 1) "" else "s"}",
+            actionLabel = "Undo",
+            duration = androidx.compose.material3.SnackbarDuration.Short,
+        )
+        if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+            viewModel.undoDelete(undo)
+        } else {
+            viewModel.clearPendingUndo()
+        }
+    }
+
     Scaffold(
         containerColor = Color.Black,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             AnimatedVisibility(
                 visible = showUI,
@@ -134,8 +157,28 @@ fun PhotoViewerScreen(
             ) {
                 ViewerActionBar(
                     hasInput = hasInput,
+                    selectingInput = selectingInput,
                     onCompare = { showCompare = true },
-                    onOriginal = { showOriginalInput = true },
+                    onUseInput = {
+                        val inputId = currentJob?.input_id ?: return@ViewerActionBar
+                        selectingInput = true
+                        scope.launch {
+                            try {
+                                val uri = withContext(Dispatchers.IO) {
+                                    repository.downloadInputToCache(inputId)
+                                }
+                                onUseInput(uri)
+                            } catch (t: Throwable) {
+                                Toast.makeText(
+                                    context,
+                                    "Couldn't load original input: ${t.message}",
+                                    Toast.LENGTH_SHORT,
+                                ).show()
+                            } finally {
+                                selectingInput = false
+                            }
+                        }
+                    },
                     onSave = {
                         val job = currentJob ?: return@ViewerActionBar
                         val src = repository.resultModel(job.id) ?: return@ViewerActionBar
@@ -205,47 +248,6 @@ fun PhotoViewerScreen(
                             onClose = { showDetails = false },
                         )
                     }
-                }
-            }
-
-            // Original Input Overlay
-            if (showOriginalInput) {
-                val currentJob = jobs.getOrNull(pagerState.currentPage)
-                val inputId = currentJob?.input_id
-                if (inputId != null) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.92f))
-                            .combinedClickable(
-                                onClick = { showOriginalInput = false },
-                                onLongClick = {},
-                            ),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        AsyncImage(
-                            model = repository.inputModel(inputId),
-                            contentDescription = "Original input",
-                            contentScale = ContentScale.Fit,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                        Surface(
-                            modifier = Modifier
-                                .align(Alignment.TopCenter)
-                                .padding(top = 16.dp),
-                            color = Color.Black.copy(alpha = 0.5f),
-                            shape = RoundedCornerShape(16.dp),
-                        ) {
-                            Text(
-                                text = "Original input · tap to close",
-                                color = Color.White,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                style = MaterialTheme.typography.labelMedium,
-                            )
-                        }
-                    }
-                } else {
-                    showOriginalInput = false
                 }
             }
 
@@ -441,8 +443,9 @@ private fun DetailRow(
 @Composable
 private fun ViewerActionBar(
     hasInput: Boolean,
+    selectingInput: Boolean,
     onCompare: () -> Unit,
-    onOriginal: () -> Unit,
+    onUseInput: () -> Unit,
     onSave: () -> Unit,
     onDetails: () -> Unit,
     onDelete: () -> Unit,
@@ -466,8 +469,9 @@ private fun ViewerActionBar(
                 )
                 ActionIcon(
                     icon = Icons.Default.Image,
-                    label = "Original",
-                    onClick = onOriginal,
+                    label = if (selectingInput) "Loading" else "Use input",
+                    onClick = onUseInput,
+                    enabled = !selectingInput,
                 )
             }
             ActionIcon(
@@ -494,6 +498,7 @@ private fun ActionIcon(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
     onClick: () -> Unit,
+    enabled: Boolean = true,
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -501,12 +506,16 @@ private fun ActionIcon(
             .padding(horizontal = 4.dp)
             .clip(RoundedCornerShape(8.dp)),
     ) {
-        IconButton(onClick = onClick) {
-            Icon(icon, contentDescription = label, tint = Color.White)
+        IconButton(onClick = onClick, enabled = enabled) {
+            Icon(
+                icon,
+                contentDescription = label,
+                tint = if (enabled) Color.White else Color.White.copy(alpha = 0.5f),
+            )
         }
         Text(
             text = label,
-            color = Color.White,
+            color = if (enabled) Color.White else Color.White.copy(alpha = 0.5f),
             style = MaterialTheme.typography.labelSmall,
         )
     }
