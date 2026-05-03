@@ -7,9 +7,12 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.zun.flux.ui.auth.BiometricResult
 import dev.zun.flux.ui.auth.LockScreen
 import dev.zun.flux.ui.auth.promptBiometric
@@ -25,7 +28,6 @@ class MainActivity : FragmentActivity() {
         window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
         enableEdgeToEdge()
         val app = application as FluxApp
-        val repo = app.repository
         val auth = app.authStateHolder
 
         lifecycle.addObserver(
@@ -41,12 +43,17 @@ class MainActivity : FragmentActivity() {
 
         setContent {
             val windowSizeClass = calculateWindowSizeClass(this)
+            val repoState by app.repositoryState.collectAsStateWithLifecycle()
             ZunFluxTheme {
-                if (auth.isAuthed) {
-                    AppNavHost(
-                        repository = repo,
-                        windowSizeClass = windowSizeClass,
-                    )
+                val current = repoState
+                if (auth.isAuthed && current != null) {
+                    key(current.version) {
+                        AppNavHost(
+                            repository = current.repository,
+                            repositoryVersion = current.version,
+                            windowSizeClass = windowSizeClass,
+                        )
+                    }
                 } else {
                     LockScreen(onUnlockClick = { tryUnlock(auth) })
                 }

@@ -18,10 +18,12 @@ import kotlinx.coroutines.launch
 @Composable
 fun GalleryScaffold(
     repository: JobRepository,
+    repositoryVersion: Long,
     onBack: () -> Unit,
 ) {
     val viewModel: GalleryViewModel =
         viewModel(
+            key = "gallery-$repositoryVersion",
             factory =
             viewModelFactory {
                 initializer { GalleryViewModel(repository) }

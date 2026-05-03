@@ -3,6 +3,8 @@ package dev.zun.flux.ui.gallery
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +19,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -49,14 +52,22 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -66,6 +77,12 @@ import dev.zun.flux.data.api.PromptDto
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.util.formatTimestamp
 import dev.zun.flux.util.resolvePromptLabel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+
+/** Whether a drag-select session is adding tiles to or removing them from the
+ *  base selection. Determined by the state of the anchor tile at long-press. */
+private enum class DragMode { Add, Remove }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -216,43 +233,141 @@ fun GalleryScreen(
                         remember(jobs) {
                             jobs.groupBy { formatTimestamp(it.created_at) }
                         }
+                    val gridState = rememberLazyGridState()
+                    // Tile bounds keyed by jobId, in root coords. Updated on
+                    // every layout pass (so scroll keeps them fresh).
+                    val tileBounds = remember { mutableStateMapOf<String, Rect>() }
+                    var anchorIndex by remember { mutableStateOf<Int?>(null) }
+                    var dragMode by remember { mutableStateOf(DragMode.Add) }
+                    var baseSelection by remember { mutableStateOf<Set<String>>(emptySet()) }
+                    var pointerLocal by remember { mutableStateOf(Offset.Zero) }
+                    var pointerRoot by remember { mutableStateOf(Offset.Zero) }
+                    var viewportHeight by remember { mutableFloatStateOf(0f) }
+                    var boxOriginInRoot by remember { mutableStateOf(Offset.Zero) }
 
-                    LazyVerticalGrid(
-                        columns = GridCells.Adaptive(minSize = 110.dp),
-                        contentPadding = PaddingValues(16.dp),
-                        modifier = Modifier.fillMaxSize(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        groupedJobs.forEach { (date, items) ->
-                            item(span = { GridItemSpan(maxLineSpan) }) {
-                                Text(
-                                    text = date,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    modifier = Modifier.padding(vertical = 8.dp),
-                                )
+                    fun applyRange(cursorIdx: Int) {
+                        val anchor = anchorIndex ?: return
+                        val lo = minOf(anchor, cursorIdx)
+                        val hi = maxOf(anchor, cursorIdx)
+                        val rangeIds = jobs.subList(lo, hi + 1).asSequence()
+                            .map { it.id }
+                            .toSet()
+                        viewModel.setSelection(
+                            if (dragMode == DragMode.Add) {
+                                baseSelection + rangeIds
+                            } else {
+                                baseSelection - rangeIds
+                            },
+                        )
+                    }
+
+                    fun hitTest(rootPos: Offset): Int {
+                        val id = tileBounds.entries
+                            .firstOrNull { it.value.contains(rootPos) }?.key
+                            ?: return -1
+                        return jobs.indexOfFirst { it.id == id }
+                    }
+
+                    // Auto-scroll loop: while a drag is active, scroll the
+                    // grid when the pointer is near the top/bottom edge.
+                    LaunchedEffect(anchorIndex != null) {
+                        if (anchorIndex == null) return@LaunchedEffect
+                        val edgeZone = 80f
+                        val pxPerFrame = 22f
+                        while (isActive) {
+                            val py = pointerLocal.y
+                            val vh = viewportHeight
+                            val direction = when {
+                                py < edgeZone -> -1f
+                                py > vh - edgeZone -> 1f
+                                else -> 0f
                             }
-                            items(items, key = { it.id }) { job ->
-                                val isSelected = selectedIds.contains(job.id)
-                                JobThumbnail(
-                                    job = job,
-                                    prompts = prompts,
-                                    model = repository.thumbModel(job.id),
-                                    isSelected = isSelected,
-                                    isSelectionMode = isSelectionMode,
-                                    onClick = {
-                                        if (isSelectionMode) {
-                                            viewModel.toggleSelection(job.id)
-                                        } else {
-                                            onJobClick(job.id)
+                            if (direction != 0f) {
+                                gridState.scrollBy(direction * pxPerFrame)
+                                // After scroll, tile bounds shift; re-hit-test.
+                                val idx = hitTest(pointerRoot)
+                                if (idx >= 0) applyRange(idx)
+                            }
+                            delay(16)
+                        }
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .onGloballyPositioned { coords ->
+                                boxOriginInRoot = coords.positionInRoot()
+                                viewportHeight = coords.size.height.toFloat()
+                            }
+                            .pointerInput(jobs) {
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = { local ->
+                                        pointerLocal = local
+                                        val root = boxOriginInRoot + local
+                                        pointerRoot = root
+                                        val hitIdx = hitTest(root)
+                                        if (hitIdx >= 0) {
+                                            val hitId = jobs[hitIdx].id
+                                            baseSelection = selectedIds
+                                            dragMode = if (hitId in baseSelection) {
+                                                DragMode.Remove
+                                            } else {
+                                                DragMode.Add
+                                            }
+                                            anchorIndex = hitIdx
+                                            applyRange(hitIdx)
                                         }
                                     },
-                                    onLongClick = {
-                                        if (!isSelectionMode) {
-                                            viewModel.toggleSelection(job.id)
-                                        }
+                                    onDrag = { change, _ ->
+                                        if (anchorIndex == null) return@detectDragGesturesAfterLongPress
+                                        val local = change.position
+                                        pointerLocal = local
+                                        val root = boxOriginInRoot + local
+                                        pointerRoot = root
+                                        val idx = hitTest(root)
+                                        if (idx >= 0) applyRange(idx)
                                     },
+                                    onDragEnd = { anchorIndex = null },
+                                    onDragCancel = { anchorIndex = null },
                                 )
+                            },
+                    ) {
+                        LazyVerticalGrid(
+                            state = gridState,
+                            columns = GridCells.Adaptive(minSize = 110.dp),
+                            contentPadding = PaddingValues(16.dp),
+                            modifier = Modifier.fillMaxSize(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            groupedJobs.forEach { (date, items) ->
+                                item(span = { GridItemSpan(maxLineSpan) }) {
+                                    Text(
+                                        text = date,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        modifier = Modifier.padding(vertical = 8.dp),
+                                    )
+                                }
+                                items(items, key = { it.id }) { job ->
+                                    val isSelected = selectedIds.contains(job.id)
+                                    JobThumbnail(
+                                        modifier = Modifier.onGloballyPositioned { coords ->
+                                            tileBounds[job.id] = coords.boundsInRoot()
+                                        },
+                                        job = job,
+                                        prompts = prompts,
+                                        model = repository.thumbModel(job.id),
+                                        isSelected = isSelected,
+                                        isSelectionMode = isSelectionMode,
+                                        onClick = {
+                                            if (isSelectionMode) {
+                                                viewModel.toggleSelection(job.id)
+                                            } else {
+                                                onJobClick(job.id)
+                                            }
+                                        },
+                                    )
+                                }
                             }
                         }
                     }
@@ -318,17 +433,17 @@ private fun JobThumbnail(
     isSelected: Boolean,
     isSelectionMode: Boolean,
     onClick: () -> Unit,
-    onLongClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Card(
         modifier =
-        Modifier
+        modifier
             .fillMaxWidth()
             .aspectRatio(1f)
             .clip(RoundedCornerShape(8.dp))
             .combinedClickable(
                 onClick = onClick,
-                onLongClick = onLongClick,
+                onLongClick = {},
             ),
         colors =
         CardDefaults.cardColors(

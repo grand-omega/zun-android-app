@@ -12,6 +12,9 @@ import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.data.repo.RealJobRepository
 import dev.zun.flux.data.repo.SettingsManager
 import dev.zun.flux.ui.auth.AuthStateHolder
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -19,9 +22,19 @@ import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import java.util.concurrent.TimeUnit
 
+data class RepositoryState(
+    val repository: JobRepository,
+    val version: Long,
+)
+
 class FluxApp : Application() {
-    lateinit var repository: JobRepository
-        private set
+    private val _repositoryState = MutableStateFlow<RepositoryState?>(null)
+    val repositoryState: StateFlow<RepositoryState?> = _repositoryState.asStateFlow()
+
+    private var repositoryVersion = 0L
+
+    val repository: JobRepository
+        get() = _repositoryState.value?.repository ?: error("Repository has not been initialized")
 
     lateinit var okHttpClient: OkHttpClient
         private set
@@ -102,6 +115,9 @@ class FluxApp : Application() {
                 .build()
 
         val api = retrofit.create(FluxApi::class.java)
-        repository = RealJobRepository(this, api, settingsManager)
+        _repositoryState.value = RepositoryState(
+            repository = RealJobRepository(this, api, settingsManager),
+            version = ++repositoryVersion,
+        )
     }
 }

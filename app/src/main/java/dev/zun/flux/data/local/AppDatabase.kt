@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(entities = [JobEntity::class, PendingDeleteEntity::class], version = 4, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
@@ -18,10 +20,106 @@ abstract class AppDatabase : RoomDatabase() {
                 context.applicationContext,
                 AppDatabase::class.java,
                 "flux_database",
-            ).fallbackToDestructiveMigration(dropAllTables = true)
+            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .build()
             instance = createdInstance
             createdInstance
+        }
+
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                ensureCurrentSchema(db)
+            }
+        }
+
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                ensureCurrentSchema(db)
+            }
+        }
+
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                ensureCurrentSchema(db)
+            }
+        }
+
+        private fun ensureCurrentSchema(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS jobs (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    status TEXT NOT NULL DEFAULT 'done',
+                    inputId INTEGER,
+                    promptId INTEGER,
+                    promptText TEXT,
+                    workflow TEXT,
+                    seed INTEGER,
+                    progress REAL,
+                    error TEXT,
+                    createdAt INTEGER NOT NULL DEFAULT 0,
+                    startedAt INTEGER,
+                    completedAt INTEGER,
+                    durationSeconds INTEGER,
+                    width INTEGER,
+                    height INTEGER
+                )
+                """.trimIndent(),
+            )
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS pending_deletes (
+                    jobId TEXT NOT NULL PRIMARY KEY,
+                    createdAt INTEGER NOT NULL
+                )
+                """.trimIndent(),
+            )
+
+            val jobColumns = columnNames(db, "jobs")
+            addColumnIfMissing(db, jobColumns, "jobs", "status TEXT NOT NULL DEFAULT 'done'")
+            addColumnIfMissing(db, jobColumns, "jobs", "inputId INTEGER")
+            addColumnIfMissing(db, jobColumns, "jobs", "promptId INTEGER")
+            addColumnIfMissing(db, jobColumns, "jobs", "promptText TEXT")
+            addColumnIfMissing(db, jobColumns, "jobs", "workflow TEXT")
+            addColumnIfMissing(db, jobColumns, "jobs", "seed INTEGER")
+            addColumnIfMissing(db, jobColumns, "jobs", "progress REAL")
+            addColumnIfMissing(db, jobColumns, "jobs", "error TEXT")
+            addColumnIfMissing(db, jobColumns, "jobs", "createdAt INTEGER NOT NULL DEFAULT 0")
+            addColumnIfMissing(db, jobColumns, "jobs", "startedAt INTEGER")
+            addColumnIfMissing(db, jobColumns, "jobs", "completedAt INTEGER")
+            addColumnIfMissing(db, jobColumns, "jobs", "durationSeconds INTEGER")
+            addColumnIfMissing(db, jobColumns, "jobs", "width INTEGER")
+            addColumnIfMissing(db, jobColumns, "jobs", "height INTEGER")
+
+            val pendingDeleteColumns = columnNames(db, "pending_deletes")
+            addColumnIfMissing(db, pendingDeleteColumns, "pending_deletes", "createdAt INTEGER NOT NULL DEFAULT 0")
+        }
+
+        private fun addColumnIfMissing(
+            db: SupportSQLiteDatabase,
+            existingColumns: Set<String>,
+            tableName: String,
+            declaration: String,
+        ) {
+            val columnName = declaration.substringBefore(' ')
+            if (columnName !in existingColumns) {
+                db.execSQL("ALTER TABLE $tableName ADD COLUMN $declaration")
+            }
+        }
+
+        private fun columnNames(
+            db: SupportSQLiteDatabase,
+            tableName: String,
+        ): Set<String> {
+            val cursor = db.query("PRAGMA table_info($tableName)")
+            return cursor.use {
+                buildSet {
+                    val nameIndex = it.getColumnIndex("name")
+                    while (it.moveToNext()) {
+                        add(it.getString(nameIndex))
+                    }
+                }
+            }
         }
     }
 }

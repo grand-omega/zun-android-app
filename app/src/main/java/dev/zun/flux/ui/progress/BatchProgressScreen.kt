@@ -51,7 +51,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -59,7 +58,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import androidx.work.WorkManager
 import coil3.compose.AsyncImage
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.ui.theme.tabular
@@ -143,14 +141,12 @@ private fun BatchTile(
     repository: JobRepository,
     onClick: (isDone: Boolean) -> Unit,
 ) {
-    val context = LocalContext.current
     val viewModel: ProgressViewModel = viewModel(
         key = jobId,
         factory = viewModelFactory {
             initializer {
                 ProgressViewModel(
                     repository = repository,
-                    workManager = WorkManager.getInstance(context),
                 )
             }
         },
@@ -312,14 +308,12 @@ private fun BatchPage(
     repository: JobRepository,
     onViewResult: () -> Unit,
 ) {
-    val context = LocalContext.current
     val viewModel: ProgressViewModel = viewModel(
         key = jobId,
         factory = viewModelFactory {
             initializer {
                 ProgressViewModel(
                     repository = repository,
-                    workManager = WorkManager.getInstance(context),
                 )
             }
         },

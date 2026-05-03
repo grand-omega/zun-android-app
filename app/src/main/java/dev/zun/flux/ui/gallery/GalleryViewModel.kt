@@ -129,6 +129,12 @@ class GalleryViewModel(
         _selectedIds.value = emptySet()
     }
 
+    /** Replaces the entire selection — used by drag-select to apply a range
+     *  computed from anchor + cursor in one shot. */
+    fun setSelection(ids: Set<String>) {
+        _selectedIds.value = ids
+    }
+
     fun deleteSelected() {
         val ids = _selectedIds.value
         if (ids.isEmpty()) return

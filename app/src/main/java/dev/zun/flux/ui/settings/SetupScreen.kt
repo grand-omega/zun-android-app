@@ -34,6 +34,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import dev.zun.flux.FluxApp
+import dev.zun.flux.util.normalizeOptionalServerUrl
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -153,8 +154,11 @@ fun SetupScreen(
                     error = null
                     scope.launch {
                         try {
-                            val lan = lanUrl.trim().removeSuffix("/").takeIf { it.isNotBlank() && it != "http://" }
-                            val ts = tailscaleUrl.trim().removeSuffix("/").takeIf { it.isNotBlank() && it != "http://" }
+                            val lan = normalizeOptionalServerUrl(lanUrl)
+                            val ts = normalizeOptionalServerUrl(tailscaleUrl)
+                            require(lan != null || ts != null) {
+                                "Enter at least one server URL"
+                            }
                             settings.lanUrl = lan
                             settings.tailscaleUrl = ts
                             settings.apiToken = token.trim()

@@ -77,26 +77,24 @@ class HomeViewModel(
     val promptErrors: Flow<String> = _promptErrors.receiveAsFlow()
 
     init {
-        fetchPrompts()
+        viewModelScope.launch { fetchPrompts() }
         startHealthCheck()
     }
 
-    private fun fetchPrompts() {
-        viewModelScope.launch {
-            val fetched =
-                try {
-                    repository.listPrompts()
-                } catch (_: Throwable) {
-                    emptyList()
-                }
+    private suspend fun fetchPrompts() {
+        val fetched =
+            try {
+                repository.listPrompts()
+            } catch (_: Throwable) {
+                emptyList()
+            }
 
-            val customEntry = PromptDto(
-                id = CUSTOM_PROMPT_ID,
-                label = "Write your own...",
-                description = "Enter a custom text prompt",
-            )
-            _prompts.value = fetched + customEntry
-        }
+        val customEntry = PromptDto(
+            id = CUSTOM_PROMPT_ID,
+            label = "Write your own...",
+            description = "Enter a custom text prompt",
+        )
+        _prompts.value = fetched + customEntry
     }
 
     private fun startHealthCheck() {
@@ -129,9 +127,13 @@ class HomeViewModel(
     fun manualRefresh() {
         viewModelScope.launch {
             _isRefreshing.value = true
-            fetchPrompts()
-            performHealthCheck()
-            _isRefreshing.value = false
+            try {
+                repository.syncHistory()
+                fetchPrompts()
+                performHealthCheck()
+            } finally {
+                _isRefreshing.value = false
+            }
         }
     }
 

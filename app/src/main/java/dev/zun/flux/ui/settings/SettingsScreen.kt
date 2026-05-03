@@ -39,6 +39,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import dev.zun.flux.BuildConfig
 import dev.zun.flux.FluxApp
+import dev.zun.flux.util.normalizeOptionalServerUrl
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,6 +54,7 @@ fun SettingsScreen(
     var tailscaleUrl by remember { mutableStateOf(settingsManager.tailscaleUrl ?: "") }
     var token by remember { mutableStateOf(settingsManager.apiToken ?: "") }
     var tokenVisible by remember { mutableStateOf(false) }
+    var connectionError by remember { mutableStateOf<String?>(null) }
 
     val lockoutOptions = listOf(
         0L to "Always lock",
@@ -126,25 +128,47 @@ fun SettingsScreen(
                     value = lanUrl,
                     onValueChange = {
                         lanUrl = it
-                        settingsManager.lanUrl = it.trim().removeSuffix("/").ifBlank { null }
-                        app.networkResolver.refresh()
+                        runCatching { normalizeOptionalServerUrl(it) }
+                            .onSuccess { normalized ->
+                                connectionError = null
+                                settingsManager.lanUrl = normalized
+                                app.networkResolver.refresh()
+                            }.onFailure { t ->
+                                connectionError = "LAN URL: ${t.message ?: "Invalid URL"}"
+                            }
                     },
                     label = { Text("LAN URL (used at home)") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
+                    isError = connectionError?.startsWith("LAN URL:") == true,
                 )
 
                 OutlinedTextField(
                     value = tailscaleUrl,
                     onValueChange = {
                         tailscaleUrl = it
-                        settingsManager.tailscaleUrl = it.trim().removeSuffix("/").ifBlank { null }
-                        app.networkResolver.refresh()
+                        runCatching { normalizeOptionalServerUrl(it) }
+                            .onSuccess { normalized ->
+                                connectionError = null
+                                settingsManager.tailscaleUrl = normalized
+                                app.networkResolver.refresh()
+                            }.onFailure { t ->
+                                connectionError = "Tailscale URL: ${t.message ?: "Invalid URL"}"
+                            }
                     },
                     label = { Text("Tailscale URL (used away)") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
+                    isError = connectionError?.startsWith("Tailscale URL:") == true,
                 )
+
+                if (connectionError != null) {
+                    Text(
+                        text = connectionError!!,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                }
 
                 OutlinedTextField(
                     value = token,

@@ -11,6 +11,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -46,6 +47,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -69,6 +71,7 @@ import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.Saver
@@ -83,6 +86,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -104,6 +108,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun HomeScreen(
     repository: JobRepository,
+    repositoryVersion: Long,
     windowSizeClass: WindowSizeClass,
     capturedUri: Uri? = null,
     onTakePhoto: () -> Unit,
@@ -114,6 +119,7 @@ fun HomeScreen(
 ) {
     val viewModel: HomeViewModel =
         viewModel(
+            key = "home-$repositoryVersion",
             factory =
             viewModelFactory {
                 initializer { HomeViewModel(repository) }
@@ -140,6 +146,9 @@ fun HomeScreen(
 
     val context = androidx.compose.ui.platform.LocalContext.current
     val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
+    val density = LocalDensity.current
+    val refreshThresholdPx = with(density) { 96.dp.toPx() }
+    var pullDistancePx by remember { mutableFloatStateOf(0f) }
 
     val appendUris: (List<Uri>) -> Unit = { newUris ->
         coroutineScope.launch {
@@ -272,9 +281,30 @@ fun HomeScreen(
         PullToRefreshBox(
             isRefreshing = isRefreshing,
             onRefresh = { viewModel.manualRefresh() },
+            indicator = {},
             modifier = Modifier
+                .fillMaxSize()
                 .padding(inner)
-                .then(exitModifier),
+                .then(exitModifier)
+                .pointerInput(isRefreshing, refreshThresholdPx) {
+                    detectVerticalDragGestures(
+                        onDragStart = { pullDistancePx = 0f },
+                        onVerticalDrag = { change, dragAmount ->
+                            if (dragAmount > 0f || pullDistancePx > 0f) {
+                                pullDistancePx = (pullDistancePx + dragAmount)
+                                    .coerceIn(0f, refreshThresholdPx * 1.25f)
+                                change.consume()
+                            }
+                        },
+                        onDragEnd = {
+                            if (pullDistancePx >= refreshThresholdPx && !isRefreshing) {
+                                viewModel.manualRefresh()
+                            }
+                            pullDistancePx = 0f
+                        },
+                        onDragCancel = { pullDistancePx = 0f },
+                    )
+                },
         ) {
             val onSubmit: () -> Unit = {
                 val promptId = selectedPromptId
@@ -345,6 +375,24 @@ fun HomeScreen(
                 isFetchingRecent = isFetchingRecent,
                 onPickRecent = onPickRecent,
             )
+            if (isRefreshing || pullDistancePx > 0f) {
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 12.dp)
+                        .size(44.dp),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surface,
+                    shadowElevation = 6.dp,
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 2.5.dp,
+                        )
+                    }
+                }
+            }
         }
     }
 

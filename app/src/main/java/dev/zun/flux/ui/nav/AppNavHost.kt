@@ -35,6 +35,7 @@ private const val KEY_DELETED_JOB_ID = "deletedJobId"
 @Composable
 fun AppNavHost(
     repository: JobRepository,
+    repositoryVersion: Long,
     windowSizeClass: WindowSizeClass,
 ) {
     val context = LocalContext.current
@@ -58,6 +59,7 @@ fun AppNavHost(
 
             HomeScreen(
                 repository = repository,
+                repositoryVersion = repositoryVersion,
                 windowSizeClass = windowSizeClass,
                 capturedUri = capturedUri,
                 onTakePhoto = { nav.navigate(Routes.CAMERA) },
@@ -93,6 +95,7 @@ fun AppNavHost(
         composable(Routes.GALLERY) {
             GalleryScaffold(
                 repository = repository,
+                repositoryVersion = repositoryVersion,
                 onBack = { nav.popBackStack() },
             )
         }

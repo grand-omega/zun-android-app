@@ -38,7 +38,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -47,7 +46,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import androidx.work.WorkManager
 import coil3.compose.AsyncImage
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.ui.theme.tabular
@@ -61,7 +59,6 @@ fun ProgressScreen(
     onDone: () -> Unit,
     onBack: () -> Unit,
 ) {
-    val context = LocalContext.current
     val viewModel: ProgressViewModel =
         viewModel(
             key = jobId,
@@ -70,7 +67,6 @@ fun ProgressScreen(
                 initializer {
                     ProgressViewModel(
                         repository = repository,
-                        workManager = WorkManager.getInstance(context),
                     )
                 }
             },
