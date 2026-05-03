@@ -40,6 +40,8 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import dev.zun.flux.BuildConfig
 import dev.zun.flux.FluxApp
+import dev.zun.flux.data.repo.ActiveRoute
+import dev.zun.flux.data.repo.ConnectionMode
 import dev.zun.flux.util.normalizeOptionalServerUrl
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -53,6 +55,7 @@ fun SettingsScreen(
 
     var lanUrl by remember { mutableStateOf(settingsManager.lanUrl ?: "") }
     var tailscaleUrl by remember { mutableStateOf(settingsManager.tailscaleUrl ?: "") }
+    var connectionMode by remember { mutableStateOf(settingsManager.connectionMode) }
     var token by remember { mutableStateOf(settingsManager.apiToken ?: "") }
     var tokenVisible by remember { mutableStateOf(false) }
     var connectionError by remember { mutableStateOf<String?>(null) }
@@ -126,6 +129,34 @@ fun SettingsScreen(
             Text("Connection", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
 
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(modifier = Modifier.selectableGroup()) {
+                    Text("Mode", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom = 4.dp))
+                    connectionModeOptions.forEach { (mode, label) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .selectable(
+                                    selected = connectionMode == mode,
+                                    onClick = {
+                                        connectionMode = mode
+                                        connectionError = null
+                                        connectionStatus = "Unsaved changes"
+                                    },
+                                    role = Role.RadioButton,
+                                )
+                                .padding(vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(selected = connectionMode == mode, onClick = null)
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.bodyLarge,
+                                modifier = Modifier.padding(start = 16.dp),
+                            )
+                        }
+                    }
+                }
+
                 OutlinedTextField(
                     value = lanUrl,
                     onValueChange = {
@@ -202,6 +233,7 @@ fun SettingsScreen(
                             }
                             settingsManager.lanUrl = lan
                             settingsManager.tailscaleUrl = tailscale
+                            settingsManager.connectionMode = connectionMode
                             settingsManager.apiToken = token.trim()
                             connectionError = null
                             connectionStatus = "Saved. Reconnecting..."
@@ -233,12 +265,32 @@ fun SettingsScreen(
                 InfoRow("Version", BuildConfig.VERSION_NAME)
                 InfoRow("Build", BuildConfig.VERSION_CODE.toString())
                 InfoRow("Package", BuildConfig.APPLICATION_ID)
+                InfoRow("Mode", connectionModeLabel(settingsManager.connectionMode))
+                InfoRow("Active Route", activeRouteLabel(settingsManager.activeRoute))
                 InfoRow("Active URL", settingsManager.serverUrl ?: "(none)", isMonospace = true)
                 InfoRow("LAN URL", settingsManager.lanUrl ?: "(not set)", isMonospace = true)
                 InfoRow("Tailscale URL", settingsManager.tailscaleUrl ?: "(not set)", isMonospace = true)
             }
         }
     }
+}
+
+private val connectionModeOptions = listOf(
+    ConnectionMode.AUTO to "Auto (LAN first, Tailscale fallback)",
+    ConnectionMode.LAN_ONLY to "LAN only",
+    ConnectionMode.TAILSCALE_ONLY to "Tailscale only",
+)
+
+private fun connectionModeLabel(mode: ConnectionMode): String = when (mode) {
+    ConnectionMode.AUTO -> "Auto"
+    ConnectionMode.LAN_ONLY -> "LAN only"
+    ConnectionMode.TAILSCALE_ONLY -> "Tailscale only"
+}
+
+private fun activeRouteLabel(route: ActiveRoute): String = when (route) {
+    ActiveRoute.NONE -> "(none)"
+    ActiveRoute.LAN -> "LAN"
+    ActiveRoute.TAILSCALE -> "Tailscale"
 }
 
 @Composable

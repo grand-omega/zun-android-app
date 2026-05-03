@@ -97,7 +97,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import coil3.compose.AsyncImage
+import dev.zun.flux.FluxApp
 import dev.zun.flux.data.api.PromptDto
+import dev.zun.flux.data.repo.ActiveRoute
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.util.cacheInputLocally
 import kotlinx.coroutines.Dispatchers
@@ -145,6 +147,7 @@ fun HomeScreen(
     var tryHarder by rememberSaveable { mutableStateOf(false) }
 
     val context = androidx.compose.ui.platform.LocalContext.current
+    val app = context.applicationContext as FluxApp
     val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
     val density = LocalDensity.current
     val refreshThresholdPx = with(density) { 96.dp.toPx() }
@@ -256,7 +259,7 @@ fun HomeScreen(
                         HealthDot(health = health)
                         Spacer(Modifier.width(6.dp))
                         Text(
-                            text = healthShortLabel(health),
+                            text = "${activeRouteLabel(app.settingsManager.activeRoute)} · ${healthShortLabel(health)}",
                             style = MaterialTheme.typography.labelSmall,
                             color = healthColor(health),
                         )
@@ -1263,6 +1266,12 @@ private fun healthDescription(health: HealthState): String = when (health) {
     is HealthState.HostUnreachable -> health.message
     is HealthState.NetworkError -> health.message
     is HealthState.ServerError -> "Server error ${health.code}"
+}
+
+private fun activeRouteLabel(route: ActiveRoute): String = when (route) {
+    ActiveRoute.NONE -> "No route"
+    ActiveRoute.LAN -> "LAN"
+    ActiveRoute.TAILSCALE -> "Tailscale"
 }
 
 private const val MAX_BATCH_IMAGES = 20

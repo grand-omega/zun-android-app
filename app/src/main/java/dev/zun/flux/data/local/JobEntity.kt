@@ -4,6 +4,7 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 import dev.zun.flux.data.api.JobStatusDto
 import dev.zun.flux.data.api.JobSummaryDto
+import dev.zun.flux.data.api.effectivePromptId
 
 @Entity(tableName = "jobs")
 data class JobEntity(
@@ -28,7 +29,7 @@ fun JobStatusDto.toEntity(): JobEntity = JobEntity(
     id = id,
     status = status,
     inputId = input_id,
-    promptId = prompt_id,
+    promptId = effectivePromptId,
     promptText = prompt_text,
     workflow = workflow,
     seed = seed,
@@ -46,7 +47,7 @@ fun JobSummaryDto.toEntity(): JobEntity = JobEntity(
     id = id,
     status = status,
     inputId = input_id,
-    promptId = prompt_id,
+    promptId = effectivePromptId,
     promptText = prompt_text,
     workflow = workflow,
     seed = seed,
@@ -64,6 +65,7 @@ fun JobEntity.toSummaryDto(): JobSummaryDto = JobSummaryDto(
     id = id,
     status = status,
     input_id = inputId,
+    source_prompt_id = promptId,
     prompt_id = promptId,
     prompt_text = promptText,
     workflow = workflow,
@@ -77,6 +79,7 @@ fun JobEntity.toStatusDto(): JobStatusDto = JobStatusDto(
     id = id,
     status = status,
     input_id = inputId,
+    source_prompt_id = promptId,
     prompt_id = promptId,
     prompt_text = promptText,
     workflow = workflow,

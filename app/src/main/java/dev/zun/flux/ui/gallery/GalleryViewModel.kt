@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.zun.flux.data.api.JobSummaryDto
 import dev.zun.flux.data.api.PromptDto
+import dev.zun.flux.data.api.effectivePromptId
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.util.saveToPictures
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -52,8 +53,8 @@ class GalleryViewModel(
         combine(allJobs, _tagFilter) { all, filter ->
             when (filter) {
                 TagFilter.All -> all
-                is TagFilter.ByPromptId -> all.filter { it.prompt_id == filter.promptId }
-                TagFilter.Custom -> all.filter { it.prompt_id == null && it.prompt_text != null }
+                is TagFilter.ByPromptId -> all.filter { it.effectivePromptId == filter.promptId }
+                TagFilter.Custom -> all.filter { it.effectivePromptId == null && it.prompt_text != null }
             }
         }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
@@ -63,7 +64,7 @@ class GalleryViewModel(
             buildList {
                 add(TagOption(TagFilter.All, "All", all.size))
                 all.asSequence()
-                    .mapNotNull { it.prompt_id }
+                    .mapNotNull { it.effectivePromptId }
                     .groupingBy { it }
                     .eachCount()
                     .entries
@@ -72,7 +73,7 @@ class GalleryViewModel(
                         val label = ps.firstOrNull { it.id == id }?.label ?: "Unknown prompt"
                         add(TagOption(TagFilter.ByPromptId(id), label, count))
                     }
-                val customCount = all.count { it.prompt_id == null && it.prompt_text != null }
+                val customCount = all.count { it.effectivePromptId == null && it.prompt_text != null }
                 if (customCount > 0) {
                     add(TagOption(TagFilter.Custom, "Custom prompts", customCount))
                 }

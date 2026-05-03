@@ -51,6 +51,8 @@ data class JobStatusDto(
     val id: String,
     val status: String,
     val input_id: Int? = null,
+    val source_prompt_id: Long? = null,
+    /** Legacy server field. Prefer [source_prompt_id]. */
     val prompt_id: Long? = null,
     val prompt_text: String? = null,
     val workflow: String? = null,
@@ -69,6 +71,8 @@ data class JobSummaryDto(
     val id: String,
     val status: String = "done",
     val input_id: Int? = null,
+    val source_prompt_id: Long? = null,
+    /** Legacy server field. Prefer [source_prompt_id]. */
     val prompt_id: Long? = null,
     val prompt_text: String? = null,
     val workflow: String? = null,
@@ -83,6 +87,12 @@ data class JobListResponse(
     val items: List<JobSummaryDto>,
     val next_cursor: String? = null,
 )
+
+val JobStatusDto.effectivePromptId: Long?
+    get() = source_prompt_id ?: prompt_id
+
+val JobSummaryDto.effectivePromptId: Long?
+    get() = source_prompt_id ?: prompt_id
 
 @Serializable
 data class InputMetadata(

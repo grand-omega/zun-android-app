@@ -8,6 +8,18 @@ import android.content.Context
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 
+enum class ConnectionMode {
+    AUTO,
+    LAN_ONLY,
+    TAILSCALE_ONLY,
+}
+
+enum class ActiveRoute {
+    NONE,
+    LAN,
+    TAILSCALE,
+}
+
 class SettingsManager(context: Context) {
     private val masterKey = MasterKey.Builder(context)
         .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
@@ -33,6 +45,18 @@ class SettingsManager(context: Context) {
     var serverUrl: String?
         get() = prefs.getString(KEY_SERVER_URL, null)
         set(value) = prefs.edit().putString(KEY_SERVER_URL, value).apply()
+
+    var activeRoute: ActiveRoute
+        get() = runCatching {
+            ActiveRoute.valueOf(prefs.getString(KEY_ACTIVE_ROUTE, ActiveRoute.NONE.name) ?: ActiveRoute.NONE.name)
+        }.getOrDefault(ActiveRoute.NONE)
+        set(value) = prefs.edit().putString(KEY_ACTIVE_ROUTE, value.name).apply()
+
+    var connectionMode: ConnectionMode
+        get() = runCatching {
+            ConnectionMode.valueOf(prefs.getString(KEY_CONNECTION_MODE, ConnectionMode.AUTO.name) ?: ConnectionMode.AUTO.name)
+        }.getOrDefault(ConnectionMode.AUTO)
+        set(value) = prefs.edit().putString(KEY_CONNECTION_MODE, value.name).apply()
 
     var lanUrl: String?
         get() {
@@ -71,6 +95,8 @@ class SettingsManager(context: Context) {
     companion object {
         private const val KEY_LOCKOUT_DURATION = "lockout_duration_ms"
         private const val KEY_SERVER_URL = "server_url"
+        private const val KEY_ACTIVE_ROUTE = "active_route"
+        private const val KEY_CONNECTION_MODE = "connection_mode"
         private const val KEY_LAN_URL = "lan_url"
         private const val KEY_TAILSCALE_URL = "tailscale_url"
         private const val KEY_API_TOKEN = "api_token"

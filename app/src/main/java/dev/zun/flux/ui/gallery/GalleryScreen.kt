@@ -75,6 +75,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import dev.zun.flux.data.api.JobSummaryDto
 import dev.zun.flux.data.api.PromptDto
+import dev.zun.flux.data.api.effectivePromptId
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.util.formatTimestamp
 import dev.zun.flux.util.resolvePromptLabel
@@ -462,7 +463,7 @@ private fun JobThumbnail(
 
             if (!isSelectionMode) {
                 Text(
-                    text = resolvePromptLabel(prompts, job.prompt_id, job.prompt_text),
+                    text = resolvePromptLabel(prompts, job.effectivePromptId, job.prompt_text),
                     style = MaterialTheme.typography.labelSmall,
                     color = Color.White,
                     modifier =

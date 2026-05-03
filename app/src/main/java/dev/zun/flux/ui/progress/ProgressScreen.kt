@@ -47,6 +47,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import coil3.compose.AsyncImage
+import dev.zun.flux.data.api.effectivePromptId
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.ui.theme.tabular
 import dev.zun.flux.util.resolvePromptLabel
@@ -179,7 +180,7 @@ fun ProgressScreen(
                             modifier = Modifier.padding(16.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            MetadataRow("Prompt", resolvePromptLabel(prompts, dto.prompt_id, dto.prompt_text))
+                            MetadataRow("Prompt", resolvePromptLabel(prompts, dto.effectivePromptId, dto.prompt_text))
                         }
                     }
                 }

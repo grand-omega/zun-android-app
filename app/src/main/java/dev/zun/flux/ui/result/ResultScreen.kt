@@ -54,6 +54,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.zun.flux.data.api.JobStatusDto
+import dev.zun.flux.data.api.effectivePromptId
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.ui.gallery.BeforeAfterSlider
 import dev.zun.flux.util.resolvePromptLabel
@@ -93,7 +94,7 @@ fun ResultScreen(
     val prompts by repository.promptsState.collectAsState()
     val isWide = windowSizeClass.widthSizeClass >= WindowWidthSizeClass.Medium
 
-    val promptLabel = jobDto?.let { resolvePromptLabel(prompts, it.prompt_id, it.prompt_text) }
+    val promptLabel = jobDto?.let { resolvePromptLabel(prompts, it.effectivePromptId, it.prompt_text) }
         ?: "Loading…"
 
     // Initial text for the edit dialog: existing free-text, or the label of
@@ -118,9 +119,9 @@ fun ResultScreen(
                             promptText = overrideText,
                             workflow = dto.workflow,
                         )
-                        dto.prompt_id != null -> repository.submitJob(
+                        dto.effectivePromptId != null -> repository.submitJob(
                             inputUri = inputUri,
-                            promptId = dto.prompt_id,
+                            promptId = dto.effectivePromptId,
                             workflow = dto.workflow,
                         )
                         else -> repository.submitJob(
@@ -344,7 +345,7 @@ fun ResultScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (dto != null) {
-                        Text("Prompt: ${resolvePromptLabel(prompts, dto.prompt_id, dto.prompt_text)}")
+                        Text("Prompt: ${resolvePromptLabel(prompts, dto.effectivePromptId, dto.prompt_text)}")
                         Text("Created: ${SimpleDateFormat("MMM d, yyyy · HH:mm", locale).format(Date(dto.created_at * 1000))}")
                         val started = dto.started_at
                         val completed = dto.completed_at

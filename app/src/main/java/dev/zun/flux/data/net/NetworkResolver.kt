@@ -1,5 +1,7 @@
 package dev.zun.flux.data.net
 
+import dev.zun.flux.data.repo.ActiveRoute
+import dev.zun.flux.data.repo.ConnectionMode
 import dev.zun.flux.data.repo.SettingsManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -33,15 +35,21 @@ class NetworkResolver(
         val lan = settings.lanUrl?.takeUnless { it.isBlank() }
         val ts = settings.tailscaleUrl?.takeUnless { it.isBlank() }
 
-        val chosen = when {
-            lan != null && probe(lan) -> lan
-            ts != null -> ts
-            else -> lan
+        val chosen = when (settings.connectionMode) {
+            ConnectionMode.AUTO -> when {
+                lan != null && probe(lan) -> lan to ActiveRoute.LAN
+                ts != null -> ts to ActiveRoute.TAILSCALE
+                lan != null -> lan to ActiveRoute.LAN
+                else -> null
+            }
+            ConnectionMode.LAN_ONLY -> lan?.let { it to ActiveRoute.LAN }
+            ConnectionMode.TAILSCALE_ONLY -> ts?.let { it to ActiveRoute.TAILSCALE }
         } ?: return@withLock
 
-        if (chosen != settings.serverUrl) {
+        if (chosen.first != settings.serverUrl || chosen.second != settings.activeRoute) {
             withContext(Dispatchers.Main) {
-                settings.serverUrl = chosen
+                settings.serverUrl = chosen.first
+                settings.activeRoute = chosen.second
                 onActiveUrlChanged()
             }
         }

@@ -4,7 +4,7 @@ import dev.zun.flux.data.api.PromptDto
 
 /**
  * Resolves a human-readable label for a job whose backing prompt may be a
- * server-defined preset (by `prompt_id`) or free-text (`prompt_text`).
+ * server-defined preset (by `source_prompt_id`) or free-text (`prompt_text`).
  * Falls back to a truncated snippet or a generic placeholder.
  */
 fun resolvePromptLabel(

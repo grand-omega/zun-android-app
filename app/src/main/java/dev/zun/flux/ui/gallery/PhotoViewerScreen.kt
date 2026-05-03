@@ -66,6 +66,7 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.zun.flux.data.api.JobSummaryDto
 import dev.zun.flux.data.api.PromptDto
+import dev.zun.flux.data.api.effectivePromptId
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.util.resolvePromptLabel
 import dev.zun.flux.util.saveToPictures
@@ -401,7 +402,7 @@ private fun JobDetailsSheet(
             )
 
             Text(
-                text = resolvePromptLabel(prompts, job.prompt_id, job.prompt_text),
+                text = resolvePromptLabel(prompts, job.effectivePromptId, job.prompt_text),
                 style = MaterialTheme.typography.headlineSmall,
             )
 

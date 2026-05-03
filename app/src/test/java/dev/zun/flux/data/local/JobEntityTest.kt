@@ -13,6 +13,7 @@ class JobEntityTest {
             id = "job-1",
             status = "running",
             input_id = 42,
+            source_prompt_id = 7,
             prompt_id = 7,
             prompt_text = null,
             workflow = "flux2_klein_edit",
@@ -37,6 +38,7 @@ class JobEntityTest {
             id = "job-2",
             status = "done",
             input_id = 8,
+            source_prompt_id = null,
             prompt_id = null,
             prompt_text = "make it sharper",
             workflow = "flux2_klein_edit",
@@ -66,5 +68,19 @@ class JobEntityTest {
 
         assertNull(entity.completedAt)
         assertNull(entity.durationSeconds)
+    }
+
+    @Test
+    fun entityMapping_fallsBackToLegacyPromptId() {
+        val dto = JobSummaryDto(
+            id = "job-4",
+            created_at = 100,
+            source_prompt_id = null,
+            prompt_id = 12,
+        )
+
+        val entity = dto.toEntity()
+
+        assertEquals(12L, entity.promptId)
     }
 }
