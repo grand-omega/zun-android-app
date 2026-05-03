@@ -4,10 +4,13 @@ import androidx.compose.material3.windowsizeclass.WindowSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -21,6 +24,13 @@ import dev.zun.flux.ui.progress.ProgressScreen
 import dev.zun.flux.ui.result.ResultScreen
 import dev.zun.flux.ui.settings.SettingsScreen
 import dev.zun.flux.ui.settings.SetupScreen
+
+/**
+ * Saved-state key the result screen uses to tell its caller (Batch or Home)
+ * that a job was just deleted. Recipients should remove it from any locally
+ * cached id list and clear the value.
+ */
+private const val KEY_DELETED_JOB_ID = "deletedJobId"
 
 @Composable
 fun AppNavHost(
@@ -111,20 +121,58 @@ fun AppNavHost(
                 jobId = jobId,
                 repository = repository,
                 windowSizeClass = windowSizeClass,
-                onTryAnotherPrompt = { nav.popBackStack(Routes.HOME, inclusive = false) },
+                onRegenerated = { newJobId ->
+                    nav.navigate(Routes.progress(newJobId)) {
+                        popUpTo(Routes.HOME)
+                    }
+                },
+                onNewImage = { nav.popBackStack(Routes.HOME, inclusive = false) },
+                onDeleted = {
+                    nav.previousBackStackEntry
+                        ?.savedStateHandle
+                        ?.set(KEY_DELETED_JOB_ID, jobId)
+                    nav.popBackStack()
+                },
                 onBack = { nav.popBackStack() },
             )
         }
         composable(Routes.BATCH_PROGRESS) { entry ->
-            val jobIds = entry.arguments?.getString("jobIds").orEmpty()
-                .split(",")
-                .filter { it.isNotEmpty() }
-            BatchProgressScreen(
-                jobIds = jobIds,
-                repository = repository,
-                onViewResult = { id -> nav.navigate(Routes.result(id)) },
-                onBack = { nav.popBackStack(Routes.HOME, inclusive = false) },
-            )
+            val originalJobIds = remember(entry) {
+                entry.arguments?.getString("jobIds").orEmpty()
+                    .split(",")
+                    .filter { it.isNotEmpty() }
+            }
+            val savedState = entry.savedStateHandle
+            val deletedJobId by savedState
+                .getStateFlow<String?>(KEY_DELETED_JOB_ID, null)
+                .collectAsStateWithLifecycle()
+            // Track removals so deleted tiles disappear from the grid.
+            val removedIds: SnapshotStateList<String> = remember { mutableStateListOf<String>() }
+            LaunchedEffect(deletedJobId) {
+                val id = deletedJobId
+                if (id != null) {
+                    if (id !in removedIds) removedIds.add(id)
+                    savedState[KEY_DELETED_JOB_ID] = null
+                }
+            }
+            val visibleJobIds = originalJobIds.filter { it !in removedIds }
+
+            // If everything's been deleted, drop back to Home — there's nothing
+            // left for this batch screen to show.
+            LaunchedEffect(visibleJobIds.isEmpty()) {
+                if (visibleJobIds.isEmpty()) {
+                    nav.popBackStack(Routes.HOME, inclusive = false)
+                }
+            }
+
+            if (visibleJobIds.isNotEmpty()) {
+                BatchProgressScreen(
+                    jobIds = visibleJobIds,
+                    repository = repository,
+                    onViewResult = { id -> nav.navigate(Routes.result(id)) },
+                    onBack = { nav.popBackStack(Routes.HOME, inclusive = false) },
+                )
+            }
         }
     }
 }

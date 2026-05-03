@@ -1,22 +1,33 @@
 package dev.zun.flux.ui.progress
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -31,7 +42,10 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -58,7 +72,212 @@ fun BatchProgressScreen(
     onViewResult: (String) -> Unit,
     onBack: () -> Unit,
 ) {
-    val pagerState = rememberPagerState(pageCount = { jobIds.size })
+    // null = grid overview, otherwise the index focused in the pager.
+    var focusedIndex by rememberSaveable { mutableStateOf<Int?>(null) }
+
+    BackHandler(focusedIndex != null) { focusedIndex = null }
+
+    if (focusedIndex == null) {
+        BatchGrid(
+            jobIds = jobIds,
+            repository = repository,
+            onTileClick = { index, isDone ->
+                if (isDone) onViewResult(jobIds[index]) else focusedIndex = index
+            },
+            onBack = onBack,
+        )
+    } else {
+        BatchFocused(
+            jobIds = jobIds,
+            initialIndex = focusedIndex!!,
+            repository = repository,
+            onViewResult = onViewResult,
+            onBack = { focusedIndex = null },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun BatchGrid(
+    jobIds: List<String>,
+    repository: JobRepository,
+    onTileClick: (index: Int, isDone: Boolean) -> Unit,
+    onBack: () -> Unit,
+) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("${jobIds.size} generations") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+            )
+        },
+    ) { inner ->
+        LazyVerticalGrid(
+            columns = GridCells.Adaptive(minSize = 130.dp),
+            contentPadding = PaddingValues(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(inner),
+        ) {
+            itemsIndexed(jobIds, key = { _, id -> id }) { index, jobId ->
+                BatchTile(
+                    jobId = jobId,
+                    repository = repository,
+                    onClick = { isDone -> onTileClick(index, isDone) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun BatchTile(
+    jobId: String,
+    repository: JobRepository,
+    onClick: (isDone: Boolean) -> Unit,
+) {
+    val context = LocalContext.current
+    val viewModel: ProgressViewModel = viewModel(
+        key = jobId,
+        factory = viewModelFactory {
+            initializer {
+                ProgressViewModel(
+                    repository = repository,
+                    workManager = WorkManager.getInstance(context),
+                )
+            }
+        },
+    )
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    LaunchedEffect(jobId) { viewModel.start(jobId) }
+
+    val currentDto = (state as? PollState.Running)?.dto ?: (state as? PollState.Done)?.dto
+    val inputModel = remember(currentDto?.input_id) { repository.inputModel(currentDto?.input_id) }
+    val isDone = state is PollState.Done
+    val resultModel = remember(jobId, isDone) {
+        if (isDone) repository.previewModel(jobId) else null
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(1f)
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color.Black)
+            .clickable { onClick(isDone) },
+        contentAlignment = Alignment.Center,
+    ) {
+        if (isDone && resultModel != null) {
+            AsyncImage(
+                model = resultModel,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+            )
+            // Done check in corner.
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(6.dp)
+                    .size(20.dp)
+                    .background(Color(0xFF1D9E75), CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Default.Check,
+                    contentDescription = "Done",
+                    tint = Color.White,
+                    modifier = Modifier.size(14.dp),
+                )
+            }
+        } else {
+            // Dimmed input + state overlay.
+            AsyncImage(
+                model = inputModel,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize().alpha(0.45f),
+            )
+            when (val s = state) {
+                PollState.Starting -> CircularProgressIndicator(
+                    color = Color.White,
+                    modifier = Modifier.size(28.dp),
+                    strokeWidth = 2.dp,
+                )
+                is PollState.Running -> {
+                    val pct = s.dto.progress?.let { (it * 100).toInt() }
+                    if (pct != null) {
+                        Text(
+                            text = "$pct%",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleLarge,
+                        )
+                    } else {
+                        CircularProgressIndicator(
+                            color = Color.White,
+                            modifier = Modifier.size(28.dp),
+                            strokeWidth = 2.dp,
+                        )
+                    }
+                }
+                is PollState.Failed -> CornerBadge(
+                    color = MaterialTheme.colorScheme.error,
+                    icon = Icons.Default.Close,
+                    description = "Failed",
+                )
+                PollState.Cancelled -> CornerBadge(
+                    color = Color.DarkGray,
+                    icon = Icons.Default.Close,
+                    description = "Cancelled",
+                )
+                is PollState.Done -> Unit // handled above
+            }
+        }
+    }
+}
+
+@Composable
+private fun BoxScope.CornerBadge(
+    color: Color,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    description: String,
+) {
+    Box(
+        modifier = Modifier
+            .align(Alignment.TopEnd)
+            .padding(6.dp)
+            .size(20.dp)
+            .background(color, CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            icon,
+            contentDescription = description,
+            tint = Color.White,
+            modifier = Modifier.size(14.dp),
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun BatchFocused(
+    jobIds: List<String>,
+    initialIndex: Int,
+    repository: JobRepository,
+    onViewResult: (String) -> Unit,
+    onBack: () -> Unit,
+) {
+    val pagerState = rememberPagerState(
+        initialPage = initialIndex,
+        pageCount = { jobIds.size },
+    )
 
     Scaffold(
         topBar = {
@@ -66,7 +285,7 @@ fun BatchProgressScreen(
                 title = { Text("${pagerState.currentPage + 1} of ${jobIds.size}") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to overview")
                     }
                 },
             )
