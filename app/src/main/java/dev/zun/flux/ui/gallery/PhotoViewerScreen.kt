@@ -7,7 +7,10 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -52,7 +55,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.text.font.FontFamily
@@ -92,9 +97,7 @@ fun PhotoViewerScreen(
     var showOriginalInput by remember { mutableStateOf(false) }
     var showCompare by remember { mutableStateOf(false) }
     var showUI by remember { mutableStateOf(true) }
-
-    // Explicit "Zoom Mode" state
-    var isZoomMode by remember { mutableStateOf(false) }
+    var zoomedPage by remember { mutableStateOf<String?>(null) }
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -106,7 +109,7 @@ fun PhotoViewerScreen(
         containerColor = Color.Black,
         topBar = {
             AnimatedVisibility(
-                visible = showUI && !isZoomMode,
+                visible = showUI,
                 enter = fadeIn(),
                 exit = fadeOut(),
             ) {
@@ -123,7 +126,7 @@ fun PhotoViewerScreen(
         },
         bottomBar = {
             AnimatedVisibility(
-                visible = showUI && !isZoomMode,
+                visible = showUI,
                 enter = fadeIn(),
                 exit = fadeOut(),
             ) {
@@ -163,17 +166,19 @@ fun PhotoViewerScreen(
                 state = pagerState,
                 modifier = Modifier.fillMaxSize(),
                 pageSpacing = 16.dp,
-                // DISABLE horizontal swiping if we are in Zoom Mode
-                userScrollEnabled = !isZoomMode,
+                userScrollEnabled = zoomedPage == null,
             ) { page ->
                 val job = jobs.getOrNull(page) ?: return@HorizontalPager
                 val previewModel = repository.previewModel(job.id)
 
                 ZoomableImage(
                     model = previewModel,
-                    isZoomMode = isZoomMode,
-                    onClick = { if (!isZoomMode) showUI = !showUI },
-                    onToggleZoomMode = { isZoomMode = !isZoomMode },
+                    onClick = { showUI = !showUI },
+                    onZoomedChange = { isZoomed ->
+                        if (pagerState.currentPage == page) {
+                            zoomedPage = if (isZoomed) job.id else null
+                        }
+                    },
                     shouldReset = pagerState.currentPage != page,
                 )
             }
@@ -256,24 +261,6 @@ fun PhotoViewerScreen(
                     showCompare = false
                 }
             }
-
-            // "Zoom Mode" Indicator
-            if (isZoomMode) {
-                Surface(
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(top = 16.dp),
-                    color = Color.Black.copy(alpha = 0.5f),
-                    shape = RoundedCornerShape(16.dp),
-                ) {
-                    Text(
-                        text = "Zoom Mode (Double tap to exit)",
-                        color = Color.White,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        style = MaterialTheme.typography.labelMedium,
-                    )
-                }
-            }
         }
     }
 }
@@ -282,41 +269,76 @@ fun PhotoViewerScreen(
 @Composable
 private fun ZoomableImage(
     model: Any?,
-    isZoomMode: Boolean,
     onClick: () -> Unit,
-    onToggleZoomMode: () -> Unit,
+    onZoomedChange: (Boolean) -> Unit,
     shouldReset: Boolean,
 ) {
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
+    var viewportSize by remember { mutableStateOf(androidx.compose.ui.geometry.Size.Zero) }
 
-    // Reset when page is hidden or when zoom mode is exited
-    LaunchedEffect(shouldReset, isZoomMode) {
-        if (shouldReset || !isZoomMode) {
+    fun clampOffset(
+        candidate: Offset,
+        currentScale: Float,
+    ): Offset {
+        if (currentScale <= 1f) return Offset.Zero
+        val maxX = (viewportSize.width * (currentScale - 1f)) / 2f
+        val maxY = (viewportSize.height * (currentScale - 1f)) / 2f
+        return Offset(
+            x = candidate.x.coerceIn(-maxX, maxX),
+            y = candidate.y.coerceIn(-maxY, maxY),
+        )
+    }
+
+    LaunchedEffect(shouldReset) {
+        if (shouldReset) {
             scale = 1f
             offset = Offset.Zero
+            onZoomedChange(false)
         }
+    }
+
+    LaunchedEffect(scale) {
+        onZoomedChange(scale > 1.01f)
     }
 
     Box(
         modifier =
         Modifier
             .fillMaxSize()
+            .onSizeChanged { size ->
+                viewportSize = androidx.compose.ui.geometry.Size(size.width.toFloat(), size.height.toFloat())
+                offset = clampOffset(offset, scale)
+            }
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = {},
-                onDoubleClick = onToggleZoomMode,
+                onDoubleClick = {
+                    scale = if (scale > 1.01f) 1f else 2.5f
+                    offset = Offset.Zero
+                },
             )
-            .pointerInput(isZoomMode) {
-                if (isZoomMode) {
-                    detectTransformGestures { _, pan, zoom, _ ->
-                        scale = (scale * zoom).coerceIn(1f, 5f)
-                        if (scale > 1f) {
-                            offset += pan
-                        } else {
-                            offset = Offset.Zero
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    do {
+                        val event = awaitPointerEvent()
+                        val pressedCount = event.changes.count { it.pressed }
+                        val shouldHandle = pressedCount >= 2 || scale > 1.01f
+                        if (shouldHandle) {
+                            val nextScale = (scale * event.calculateZoom()).coerceIn(1f, 5f)
+                            val nextOffset = if (nextScale > 1.01f) {
+                                offset + event.calculatePan()
+                            } else {
+                                Offset.Zero
+                            }
+                            scale = nextScale
+                            offset = clampOffset(nextOffset, nextScale)
+                            event.changes.forEach { change ->
+                                if (change.positionChanged()) change.consume()
+                            }
                         }
-                    }
+                    } while (event.changes.any { it.pressed })
                 }
             },
         contentAlignment = Alignment.Center,
