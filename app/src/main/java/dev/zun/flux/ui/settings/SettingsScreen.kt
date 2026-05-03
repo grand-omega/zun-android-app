@@ -38,11 +38,14 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import dev.zun.flux.BuildConfig
 import dev.zun.flux.FluxApp
 import dev.zun.flux.data.repo.ActiveRoute
 import dev.zun.flux.data.repo.ConnectionMode
-import dev.zun.flux.util.normalizeOptionalServerUrl
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -50,16 +53,16 @@ fun SettingsScreen(
     app: FluxApp,
     onBack: () -> Unit,
 ) {
+    val viewModel: SettingsViewModel = viewModel(
+        factory = viewModelFactory {
+            initializer { SettingsViewModel(app) }
+        },
+    )
     val settingsManager = app.settingsManager
     var lockoutDuration by remember { mutableLongStateOf(settingsManager.lockoutDurationMs) }
+    val connectionDraft by viewModel.connectionDraft.collectAsStateWithLifecycle()
 
-    var lanUrl by remember { mutableStateOf(settingsManager.lanUrl ?: "") }
-    var tailscaleUrl by remember { mutableStateOf(settingsManager.tailscaleUrl ?: "") }
-    var connectionMode by remember { mutableStateOf(settingsManager.connectionMode) }
-    var token by remember { mutableStateOf(settingsManager.apiToken ?: "") }
     var tokenVisible by remember { mutableStateOf(false) }
-    var connectionError by remember { mutableStateOf<String?>(null) }
-    var connectionStatus by remember { mutableStateOf("Current settings are active.") }
 
     val lockoutOptions = listOf(
         0L to "Always lock",
@@ -136,18 +139,14 @@ fun SettingsScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .selectable(
-                                    selected = connectionMode == mode,
-                                    onClick = {
-                                        connectionMode = mode
-                                        connectionError = null
-                                        connectionStatus = "Unsaved changes"
-                                    },
+                                    selected = connectionDraft.connectionMode == mode,
+                                    onClick = { viewModel.updateConnectionMode(mode) },
                                     role = Role.RadioButton,
                                 )
                                 .padding(vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            RadioButton(selected = connectionMode == mode, onClick = null)
+                            RadioButton(selected = connectionDraft.connectionMode == mode, onClick = null)
                             Text(
                                 text = label,
                                 style = MaterialTheme.typography.bodyLarge,
@@ -158,46 +157,35 @@ fun SettingsScreen(
                 }
 
                 OutlinedTextField(
-                    value = lanUrl,
-                    onValueChange = {
-                        lanUrl = it
-                        connectionError = null
-                        connectionStatus = "Unsaved changes"
-                    },
+                    value = connectionDraft.lanUrl,
+                    onValueChange = viewModel::updateLanUrl,
                     label = { Text("LAN URL (used at home)") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    isError = connectionError?.startsWith("LAN URL:") == true,
+                    isError = connectionDraft.error?.startsWith("LAN URL:") == true,
                 )
 
                 OutlinedTextField(
-                    value = tailscaleUrl,
-                    onValueChange = {
-                        tailscaleUrl = it
-                        connectionError = null
-                        connectionStatus = "Unsaved changes"
-                    },
+                    value = connectionDraft.tailscaleUrl,
+                    onValueChange = viewModel::updateTailscaleUrl,
                     label = { Text("Tailscale URL (used away)") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    isError = connectionError?.startsWith("Tailscale URL:") == true,
+                    isError = connectionDraft.error?.startsWith("Tailscale URL:") == true,
                 )
 
+                val connectionError = connectionDraft.error
                 if (connectionError != null) {
                     Text(
-                        text = connectionError!!,
+                        text = connectionError,
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.labelMedium,
                     )
                 }
 
                 OutlinedTextField(
-                    value = token,
-                    onValueChange = {
-                        token = it
-                        connectionError = null
-                        connectionStatus = "Unsaved changes"
-                    },
+                    value = connectionDraft.token,
+                    onValueChange = viewModel::updateToken,
                     label = { Text("API Token") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
@@ -221,36 +209,14 @@ fun SettingsScreen(
                 )
 
                 Button(
-                    onClick = {
-                        try {
-                            val lan = normalizeOptionalServerUrl(lanUrl)
-                            val tailscale = normalizeOptionalServerUrl(tailscaleUrl)
-                            require(lan != null || tailscale != null) {
-                                "Enter at least one server URL"
-                            }
-                            require(token.isNotBlank()) {
-                                "Enter an API token"
-                            }
-                            settingsManager.lanUrl = lan
-                            settingsManager.tailscaleUrl = tailscale
-                            settingsManager.connectionMode = connectionMode
-                            settingsManager.apiToken = token.trim()
-                            connectionError = null
-                            connectionStatus = "Saved. Reconnecting..."
-                            app.networkResolver.refresh()
-                            app.rebuildRepository()
-                        } catch (t: Throwable) {
-                            connectionError = t.message ?: "Invalid connection settings"
-                            connectionStatus = "Not saved"
-                        }
-                    },
+                    onClick = viewModel::connect,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text("Connect")
                 }
 
                 Text(
-                    text = connectionStatus,
+                    text = connectionDraft.status,
                     color = MaterialTheme.colorScheme.secondary,
                     style = MaterialTheme.typography.bodyMedium,
                 )

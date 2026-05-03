@@ -38,6 +38,15 @@ sealed interface SubmitState {
 /** Progress through a batch submit: "Uploading [current] of [total]". */
 data class BatchProgress(val current: Int, val total: Int)
 
+data class HomeComposerState(
+    val inputUris: List<Uri> = emptyList(),
+    val selectedPromptId: Long? = null,
+    val customPromptText: String = "",
+    val tryHarder: Boolean = false,
+)
+
+data class AddInputResult(val capped: Boolean)
+
 sealed interface HealthState {
     data object Checking : HealthState
 
@@ -56,6 +65,7 @@ sealed interface HealthState {
 
 class HomeViewModel(
     private val repository: JobRepository,
+    private val healthChecksEnabled: Boolean = true,
 ) : ViewModel() {
     private val _state = MutableStateFlow<SubmitState>(SubmitState.Idle)
     val state: StateFlow<SubmitState> = _state.asStateFlow()
@@ -72,6 +82,9 @@ class HomeViewModel(
     private val _batchProgress = MutableStateFlow<BatchProgress?>(null)
     val batchProgress: StateFlow<BatchProgress?> = _batchProgress.asStateFlow()
 
+    private val _composer = MutableStateFlow(HomeComposerState())
+    val composer: StateFlow<HomeComposerState> = _composer.asStateFlow()
+
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
@@ -83,7 +96,9 @@ class HomeViewModel(
 
     init {
         viewModelScope.launch { fetchPrompts() }
-        startHealthCheck()
+        if (healthChecksEnabled) {
+            startHealthCheck()
+        }
     }
 
     private suspend fun fetchPrompts() {
@@ -100,6 +115,10 @@ class HomeViewModel(
             description = "Enter a custom text prompt",
         )
         _prompts.value = fetched + customEntry
+        val selectedPromptId = _composer.value.selectedPromptId
+        if (selectedPromptId != null && selectedPromptId != CUSTOM_PROMPT_ID && fetched.none { it.id == selectedPromptId }) {
+            _composer.value = _composer.value.copy(selectedPromptId = null)
+        }
     }
 
     private fun startHealthCheck() {
@@ -153,13 +172,41 @@ class HomeViewModel(
         }
     }
 
-    fun submit(
-        inputUris: List<Uri>,
-        selectedPromptId: Long,
-        customPromptText: String,
-        tryHarder: Boolean,
-    ) {
+    fun addInputUris(uris: List<Uri>, maxImages: Int): AddInputResult {
+        val current = _composer.value.inputUris
+        val remaining = maxImages - current.size
+        if (remaining <= 0) return AddInputResult(capped = true)
+
+        val toAdd = uris.filter { it !in current }.take(remaining)
+        _composer.value = _composer.value.copy(inputUris = current + toAdd)
+
+        return AddInputResult(capped = uris.size > toAdd.size)
+    }
+
+    fun removeInputUri(uri: Uri) {
+        _composer.value = _composer.value.copy(inputUris = _composer.value.inputUris - uri)
+    }
+
+    fun selectPrompt(promptId: Long) {
+        _composer.value = _composer.value.copy(selectedPromptId = promptId)
+    }
+
+    fun updateCustomPrompt(text: String) {
+        _composer.value = _composer.value.copy(customPromptText = text)
+    }
+
+    fun setTryHarder(enabled: Boolean) {
+        _composer.value = _composer.value.copy(tryHarder = enabled)
+    }
+
+    fun submit() {
         if (_state.value is SubmitState.InFlight) return
+        val composer = _composer.value
+        val inputUris = composer.inputUris
+        val selectedPromptId = composer.selectedPromptId ?: return
+        val customPromptText = composer.customPromptText
+        val tryHarder = composer.tryHarder
+
         if (inputUris.isEmpty()) return
 
         if (inputUris.size == 1) {
@@ -247,6 +294,9 @@ class HomeViewModel(
     }
 
     fun acknowledgeDone() {
+        if (_state.value is SubmitState.Done || _state.value is SubmitState.DoneBatch) {
+            _composer.value = _composer.value.copy(inputUris = emptyList())
+        }
         _state.value = SubmitState.Idle
     }
 
@@ -259,6 +309,10 @@ class HomeViewModel(
                     workflow = DEFAULT_CUSTOM_WORKFLOW,
                 )
                 fetchPrompts()
+                _composer.value = _composer.value.copy(
+                    selectedPromptId = created.id,
+                    customPromptText = "",
+                )
                 _promptSavedEvents.trySend(created.id)
             } catch (t: Throwable) {
                 _promptErrors.trySend(t.message ?: "Failed to save prompt")
@@ -270,6 +324,9 @@ class HomeViewModel(
         viewModelScope.launch {
             try {
                 repository.deletePrompt(promptId)
+                if (_composer.value.selectedPromptId == promptId) {
+                    _composer.value = _composer.value.copy(selectedPromptId = null)
+                }
                 fetchPrompts()
             } catch (t: Throwable) {
                 _promptErrors.trySend(t.message ?: "Failed to delete prompt")

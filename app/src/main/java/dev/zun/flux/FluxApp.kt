@@ -95,9 +95,7 @@ class FluxApp : Application() {
         networkResolver.refresh()
     }
 
-    /**
-     * Call this when serverUrl or apiToken changes to refresh the repository.
-     */
+    /** Rebuild Retrofit when the active base URL changes. */
     fun rebuildRepository() {
         val baseUrl = settingsManager.serverUrl.takeIf { !it.isNullOrBlank() } ?: "https://example.invalid"
 

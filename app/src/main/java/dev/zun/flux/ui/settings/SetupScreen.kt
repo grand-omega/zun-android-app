@@ -163,7 +163,7 @@ fun SetupScreen(
                             settings.tailscaleUrl = ts
                             settings.apiToken = token.trim()
 
-                            // Pick LAN if reachable, else Tailscale; updates serverUrl + rebuilds repo.
+                            // Resolve the active route once after the user taps Connect.
                             app.networkResolver.refreshNow()
 
                             // Validate token & connectivity (listPrompts requires auth).

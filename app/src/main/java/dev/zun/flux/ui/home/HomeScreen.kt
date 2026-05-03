@@ -4,10 +4,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,28 +16,15 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.AddPhotoAlternate
-import androidx.compose.material.icons.filled.BookmarkAdd
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.PhotoCamera
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -50,19 +34,16 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.windowsizeclass.WindowSizeClass
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.runtime.Composable
@@ -71,31 +52,22 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.Saver
-import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import coil3.compose.AsyncImage
 import dev.zun.flux.FluxApp
 import dev.zun.flux.data.api.PromptDto
-import dev.zun.flux.data.repo.ActiveRoute
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.util.cacheInputLocally
 import kotlinx.coroutines.Dispatchers
@@ -125,6 +97,7 @@ fun HomeScreen(
         )
     val state by viewModel.state.collectAsStateWithLifecycle()
     val prompts by viewModel.prompts.collectAsStateWithLifecycle()
+    val composer by viewModel.composer.collectAsStateWithLifecycle()
     val health by viewModel.health.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val uploadProgress by viewModel.uploadProgress.collectAsStateWithLifecycle()
@@ -134,12 +107,8 @@ fun HomeScreen(
     val haptic = LocalHapticFeedback.current
     val snackbarHostState = remember { SnackbarHostState() }
 
-    var imageUris by rememberSaveable(stateSaver = UriListSaver) { mutableStateOf<List<Uri>>(emptyList()) }
-    var selectedPromptId by rememberSaveable { mutableStateOf<Long?>(null) }
-    var customPromptText by rememberSaveable { mutableStateOf("") }
     var showSaveDialog by rememberSaveable { mutableStateOf(false) }
     var saveDialogLabel by rememberSaveable { mutableStateOf("") }
-    var tryHarder by rememberSaveable { mutableStateOf(false) }
 
     val context = androidx.compose.ui.platform.LocalContext.current
     val app = context.applicationContext as FluxApp
@@ -150,17 +119,17 @@ fun HomeScreen(
 
     val appendUris: (List<Uri>) -> Unit = { newUris ->
         coroutineScope.launch {
-            val remaining = MAX_BATCH_IMAGES - imageUris.size
+            val remaining = MAX_BATCH_IMAGES - composer.inputUris.size
             if (remaining <= 0) {
                 snackbarHostState.showOne("Limit is $MAX_BATCH_IMAGES images")
                 return@launch
             }
-            val toAdd = newUris.filter { it !in imageUris }.take(remaining)
+            val toAdd = newUris.filter { it !in composer.inputUris }.take(remaining)
             val cached = withContext(Dispatchers.IO) {
                 toAdd.map { uri -> runCatching { cacheInputLocally(context, uri) }.getOrDefault(uri) }
             }
-            imageUris = imageUris + cached
-            if (newUris.size > toAdd.size) {
+            val result = viewModel.addInputUris(cached, MAX_BATCH_IMAGES)
+            if (newUris.size > toAdd.size || result.capped) {
                 snackbarHostState.showOne("Capped at $MAX_BATCH_IMAGES images")
             }
         }
@@ -172,9 +141,7 @@ fun HomeScreen(
     }
 
     LaunchedEffect(Unit) {
-        viewModel.promptSavedEvents.collect { newId ->
-            selectedPromptId = newId
-            customPromptText = ""
+        viewModel.promptSavedEvents.collect {
             snackbarHostState.showOne("Prompt saved")
         }
     }
@@ -182,14 +149,6 @@ fun HomeScreen(
     LaunchedEffect(Unit) {
         viewModel.promptErrors.collect { message ->
             snackbarHostState.showOne(message)
-        }
-    }
-
-    // If the selected prompt gets deleted, clear the selection.
-    LaunchedEffect(prompts, selectedPromptId) {
-        val current = selectedPromptId
-        if (current != null && current != CUSTOM_PROMPT_ID && prompts.none { it.id == current }) {
-            selectedPromptId = null
         }
     }
 
@@ -206,7 +165,7 @@ fun HomeScreen(
             if (uris.isNotEmpty()) appendUris(uris)
         }
     val launchPicker: () -> Unit = {
-        val remaining = MAX_BATCH_IMAGES - imageUris.size
+        val remaining = MAX_BATCH_IMAGES - composer.inputUris.size
         when {
             remaining <= 0 -> coroutineScope.launch {
                 snackbarHostState.showSnackbar("Limit is $MAX_BATCH_IMAGES images")
@@ -224,12 +183,10 @@ fun HomeScreen(
         when (val s = state) {
             is SubmitState.Done -> {
                 viewModel.acknowledgeDone()
-                imageUris = emptyList()
                 onJobSubmitted(s.jobId)
             }
             is SubmitState.DoneBatch -> {
                 viewModel.acknowledgeDone()
-                imageUris = emptyList()
                 if (s.failed > 0) {
                     snackbarHostState.showOne(
                         "${s.submittedIds.size} submitted, ${s.failed} failed",
@@ -300,21 +257,20 @@ fun HomeScreen(
                 },
         ) {
             val onSubmit: () -> Unit = {
-                val promptId = selectedPromptId
-                if (imageUris.isNotEmpty() && promptId != null) {
+                if (composer.inputUris.isNotEmpty() && composer.selectedPromptId != null) {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    viewModel.submit(imageUris, promptId, customPromptText, tryHarder)
+                    viewModel.submit()
                 }
             }
             val onRemoveImage: (Uri) -> Unit = { uri ->
-                imageUris = imageUris - uri
+                viewModel.removeInputUri(uri)
             }
             var isFetchingRecent by remember { mutableStateOf(false) }
             val onPickRecent: (Int) -> Unit = { inputId ->
                 val expectedUri = repository.recentInputUri(inputId)
-                if (expectedUri in imageUris) {
+                if (expectedUri in composer.inputUris) {
                     // Tap a selected recent to toggle it off.
-                    imageUris = imageUris - expectedUri
+                    viewModel.removeInputUri(expectedUri)
                 } else if (!isFetchingRecent) {
                     coroutineScope.launch {
                         isFetchingRecent = true
@@ -332,34 +288,30 @@ fun HomeScreen(
                 }
             }
             val recents = recentInputIds.map { id ->
-                Triple(id, repository.inputModel(id), repository.recentInputUri(id) in imageUris)
+                Triple(id, repository.inputModel(id), repository.recentInputUri(id) in composer.inputUris)
             }
 
             HomeContent(
                 isWide = isWide,
-                imageUris = imageUris,
+                imageUris = composer.inputUris,
                 prompts = prompts,
-                selectedPromptId = selectedPromptId,
-                customPromptText = customPromptText,
-                onCustomPromptChange = { customPromptText = it },
-                tryHarder = tryHarder,
-                onTryHarderChange = { tryHarder = it },
-                onDeletePrompt = { id ->
-                    viewModel.deletePrompt(id)
-                    if (selectedPromptId == id) selectedPromptId = null
-                },
+                selectedPromptId = composer.selectedPromptId,
+                customPromptText = composer.customPromptText,
+                onCustomPromptChange = viewModel::updateCustomPrompt,
+                tryHarder = composer.tryHarder,
+                onTryHarderChange = viewModel::setTryHarder,
+                onDeletePrompt = viewModel::deletePrompt,
                 onSavePromptClick = {
                     saveDialogLabel = ""
                     showSaveDialog = true
                 },
                 state = state,
-                health = health,
                 uploadProgress = uploadProgress,
                 batchProgress = batchProgress,
                 onTakePhoto = onTakePhoto,
                 onPickGallery = launchPicker,
                 onRemoveImage = onRemoveImage,
-                onSelectPrompt = { selectedPromptId = it },
+                onSelectPrompt = viewModel::selectPrompt,
                 onSubmit = onSubmit,
                 recents = recents,
                 isFetchingRecent = isFetchingRecent,
@@ -393,7 +345,7 @@ fun HomeScreen(
             text = {
                 Column {
                     Text(
-                        text = customPromptText.trim(),
+                        text = composer.customPromptText.trim(),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.secondary,
                     )
@@ -410,9 +362,9 @@ fun HomeScreen(
             },
             confirmButton = {
                 TextButton(
-                    enabled = saveDialogLabel.isNotBlank() && customPromptText.isNotBlank(),
+                    enabled = saveDialogLabel.isNotBlank() && composer.customPromptText.isNotBlank(),
                     onClick = {
-                        viewModel.savePrompt(saveDialogLabel, customPromptText)
+                        viewModel.savePrompt(saveDialogLabel, composer.customPromptText)
                         showSaveDialog = false
                     },
                 ) {
@@ -442,7 +394,6 @@ private fun HomeContent(
     onDeletePrompt: (Long) -> Unit,
     onSavePromptClick: () -> Unit,
     state: SubmitState,
-    health: HealthState,
     uploadProgress: Float?,
     batchProgress: BatchProgress?,
     onTakePhoto: () -> Unit,
@@ -624,265 +575,6 @@ private fun Composer(
 }
 
 @Composable
-private fun ImageHero(
-    imageUris: List<Uri>,
-    recents: List<Triple<Int, Any?, Boolean>>,
-    isFetchingRecent: Boolean,
-    onPickGallery: () -> Unit,
-    onTakePhoto: () -> Unit,
-    onPickRecent: (Int) -> Unit,
-    onRemove: (Uri) -> Unit,
-) {
-    when {
-        imageUris.isEmpty() -> EmptyHero(
-            recents = recents,
-            isFetchingRecent = isFetchingRecent,
-            onPickGallery = onPickGallery,
-            onTakePhoto = onTakePhoto,
-            onPickRecent = onPickRecent,
-        )
-        imageUris.size == 1 -> Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-            contentAlignment = Alignment.Center,
-        ) {
-            AsyncImage(
-                model = imageUris[0],
-                contentDescription = null,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
-        else -> Column(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text(
-                text = "${imageUris.size} images · same prompt",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.secondary,
-            )
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                items(imageUris, key = { it.toString() }) { uri ->
-                    ImageThumb(uri = uri, onRemove = { onRemove(uri) })
-                }
-                if (imageUris.size < MAX_BATCH_IMAGES) {
-                    item(key = "__add_more__") {
-                        AddMoreTile(onClick = onPickGallery)
-                    }
-                }
-            }
-            // Reserve space below the strip for the focused image too.
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
-                contentAlignment = Alignment.Center,
-            ) {
-                AsyncImage(
-                    model = imageUris[0],
-                    contentDescription = null,
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun EmptyHero(
-    recents: List<Triple<Int, Any?, Boolean>>,
-    isFetchingRecent: Boolean,
-    onPickGallery: () -> Unit,
-    onTakePhoto: () -> Unit,
-    onPickRecent: (Int) -> Unit,
-) {
-    Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-        modifier = Modifier
-            .fillMaxSize()
-            .clickable(onClick = onPickGallery),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            Icon(
-                imageVector = Icons.Default.AddPhotoAlternate,
-                contentDescription = null,
-                modifier = Modifier.size(48.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.heightIn(min = 8.dp))
-            Text(
-                text = "Tap to add a photo",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Spacer(Modifier.heightIn(min = 4.dp))
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(top = 8.dp),
-            ) {
-                IconLabel(
-                    icon = Icons.Default.PhotoCamera,
-                    label = "Take photo",
-                    onClick = onTakePhoto,
-                )
-                IconLabel(
-                    icon = Icons.Default.Image,
-                    label = "From gallery",
-                    onClick = onPickGallery,
-                )
-            }
-            if (recents.isNotEmpty()) {
-                Spacer(Modifier.heightIn(min = 16.dp))
-                Text(
-                    text = "Recent",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.secondary,
-                )
-                Spacer(Modifier.heightIn(min = 6.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    recents.forEach { (id, model, selected) ->
-                        Box(modifier = Modifier.size(64.dp)) {
-                            AsyncImage(
-                                model = model,
-                                contentDescription = "Recent upload",
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(MaterialTheme.colorScheme.surface)
-                                    .combinedClickable(
-                                        enabled = !isFetchingRecent,
-                                        onClick = { onPickRecent(id) },
-                                        onLongClick = {},
-                                    ),
-                            )
-                            if (selected) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(Color.Black.copy(alpha = 0.45f)),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Check,
-                                        contentDescription = "Already selected",
-                                        tint = Color.White,
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun IconLabel(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    onClick: () -> Unit,
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-        modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurface,
-        )
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-    }
-}
-
-@Composable
-private fun CompactSourceRow(
-    imageCount: Int,
-    onTakePhoto: () -> Unit,
-    onPickGallery: () -> Unit,
-    recents: List<Triple<Int, Any?, Boolean>>,
-    isFetchingRecent: Boolean,
-    onPickRecent: (Int) -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        IconButton(onClick = onTakePhoto) {
-            Icon(Icons.Default.PhotoCamera, contentDescription = "Take photo")
-        }
-        IconButton(onClick = onPickGallery) {
-            Icon(Icons.Default.AddPhotoAlternate, contentDescription = "Add image")
-        }
-        Spacer(Modifier.width(4.dp))
-        // Inline recent thumbnails (small).
-        recents.take(3).forEach { (id, model, selected) ->
-            Box(modifier = Modifier.size(36.dp)) {
-                AsyncImage(
-                    model = model,
-                    contentDescription = "Recent upload",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .combinedClickable(
-                            enabled = !isFetchingRecent,
-                            onClick = { onPickRecent(id) },
-                            onLongClick = {},
-                        ),
-                )
-                if (selected) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(Color.Black.copy(alpha = 0.45f)),
-                    )
-                }
-            }
-            Spacer(Modifier.width(4.dp))
-        }
-        Spacer(Modifier.weight(1f))
-        if (imageCount > 1) {
-            Text(
-                text = "$imageCount selected",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.secondary,
-            )
-        }
-    }
-}
-
-@Composable
 private fun PromptStrip(
     selectedLabel: String?,
     tryHarder: Boolean,
@@ -940,420 +632,6 @@ private fun PromptStrip(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun PromptLibrarySheet(
-    prompts: List<PromptDto>,
-    selectedPromptId: Long?,
-    customPromptText: String,
-    onCustomPromptChange: (String) -> Unit,
-    tryHarder: Boolean,
-    onTryHarderChange: (Boolean) -> Unit,
-    onSavePromptClick: () -> Unit,
-    onManagePrompts: () -> Unit,
-    onSelectPrompt: (Long) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var query by remember { mutableStateOf("") }
-
-    val builtIns = prompts.filter { it.id != CUSTOM_PROMPT_ID }
-    val filtered = remember(query, builtIns) {
-        if (query.isBlank()) {
-            builtIns
-        } else {
-            builtIns.filter { it.label.contains(query.trim(), ignoreCase = true) }
-        }
-    }
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp)
-                .padding(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(
-                    text = "Choose a prompt",
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                TextButton(onClick = onManagePrompts) { Text("Manage") }
-            }
-
-            // High-quality toggle (was "Try Harder").
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "High quality",
-                            style = MaterialTheme.typography.bodyLarge,
-                        )
-                        Text(
-                            text = "Slower, larger model",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.secondary,
-                        )
-                    }
-                    Switch(checked = tryHarder, onCheckedChange = onTryHarderChange)
-                }
-            }
-
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it },
-                placeholder = { Text("Search prompts") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            // Custom prompt always at top, expanded when selected.
-            CustomPromptItem(
-                expanded = selectedPromptId == CUSTOM_PROMPT_ID,
-                customText = customPromptText,
-                onClick = { onSelectPrompt(CUSTOM_PROMPT_ID) },
-                onTextChange = onCustomPromptChange,
-                onSaveClick = onSavePromptClick,
-            )
-
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 360.dp),
-            ) {
-                items(filtered, key = { it.id }) { prompt ->
-                    PromptRow(
-                        label = prompt.label,
-                        description = prompt.description,
-                        selected = selectedPromptId == prompt.id,
-                        onClick = { onSelectPrompt(prompt.id) },
-                    )
-                }
-                if (filtered.isEmpty()) {
-                    item {
-                        Text(
-                            text = "No prompts match \"$query\"",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.secondary,
-                            modifier = Modifier.padding(vertical = 12.dp),
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun PromptRow(
-    label: String,
-    description: String?,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    val containerColor = if (selected) {
-        MaterialTheme.colorScheme.secondaryContainer
-    } else {
-        Color.Transparent
-    }
-    Surface(
-        shape = RoundedCornerShape(8.dp),
-        color = containerColor,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (selected) {
-                Icon(
-                    Icons.Default.Check,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(Modifier.width(8.dp))
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = if (selected) {
-                        MaterialTheme.colorScheme.onSecondaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    },
-                )
-                if (!description.isNullOrBlank()) {
-                    Text(
-                        text = description,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.secondary,
-                    )
-                }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun PromptManageSheet(
-    prompts: List<PromptDto>,
-    selectedPromptId: Long?,
-    onDeletePrompt: (Long) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val savedPrompts = prompts.filter { it.id != CUSTOM_PROMPT_ID }
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp)
-                .padding(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(
-                    text = "Manage prompts",
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                TextButton(onClick = onDismiss) { Text("Done") }
-            }
-
-            if (savedPrompts.isEmpty()) {
-                Text(
-                    text = "No saved prompts yet",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.padding(vertical = 12.dp),
-                )
-            } else {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 420.dp),
-                ) {
-                    items(savedPrompts, key = { it.id }) { prompt ->
-                        PromptManageRow(
-                            label = prompt.label,
-                            description = prompt.description,
-                            selected = selectedPromptId == prompt.id,
-                            onDelete = { onDeletePrompt(prompt.id) },
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun PromptManageRow(
-    label: String,
-    description: String?,
-    selected: Boolean,
-    onDelete: () -> Unit,
-) {
-    Surface(
-        shape = RoundedCornerShape(8.dp),
-        color = if (selected) {
-            MaterialTheme.colorScheme.secondaryContainer
-        } else {
-            Color.Transparent
-        },
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = if (selected) {
-                            MaterialTheme.colorScheme.onSecondaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
-                        },
-                    )
-                    if (selected) {
-                        Spacer(Modifier.width(8.dp))
-                        Icon(
-                            Icons.Default.Check,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                            modifier = Modifier.size(18.dp),
-                        )
-                    }
-                }
-                if (!description.isNullOrBlank()) {
-                    Text(
-                        text = description,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.secondary,
-                    )
-                }
-            }
-            IconButton(onClick = onDelete) {
-                Icon(
-                    Icons.Default.Close,
-                    contentDescription = "Delete prompt",
-                    tint = MaterialTheme.colorScheme.error,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun CustomPromptItem(
-    expanded: Boolean,
-    customText: String,
-    onClick: () -> Unit,
-    onTextChange: (String) -> Unit,
-    onSaveClick: () -> Unit,
-) {
-    Surface(
-        shape = RoundedCornerShape(8.dp),
-        color = if (expanded) {
-            MaterialTheme.colorScheme.secondaryContainer
-        } else {
-            Color.Transparent
-        },
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-    ) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (expanded) {
-                    Icon(
-                        Icons.Default.Check,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(Modifier.width(8.dp))
-                }
-                Text(
-                    text = "Write your own…",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = if (expanded) {
-                        MaterialTheme.colorScheme.onSecondaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    },
-                )
-            }
-            if (expanded) {
-                OutlinedTextField(
-                    value = customText,
-                    onValueChange = onTextChange,
-                    placeholder = { Text("e.g. A cat wearing a spacesuit") },
-                    modifier = Modifier.fillMaxWidth(),
-                    trailingIcon = {
-                        if (customText.isNotBlank()) {
-                            IconButton(onClick = onSaveClick) {
-                                Icon(
-                                    imageVector = Icons.Default.BookmarkAdd,
-                                    contentDescription = "Save prompt",
-                                )
-                            }
-                        }
-                    },
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun HealthDot(health: HealthState) {
-    val color = healthColor(health)
-    val description = healthDescription(health)
-    Box(
-        modifier = Modifier
-            .size(8.dp)
-            .background(color, CircleShape)
-            .semantics { contentDescription = description },
-    )
-}
-
-@Composable
-private fun healthColor(health: HealthState): Color = when (health) {
-    HealthState.Checking -> MaterialTheme.colorScheme.outlineVariant
-    HealthState.Connected -> Color(0xFF1D9E75)
-    is HealthState.ServiceDown -> Color(0xFFE0A800)
-    HealthState.Unauthorized,
-    is HealthState.HostUnreachable,
-    is HealthState.NetworkError,
-    is HealthState.ServerError,
-    -> MaterialTheme.colorScheme.error
-}
-
-private fun healthShortLabel(health: HealthState): String = when (health) {
-    HealthState.Checking -> "Checking"
-    HealthState.Connected -> "Online"
-    HealthState.Unauthorized -> "Auth"
-    is HealthState.ServiceDown -> "Service down"
-    is HealthState.HostUnreachable -> "Unreachable"
-    is HealthState.NetworkError -> "Network"
-    is HealthState.ServerError -> "Server ${health.code}"
-}
-
-private fun healthDescription(health: HealthState): String = when (health) {
-    HealthState.Checking -> "Checking connection"
-    HealthState.Connected -> "Connected"
-    HealthState.Unauthorized -> "Invalid API token"
-    is HealthState.ServiceDown -> health.message
-    is HealthState.HostUnreachable -> health.message
-    is HealthState.NetworkError -> health.message
-    is HealthState.ServerError -> "Server error ${health.code}"
-}
-
-private fun activeRouteLabel(route: ActiveRoute): String = when (route) {
-    ActiveRoute.NONE -> "No route"
-    ActiveRoute.LAN -> "LAN"
-    ActiveRoute.TAILSCALE -> "Tailscale"
-}
-
-private const val MAX_BATCH_IMAGES = 20
-
 /**
  * Show a snackbar but dismiss any in-flight one first, so rapid taps don't
  * pile up a multi-second queue of identical messages.
@@ -1362,11 +640,6 @@ private suspend fun SnackbarHostState.showOne(message: String) {
     currentSnackbarData?.dismiss()
     showSnackbar(message = message, duration = SnackbarDuration.Short)
 }
-
-private val UriListSaver: Saver<List<Uri>, Any> = listSaver(
-    save = { it.toList() },
-    restore = { it },
-)
 
 private fun submitButtonLabel(state: SubmitState, count: Int): String = when {
     state is SubmitState.InFlight -> "Submitting…"
@@ -1399,67 +672,6 @@ private fun UploadProgressSection(
                 progress = { uploadProgress },
                 modifier = Modifier.fillMaxWidth(),
             )
-        }
-    }
-}
-
-@Composable
-private fun ImageThumb(uri: Uri, onRemove: () -> Unit) {
-    Box(modifier = Modifier.size(96.dp)) {
-        AsyncImage(
-            model = uri,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .fillMaxSize()
-                .clip(RoundedCornerShape(8.dp)),
-        )
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .offset(x = 4.dp, y = (-4).dp)
-                .size(22.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.7f))
-                .combinedClickable(onClick = onRemove, onLongClick = {}),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = Icons.Default.Close,
-                contentDescription = "Remove image",
-                tint = Color.White,
-                modifier = Modifier.size(14.dp),
-            )
-        }
-    }
-}
-
-@Composable
-private fun AddMoreTile(onClick: () -> Unit) {
-    Surface(
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-        modifier = Modifier
-            .size(96.dp)
-            .combinedClickable(onClick = onClick, onLongClick = {}),
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Add more images",
-                    tint = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    text = "Add more",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-            }
         }
     }
 }
