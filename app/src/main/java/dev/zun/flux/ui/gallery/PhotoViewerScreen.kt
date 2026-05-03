@@ -22,8 +22,11 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material.icons.automirrored.filled.CompareArrows
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -44,6 +47,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -87,7 +91,6 @@ fun PhotoViewerScreen(
     var showDetails by remember { mutableStateOf(false) }
     var showOriginalInput by remember { mutableStateOf(false) }
     var showCompare by remember { mutableStateOf(false) }
-    var showContextMenu by remember { mutableStateOf(false) }
     var showUI by remember { mutableStateOf(true) }
 
     // Explicit "Zoom Mode" state
@@ -95,6 +98,9 @@ fun PhotoViewerScreen(
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    val currentJob = jobs.getOrNull(pagerState.currentPage)
+    val hasInput = currentJob?.input_id != null
 
     Scaffold(
         containerColor = Color.Black,
@@ -115,6 +121,37 @@ fun PhotoViewerScreen(
                 )
             }
         },
+        bottomBar = {
+            AnimatedVisibility(
+                visible = showUI && !isZoomMode,
+                enter = fadeIn(),
+                exit = fadeOut(),
+            ) {
+                ViewerActionBar(
+                    hasInput = hasInput,
+                    onCompare = { showCompare = true },
+                    onOriginal = { showOriginalInput = true },
+                    onSave = {
+                        val job = currentJob ?: return@ViewerActionBar
+                        val src = repository.resultModel(job.id) ?: return@ViewerActionBar
+                        scope.launch {
+                            try {
+                                saveToPictures(context, src, "flux-${job.id}.jpg")
+                                Toast.makeText(context, "Saved to Gallery", Toast.LENGTH_SHORT).show()
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Save failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    },
+                    onDetails = { showDetails = true },
+                    onDelete = {
+                        val job = currentJob ?: return@ViewerActionBar
+                        viewModel.deleteJob(job.id)
+                        if (jobs.size <= 1) onBack()
+                    },
+                )
+            }
+        },
     ) { inner ->
         Box(
             modifier =
@@ -131,72 +168,14 @@ fun PhotoViewerScreen(
             ) { page ->
                 val job = jobs.getOrNull(page) ?: return@HorizontalPager
                 val previewModel = repository.previewModel(job.id)
-                val fullResModel = repository.resultModel(job.id)
 
                 ZoomableImage(
                     model = previewModel,
                     isZoomMode = isZoomMode,
                     onClick = { if (!isZoomMode) showUI = !showUI },
-                    onLongClick = { if (!isZoomMode) showContextMenu = true },
                     onToggleZoomMode = { isZoomMode = !isZoomMode },
                     shouldReset = pagerState.currentPage != page,
                 )
-
-                // Context Menu for Long Press (only in standard mode).
-                // Gate on currentPage so only the visible page's menu opens —
-                // otherwise every pre-composed page renders a popup that can
-                // capture taps and act on the wrong job.
-                DropdownMenu(
-                    expanded = showContextMenu && page == pagerState.currentPage,
-                    onDismissRequest = { showContextMenu = false },
-                ) {
-                    DropdownMenuItem(
-                        text = { Text("View details") },
-                        onClick = {
-                            showContextMenu = false
-                            showDetails = true
-                        },
-                    )
-                    if (job.input_id != null) {
-                        DropdownMenuItem(
-                            text = { Text("View original input") },
-                            onClick = {
-                                showContextMenu = false
-                                showOriginalInput = true
-                            },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Compare before/after") },
-                            onClick = {
-                                showContextMenu = false
-                                showCompare = true
-                            },
-                        )
-                    }
-                    DropdownMenuItem(
-                        text = { Text("Save to photos") },
-                        onClick = {
-                            showContextMenu = false
-                            scope.launch {
-                                try {
-                                    val src = fullResModel ?: return@launch
-                                    saveToPictures(context, src, "flux-${job.id}.jpg")
-                                    Toast.makeText(context, "Saved to Gallery", Toast.LENGTH_SHORT).show()
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, "Save failed: ${e.message}", Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                        },
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Delete") },
-                        onClick = {
-                            showContextMenu = false
-                            viewModel.deleteJob(job.id)
-                            if (jobs.size <= 1) onBack()
-                        },
-                    )
-                }
             }
 
             // Details Overlay (Modal)
@@ -305,7 +284,6 @@ private fun ZoomableImage(
     model: Any?,
     isZoomMode: Boolean,
     onClick: () -> Unit,
-    onLongClick: () -> Unit,
     onToggleZoomMode: () -> Unit,
     shouldReset: Boolean,
 ) {
@@ -326,7 +304,7 @@ private fun ZoomableImage(
             .fillMaxSize()
             .combinedClickable(
                 onClick = onClick,
-                onLongClick = onLongClick,
+                onLongClick = {},
                 onDoubleClick = onToggleZoomMode,
             )
             .pointerInput(isZoomMode) {
@@ -424,6 +402,80 @@ private fun DetailRow(
         Text(
             text = value,
             style = if (isMonospace) MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace) else MaterialTheme.typography.bodyMedium,
+        )
+    }
+}
+
+@Composable
+private fun ViewerActionBar(
+    hasInput: Boolean,
+    onCompare: () -> Unit,
+    onOriginal: () -> Unit,
+    onSave: () -> Unit,
+    onDetails: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    Surface(
+        color = Color.Black.copy(alpha = 0.55f),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (hasInput) {
+                ActionIcon(
+                    icon = Icons.AutoMirrored.Filled.CompareArrows,
+                    label = "Compare",
+                    onClick = onCompare,
+                )
+                ActionIcon(
+                    icon = Icons.Default.Image,
+                    label = "Original",
+                    onClick = onOriginal,
+                )
+            }
+            ActionIcon(
+                icon = Icons.Default.Download,
+                label = "Save",
+                onClick = onSave,
+            )
+            ActionIcon(
+                icon = Icons.Default.Info,
+                label = "Details",
+                onClick = onDetails,
+            )
+            ActionIcon(
+                icon = Icons.Default.Delete,
+                label = "Delete",
+                onClick = onDelete,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ActionIcon(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    onClick: () -> Unit,
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .padding(horizontal = 4.dp)
+            .clip(RoundedCornerShape(8.dp)),
+    ) {
+        IconButton(onClick = onClick) {
+            Icon(icon, contentDescription = label, tint = Color.White)
+        }
+        Text(
+            text = label,
+            color = Color.White,
+            style = MaterialTheme.typography.labelSmall,
         )
     }
 }

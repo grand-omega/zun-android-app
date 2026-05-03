@@ -50,6 +50,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.work.WorkManager
 import coil3.compose.AsyncImage
 import dev.zun.flux.data.repo.JobRepository
+import dev.zun.flux.ui.theme.tabular
 import dev.zun.flux.util.resolvePromptLabel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -150,7 +151,11 @@ fun ProgressScreen(
                             )
                             val pct = s.dto.progress?.let { (it * 100).toInt() }
                             if (pct != null) {
-                                Text("$pct%", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                                Text(
+                                    text = "$pct%",
+                                    style = MaterialTheme.typography.displayMedium.tabular(),
+                                    fontWeight = FontWeight.Bold,
+                                )
                             }
                         }
                         is PollState.Done -> Text("Done", style = MaterialTheme.typography.titleMedium)

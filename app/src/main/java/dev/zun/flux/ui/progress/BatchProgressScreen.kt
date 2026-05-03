@@ -63,6 +63,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.work.WorkManager
 import coil3.compose.AsyncImage
 import dev.zun.flux.data.repo.JobRepository
+import dev.zun.flux.ui.theme.tabular
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -216,7 +217,7 @@ private fun BatchTile(
                             text = "$pct%",
                             color = Color.White,
                             fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.titleLarge,
+                            style = MaterialTheme.typography.headlineMedium.tabular(),
                         )
                     } else {
                         CircularProgressIndicator(
@@ -402,8 +403,8 @@ private fun BatchPage(
                         val pct = s.dto.progress?.let { (it * 100).toInt() }
                         if (pct != null) {
                             Text(
-                                "$pct%",
-                                style = MaterialTheme.typography.headlineSmall,
+                                text = "$pct%",
+                                style = MaterialTheme.typography.displayMedium.tabular(),
                                 fontWeight = FontWeight.Bold,
                             )
                         }
