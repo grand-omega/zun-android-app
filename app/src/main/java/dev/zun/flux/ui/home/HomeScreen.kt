@@ -254,6 +254,12 @@ fun HomeScreen(
                         Text("FluxEdit")
                         Spacer(Modifier.width(10.dp))
                         HealthDot(health = health)
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = healthShortLabel(health),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = healthColor(health),
+                        )
                     }
                 },
                 actions = {
@@ -1217,27 +1223,46 @@ private fun CustomPromptItem(
 
 @Composable
 private fun HealthDot(health: HealthState) {
-    val color = when (health) {
-        HealthState.Checking -> MaterialTheme.colorScheme.outlineVariant
-        HealthState.Connected -> Color(0xFF1D9E75)
-        HealthState.Unauthorized,
-        is HealthState.NetworkError,
-        is HealthState.ServerError,
-        -> MaterialTheme.colorScheme.error
-    }
-    val description = when (health) {
-        HealthState.Checking -> "Checking connection"
-        HealthState.Connected -> "Connected"
-        HealthState.Unauthorized -> "Invalid API token"
-        is HealthState.NetworkError -> health.message
-        is HealthState.ServerError -> "Server error ${health.code}"
-    }
+    val color = healthColor(health)
+    val description = healthDescription(health)
     Box(
         modifier = Modifier
             .size(8.dp)
             .background(color, CircleShape)
             .semantics { contentDescription = description },
     )
+}
+
+@Composable
+private fun healthColor(health: HealthState): Color = when (health) {
+    HealthState.Checking -> MaterialTheme.colorScheme.outlineVariant
+    HealthState.Connected -> Color(0xFF1D9E75)
+    is HealthState.ServiceDown -> Color(0xFFE0A800)
+    HealthState.Unauthorized,
+    is HealthState.HostUnreachable,
+    is HealthState.NetworkError,
+    is HealthState.ServerError,
+    -> MaterialTheme.colorScheme.error
+}
+
+private fun healthShortLabel(health: HealthState): String = when (health) {
+    HealthState.Checking -> "Checking"
+    HealthState.Connected -> "Online"
+    HealthState.Unauthorized -> "Auth"
+    is HealthState.ServiceDown -> "Service down"
+    is HealthState.HostUnreachable -> "Unreachable"
+    is HealthState.NetworkError -> "Network"
+    is HealthState.ServerError -> "Server ${health.code}"
+}
+
+private fun healthDescription(health: HealthState): String = when (health) {
+    HealthState.Checking -> "Checking connection"
+    HealthState.Connected -> "Connected"
+    HealthState.Unauthorized -> "Invalid API token"
+    is HealthState.ServiceDown -> health.message
+    is HealthState.HostUnreachable -> health.message
+    is HealthState.NetworkError -> health.message
+    is HealthState.ServerError -> "Server error ${health.code}"
 }
 
 private const val MAX_BATCH_IMAGES = 20

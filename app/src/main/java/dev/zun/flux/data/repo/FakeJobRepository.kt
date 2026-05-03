@@ -56,6 +56,8 @@ class FakeJobRepository(
         return HealthResponse(status = "ok (fake)")
     }
 
+    override suspend fun diagnoseConnection(): ConnectionDiagnosis = ConnectionDiagnosis.Reachable
+
     private val extraPrompts = MutableStateFlow<List<PromptDto>>(emptyList())
     private val nextPromptId = AtomicInteger(100)
 

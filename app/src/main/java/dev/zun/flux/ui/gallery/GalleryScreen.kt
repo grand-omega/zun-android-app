@@ -1,10 +1,10 @@
 package dev.zun.flux.ui.gallery
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
-import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -52,7 +52,6 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -64,12 +63,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
@@ -78,8 +78,6 @@ import dev.zun.flux.data.api.PromptDto
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.util.formatTimestamp
 import dev.zun.flux.util.resolvePromptLabel
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 
 /** Whether a drag-select session is adding tiles to or removing them from the
  *  base selection. Determined by the state of the anchor tile at long-press. */
@@ -106,10 +104,15 @@ fun GalleryScreen(
     val tagFilter by viewModel.tagFilter.collectAsStateWithLifecycle()
     val availableTags by viewModel.availableTags.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
 
     val snackbarHostState = remember { SnackbarHostState() }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showFilterMenu by remember { mutableStateOf(false) }
+
+    BackHandler(isSelectionMode) {
+        viewModel.clearSelection()
+    }
 
     LaunchedEffect(eventMessage) {
         eventMessage?.let {
@@ -224,10 +227,26 @@ fun GalleryScreen(
             ) {
                 if (jobs.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        when {
-                            isLoading -> CircularProgressIndicator()
-                            tagFilter != TagFilter.All -> Text("No generations match this tag")
-                            else -> Text("No generations yet")
+                        if (isLoading) {
+                            CircularProgressIndicator()
+                        } else {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Text(if (tagFilter != TagFilter.All) "No generations match this tag" else "No generations yet")
+                                TextButton(
+                                    onClick = {
+                                        if (tagFilter != TagFilter.All) {
+                                            viewModel.setTagFilter(TagFilter.All)
+                                        } else {
+                                            onBack()
+                                        }
+                                    },
+                                ) {
+                                    Text(if (tagFilter != TagFilter.All) "Clear filter" else "Create an edit")
+                                }
+                            }
                         }
                     }
                 } else {
@@ -242,10 +261,6 @@ fun GalleryScreen(
                     var anchorIndex by remember { mutableStateOf<Int?>(null) }
                     var dragMode by remember { mutableStateOf(DragMode.Add) }
                     var baseSelection by remember { mutableStateOf<Set<String>>(emptySet()) }
-                    var pointerLocal by remember { mutableStateOf(Offset.Zero) }
-                    var pointerRoot by remember { mutableStateOf(Offset.Zero) }
-                    var viewportHeight by remember { mutableFloatStateOf(0f) }
-                    var boxOriginInRoot by remember { mutableStateOf(Offset.Zero) }
 
                     fun applyRange(cursorIdx: Int) {
                         val anchor = anchorIndex ?: return
@@ -270,37 +285,8 @@ fun GalleryScreen(
                         return jobs.indexOfFirst { it.id == id }
                     }
 
-                    // Auto-scroll loop: while a drag is active, scroll the
-                    // grid when the pointer is near the top/bottom edge.
-                    LaunchedEffect(anchorIndex != null) {
-                        if (anchorIndex == null) return@LaunchedEffect
-                        val edgeZone = 80f
-                        val pxPerFrame = 22f
-                        while (isActive) {
-                            val py = pointerLocal.y
-                            val vh = viewportHeight
-                            val direction = when {
-                                py < edgeZone -> -1f
-                                py > vh - edgeZone -> 1f
-                                else -> 0f
-                            }
-                            if (direction != 0f) {
-                                gridState.scrollBy(direction * pxPerFrame)
-                                // After scroll, tile bounds shift; re-hit-test.
-                                val idx = hitTest(pointerRoot)
-                                if (idx >= 0) applyRange(idx)
-                            }
-                            delay(16)
-                        }
-                    }
-
                     Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .onGloballyPositioned { coords ->
-                                boxOriginInRoot = coords.positionInRoot()
-                                viewportHeight = coords.size.height.toFloat()
-                            },
+                        modifier = Modifier.fillMaxSize(),
                     ) {
                         LazyVerticalGrid(
                             state = gridState,
@@ -332,9 +318,6 @@ fun GalleryScreen(
                                                         if (jobIndex < 0) return@detectDragGesturesAfterLongPress
                                                         val tileBoundsForJob = tileBounds[job.id]
                                                             ?: return@detectDragGesturesAfterLongPress
-                                                        val root = tileBoundsForJob.topLeft + local
-                                                        pointerRoot = root
-                                                        pointerLocal = root - boxOriginInRoot
                                                         baseSelection = latestSelectedIds
                                                         dragMode = if (job.id in baseSelection) {
                                                             DragMode.Remove
@@ -342,6 +325,7 @@ fun GalleryScreen(
                                                             DragMode.Add
                                                         }
                                                         anchorIndex = jobIndex
+                                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                                         applyRange(jobIndex)
                                                     },
                                                     onDrag = { change, _ ->
@@ -349,8 +333,6 @@ fun GalleryScreen(
                                                         val tileBoundsForJob = tileBounds[job.id]
                                                             ?: return@detectDragGesturesAfterLongPress
                                                         val root = tileBoundsForJob.topLeft + change.position
-                                                        pointerRoot = root
-                                                        pointerLocal = root - boxOriginInRoot
                                                         val idx = hitTest(root)
                                                         if (idx >= 0) applyRange(idx)
                                                         change.consume()
@@ -493,6 +475,11 @@ private fun JobThumbnail(
             }
 
             if (isSelected) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.20f)),
+                )
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)

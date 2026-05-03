@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.zun.flux.data.api.JobCreatedResponse
 import dev.zun.flux.data.api.PromptDto
+import dev.zun.flux.data.repo.ConnectionDiagnosis
 import dev.zun.flux.data.repo.JobRepository
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -41,6 +42,10 @@ sealed interface HealthState {
     data object Checking : HealthState
 
     data object Connected : HealthState
+
+    data class ServiceDown(val message: String) : HealthState
+
+    data class HostUnreachable(val message: String) : HealthState
 
     data class NetworkError(val message: String) : HealthState
 
@@ -118,10 +123,21 @@ class HomeViewModel(
                     HealthState.ServerError(e.code(), e.message())
                 }
             } catch (_: java.io.IOException) {
-                HealthState.NetworkError("Network unreachable")
+                repository.diagnoseConnection().toHealthState()
             } catch (e: Throwable) {
                 HealthState.NetworkError(e.message ?: "Unknown error")
             }
+    }
+
+    private fun ConnectionDiagnosis.toHealthState(): HealthState = when (this) {
+        ConnectionDiagnosis.Reachable -> HealthState.ServiceDown(
+            "Server port is reachable, but /health did not respond. The service may be starting or unhealthy.",
+        )
+        ConnectionDiagnosis.NoServerUrl -> HealthState.NetworkError("No active server URL")
+        is ConnectionDiagnosis.InvalidUrl -> HealthState.NetworkError(message)
+        is ConnectionDiagnosis.ServiceNotListening -> HealthState.ServiceDown(message)
+        is ConnectionDiagnosis.HostUnreachable -> HealthState.HostUnreachable(message)
+        is ConnectionDiagnosis.Unknown -> HealthState.NetworkError(message)
     }
 
     fun manualRefresh() {

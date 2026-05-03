@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -55,6 +56,7 @@ fun SettingsScreen(
     var token by remember { mutableStateOf(settingsManager.apiToken ?: "") }
     var tokenVisible by remember { mutableStateOf(false) }
     var connectionError by remember { mutableStateOf<String?>(null) }
+    var connectionStatus by remember { mutableStateOf("Current settings are active.") }
 
     val lockoutOptions = listOf(
         0L to "Always lock",
@@ -128,14 +130,8 @@ fun SettingsScreen(
                     value = lanUrl,
                     onValueChange = {
                         lanUrl = it
-                        runCatching { normalizeOptionalServerUrl(it) }
-                            .onSuccess { normalized ->
-                                connectionError = null
-                                settingsManager.lanUrl = normalized
-                                app.networkResolver.refresh()
-                            }.onFailure { t ->
-                                connectionError = "LAN URL: ${t.message ?: "Invalid URL"}"
-                            }
+                        connectionError = null
+                        connectionStatus = "Unsaved changes"
                     },
                     label = { Text("LAN URL (used at home)") },
                     modifier = Modifier.fillMaxWidth(),
@@ -147,14 +143,8 @@ fun SettingsScreen(
                     value = tailscaleUrl,
                     onValueChange = {
                         tailscaleUrl = it
-                        runCatching { normalizeOptionalServerUrl(it) }
-                            .onSuccess { normalized ->
-                                connectionError = null
-                                settingsManager.tailscaleUrl = normalized
-                                app.networkResolver.refresh()
-                            }.onFailure { t ->
-                                connectionError = "Tailscale URL: ${t.message ?: "Invalid URL"}"
-                            }
+                        connectionError = null
+                        connectionStatus = "Unsaved changes"
                     },
                     label = { Text("Tailscale URL (used away)") },
                     modifier = Modifier.fillMaxWidth(),
@@ -174,8 +164,8 @@ fun SettingsScreen(
                     value = token,
                     onValueChange = {
                         token = it
-                        settingsManager.apiToken = it.trim()
-                        app.rebuildRepository()
+                        connectionError = null
+                        connectionStatus = "Unsaved changes"
                     },
                     label = { Text("API Token") },
                     modifier = Modifier.fillMaxWidth(),
@@ -197,6 +187,40 @@ fun SettingsScreen(
                             )
                         }
                     },
+                )
+
+                Button(
+                    onClick = {
+                        try {
+                            val lan = normalizeOptionalServerUrl(lanUrl)
+                            val tailscale = normalizeOptionalServerUrl(tailscaleUrl)
+                            require(lan != null || tailscale != null) {
+                                "Enter at least one server URL"
+                            }
+                            require(token.isNotBlank()) {
+                                "Enter an API token"
+                            }
+                            settingsManager.lanUrl = lan
+                            settingsManager.tailscaleUrl = tailscale
+                            settingsManager.apiToken = token.trim()
+                            connectionError = null
+                            connectionStatus = "Saved. Reconnecting..."
+                            app.networkResolver.refresh()
+                            app.rebuildRepository()
+                        } catch (t: Throwable) {
+                            connectionError = t.message ?: "Invalid connection settings"
+                            connectionStatus = "Not saved"
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Connect")
+                }
+
+                Text(
+                    text = connectionStatus,
+                    color = MaterialTheme.colorScheme.secondary,
+                    style = MaterialTheme.typography.bodyMedium,
                 )
             }
 

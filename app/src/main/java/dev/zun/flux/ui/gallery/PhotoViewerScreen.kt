@@ -11,6 +11,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -310,14 +311,22 @@ private fun ZoomableImage(
                 viewportSize = androidx.compose.ui.geometry.Size(size.width.toFloat(), size.height.toFloat())
                 offset = clampOffset(offset, scale)
             }
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = {},
-                onDoubleClick = {
-                    scale = if (scale > 1.01f) 1f else 2.5f
-                    offset = Offset.Zero
-                },
-            )
+            .pointerInput(viewportSize, scale) {
+                detectTapGestures(
+                    onTap = { onClick() },
+                    onDoubleTap = { tap ->
+                        if (scale > 1.01f) {
+                            scale = 1f
+                            offset = Offset.Zero
+                        } else {
+                            val targetScale = 2.5f
+                            val center = Offset(viewportSize.width / 2f, viewportSize.height / 2f)
+                            scale = targetScale
+                            offset = clampOffset((center - tap) * (targetScale - 1f), targetScale)
+                        }
+                    },
+                )
+            }
             .pointerInput(Unit) {
                 awaitEachGesture {
                     awaitFirstDown(requireUnconsumed = false)

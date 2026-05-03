@@ -186,6 +186,12 @@ fun ProgressScreen(
 
                 Spacer(Modifier.height(32.dp))
 
+                Text(
+                    text = "You can go back and pull-refresh Gallery later to pick up completed generations.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.secondary,
+                )
+
                 OutlinedButton(
                     onClick = {
                         viewModel.cancelJob(jobId)

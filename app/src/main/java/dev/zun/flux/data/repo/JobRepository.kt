@@ -10,12 +10,29 @@ import dev.zun.flux.data.api.PromptDto
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
+sealed interface ConnectionDiagnosis {
+    data object Reachable : ConnectionDiagnosis
+
+    data object NoServerUrl : ConnectionDiagnosis
+
+    data class InvalidUrl(val message: String) : ConnectionDiagnosis
+
+    data class ServiceNotListening(val message: String) : ConnectionDiagnosis
+
+    data class HostUnreachable(val message: String) : ConnectionDiagnosis
+
+    data class Unknown(val message: String) : ConnectionDiagnosis
+}
+
 /**
  * Single seam between the UI and the backend. UI layers depend on this
  * interface; implementations are swapped in [dev.zun.flux.FluxApp].
  */
 interface JobRepository {
     suspend fun health(): HealthResponse
+
+    /** Best-effort TCP diagnosis for the currently active server URL. */
+    suspend fun diagnoseConnection(): ConnectionDiagnosis
 
     /** List prompts from the server, updates [promptsState] as a side effect. */
     suspend fun listPrompts(): List<PromptDto>
