@@ -1174,7 +1174,8 @@ private fun HealthDot(health: HealthState) {
         HealthState.Connected -> Color(0xFF1D9E75)
         HealthState.Unauthorized,
         is HealthState.NetworkError,
-        is HealthState.ServerError -> MaterialTheme.colorScheme.error
+        is HealthState.ServerError,
+        -> MaterialTheme.colorScheme.error
     }
     val description = when (health) {
         HealthState.Checking -> "Checking connection"
@@ -1302,4 +1303,3 @@ private fun AddMoreTile(onClick: () -> Unit) {
         }
     }
 }
-

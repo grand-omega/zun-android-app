@@ -72,8 +72,12 @@ class FluxApp : Application() {
         // Re-pick LAN vs Tailscale on every default-network change.
         val cm = getSystemService(ConnectivityManager::class.java)
         cm?.registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: Network) { networkResolver.refresh() }
-            override fun onLost(network: Network) { networkResolver.refresh() }
+            override fun onAvailable(network: Network) {
+                networkResolver.refresh()
+            }
+            override fun onLost(network: Network) {
+                networkResolver.refresh()
+            }
         })
         networkResolver.refresh()
     }
