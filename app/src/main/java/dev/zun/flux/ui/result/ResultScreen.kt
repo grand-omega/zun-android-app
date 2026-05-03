@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
@@ -27,7 +28,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -36,6 +36,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.windowsizeclass.WindowSizeClass
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -57,6 +58,9 @@ import dev.zun.flux.data.api.JobStatusDto
 import dev.zun.flux.data.api.effectivePromptId
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.ui.gallery.BeforeAfterSlider
+import dev.zun.flux.ui.home.CUSTOM_PROMPT_ID
+import dev.zun.flux.ui.home.PromptLibrarySheet
+import dev.zun.flux.ui.home.PromptManageSheet
 import dev.zun.flux.util.resolvePromptLabel
 import dev.zun.flux.util.saveToPictures
 import dev.zun.flux.util.shareImage
@@ -65,6 +69,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
+
+private const val DEFAULT_CUSTOM_WORKFLOW = "flux2_klein_edit"
+private const val TRY_HARDER_WORKFLOW = "flux2_klein_9b_kv_experimental"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -90,46 +97,61 @@ fun ResultScreen(
     var regenerating by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
     var showDetails by remember { mutableStateOf(false) }
-    var showEditPrompt by remember { mutableStateOf(false) }
+    var showPromptSheet by remember { mutableStateOf(false) }
+    var showPromptManageSheet by remember { mutableStateOf(false) }
+    var showSavePromptDialog by remember { mutableStateOf(false) }
+    var savePromptLabel by remember { mutableStateOf("") }
+    var selectedPromptId by remember(jobId) { mutableStateOf<Long?>(null) }
+    var customPromptText by remember(jobId) { mutableStateOf("") }
+    var tryHarder by remember(jobId) { mutableStateOf(false) }
     val prompts by repository.promptsState.collectAsState()
     val isWide = windowSizeClass.widthSizeClass >= WindowWidthSizeClass.Medium
 
-    val promptLabel = jobDto?.let { resolvePromptLabel(prompts, it.effectivePromptId, it.prompt_text) }
-        ?: "Loading…"
+    LaunchedEffect(jobDto?.id) {
+        val dto = jobDto ?: return@LaunchedEffect
+        selectedPromptId = dto.effectivePromptId ?: dto.prompt_text
+            ?.takeIf { it.isNotBlank() }
+            ?.let { CUSTOM_PROMPT_ID }
+        customPromptText = dto.prompt_text.orEmpty()
+        tryHarder = dto.workflow == TRY_HARDER_WORKFLOW
+    }
 
-    // Initial text for the edit dialog: existing free-text, or the label of
-    // the preset (the user can rewrite it from there).
-    val editInitial = jobDto?.prompt_text?.takeIf { it.isNotBlank() } ?: promptLabel
+    val promptLabel = when (val id = selectedPromptId) {
+        null -> jobDto?.let { resolvePromptLabel(prompts, it.effectivePromptId, it.prompt_text) } ?: "Loading…"
+        CUSTOM_PROMPT_ID -> customPromptText.trim().takeIf { it.isNotBlank() }?.let {
+            if (it.length <= 64) it else it.take(61) + "…"
+        } ?: "Write your own..."
+        else -> prompts.firstOrNull { it.id == id }?.label
+            ?: jobDto?.let { resolvePromptLabel(prompts, it.effectivePromptId, it.prompt_text) }
+            ?: "Choose a prompt"
+    }
 
     val canRegenerate = jobDto?.input_id != null && !regenerating
 
-    val launchRegenerate: (String?) -> Unit = { overrideText ->
+    fun launchRegenerate() {
         val dto = jobDto
         val inputId = dto?.input_id
-        if (dto != null && inputId != null && !regenerating) {
+        val promptId = selectedPromptId
+        val customText = customPromptText.trim()
+        if (
+            dto != null &&
+            inputId != null &&
+            promptId != null &&
+            (promptId != CUSTOM_PROMPT_ID || customText.isNotBlank()) &&
+            !regenerating
+        ) {
             regenerating = true
             scope.launch {
                 try {
                     val inputUri = withContext(Dispatchers.IO) {
                         repository.downloadInputToCache(inputId)
                     }
-                    val resp = when {
-                        overrideText != null -> repository.submitJob(
-                            inputUri = inputUri,
-                            promptText = overrideText,
-                            workflow = dto.workflow,
-                        )
-                        dto.effectivePromptId != null -> repository.submitJob(
-                            inputUri = inputUri,
-                            promptId = dto.effectivePromptId,
-                            workflow = dto.workflow,
-                        )
-                        else -> repository.submitJob(
-                            inputUri = inputUri,
-                            promptText = dto.prompt_text.orEmpty(),
-                            workflow = dto.workflow,
-                        )
-                    }
+                    val resp = repository.submitJob(
+                        inputUri = inputUri,
+                        promptId = promptId.takeUnless { it == CUSTOM_PROMPT_ID },
+                        promptText = customText.takeIf { promptId == CUSTOM_PROMPT_ID },
+                        workflow = if (tryHarder) TRY_HARDER_WORKFLOW else DEFAULT_CUSTOM_WORKFLOW,
+                    )
                     onRegenerated(resp.job_id)
                 } catch (t: Throwable) {
                     Toast.makeText(
@@ -140,6 +162,21 @@ fun ResultScreen(
                 } finally {
                     regenerating = false
                 }
+            }
+        }
+    }
+
+    fun deleteResult() {
+        scope.launch {
+            try {
+                repository.deleteJob(jobId)
+                onDeleted()
+            } catch (t: Throwable) {
+                Toast.makeText(
+                    context,
+                    "Delete failed: ${t.message}",
+                    Toast.LENGTH_SHORT,
+                ).show()
             }
         }
     }
@@ -176,18 +213,7 @@ fun ResultScreen(
                             text = { Text("Delete") },
                             onClick = {
                                 showMenu = false
-                                scope.launch {
-                                    try {
-                                        repository.deleteJob(jobId)
-                                        onDeleted()
-                                    } catch (t: Throwable) {
-                                        Toast.makeText(
-                                            context,
-                                            "Delete failed: ${t.message}",
-                                            Toast.LENGTH_SHORT,
-                                        ).show()
-                                    }
-                                }
+                                deleteResult()
                             },
                         )
                     }
@@ -238,15 +264,17 @@ fun ResultScreen(
 
             PromptStrip(
                 label = promptLabel,
-                onEdit = { showEditPrompt = true },
+                onEdit = { showPromptSheet = true },
                 editEnabled = canRegenerate,
             )
 
             // Primary action: regenerate with same params. Disabled when there's
             // no input image (text-only generations can't be re-run from here).
             Button(
-                onClick = { launchRegenerate(null) },
-                enabled = canRegenerate,
+                onClick = { launchRegenerate() },
+                enabled = canRegenerate &&
+                    selectedPromptId != null &&
+                    (selectedPromptId != CUSTOM_PROMPT_ID || customPromptText.isNotBlank()),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 if (regenerating) {
@@ -325,13 +353,105 @@ fun ResultScreen(
         }
     }
 
-    if (showEditPrompt) {
-        EditPromptDialog(
-            initialText = editInitial,
-            onDismiss = { showEditPrompt = false },
-            onRun = { newText ->
-                showEditPrompt = false
-                launchRegenerate(newText)
+    if (showPromptSheet) {
+        PromptLibrarySheet(
+            prompts = prompts,
+            selectedPromptId = selectedPromptId,
+            customPromptText = customPromptText,
+            onCustomPromptChange = {
+                customPromptText = it
+                selectedPromptId = CUSTOM_PROMPT_ID
+            },
+            tryHarder = tryHarder,
+            onTryHarderChange = { tryHarder = it },
+            onSavePromptClick = {
+                savePromptLabel = ""
+                showSavePromptDialog = true
+            },
+            onManagePrompts = {
+                showPromptSheet = false
+                showPromptManageSheet = true
+            },
+            onSelectPrompt = { id ->
+                selectedPromptId = id
+                if (id != CUSTOM_PROMPT_ID) showPromptSheet = false
+            },
+            onDismiss = { showPromptSheet = false },
+        )
+    }
+
+    if (showPromptManageSheet) {
+        PromptManageSheet(
+            prompts = prompts,
+            selectedPromptId = selectedPromptId,
+            onDeletePrompt = { promptId ->
+                scope.launch {
+                    try {
+                        repository.deletePrompt(promptId)
+                        if (selectedPromptId == promptId) selectedPromptId = null
+                    } catch (t: Throwable) {
+                        Toast.makeText(
+                            context,
+                            "Delete prompt failed: ${t.message}",
+                            Toast.LENGTH_SHORT,
+                        ).show()
+                    }
+                }
+            },
+            onDismiss = { showPromptManageSheet = false },
+        )
+    }
+
+    if (showSavePromptDialog) {
+        AlertDialog(
+            onDismissRequest = { showSavePromptDialog = false },
+            title = { Text("Save this prompt") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = customPromptText.trim(),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    androidx.compose.material3.OutlinedTextField(
+                        value = savePromptLabel,
+                        onValueChange = { savePromptLabel = it },
+                        label = { Text("Label") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = savePromptLabel.isNotBlank() && customPromptText.isNotBlank(),
+                    onClick = {
+                        val label = savePromptLabel.trim()
+                        val text = customPromptText.trim()
+                        scope.launch {
+                            try {
+                                val created = repository.createPrompt(
+                                    label = label,
+                                    text = text,
+                                    workflow = DEFAULT_CUSTOM_WORKFLOW,
+                                )
+                                selectedPromptId = created.id
+                                customPromptText = ""
+                                showSavePromptDialog = false
+                                showPromptSheet = false
+                                Toast.makeText(context, "Prompt saved", Toast.LENGTH_SHORT).show()
+                            } catch (t: Throwable) {
+                                Toast.makeText(
+                                    context,
+                                    "Save prompt failed: ${t.message}",
+                                    Toast.LENGTH_SHORT,
+                                ).show()
+                            }
+                        }
+                    },
+                ) { Text("Save") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSavePromptDialog = false }) { Text("Cancel") }
             },
         )
     }
@@ -393,43 +513,6 @@ private fun PromptStrip(
             }
         }
     }
-}
-
-@Composable
-private fun EditPromptDialog(
-    initialText: String,
-    onDismiss: () -> Unit,
-    onRun: (String) -> Unit,
-) {
-    var text by remember { mutableStateOf(initialText) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Edit prompt") },
-        text = {
-            Column {
-                Text(
-                    text = "Re-runs on the same input image.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.padding(bottom = 12.dp),
-                )
-                OutlinedTextField(
-                    value = text,
-                    onValueChange = { text = it },
-                    label = { Text("Prompt") },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 2,
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(
-                enabled = text.isNotBlank(),
-                onClick = { onRun(text.trim()) },
-            ) { Text("Run") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-    )
 }
 
 @Composable
