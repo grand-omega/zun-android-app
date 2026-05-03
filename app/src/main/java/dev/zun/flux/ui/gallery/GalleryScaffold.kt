@@ -1,5 +1,6 @@
 package dev.zun.flux.ui.gallery
 
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.layout.AnimatedPane
@@ -19,6 +20,7 @@ import kotlinx.coroutines.launch
 fun GalleryScaffold(
     repository: JobRepository,
     repositoryVersion: Long,
+    onUseInput: (Uri) -> Unit,
     onBack: () -> Unit,
 ) {
     val viewModel: GalleryViewModel =
@@ -46,6 +48,7 @@ fun GalleryScaffold(
                         scope.launch { navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, jobId) }
                     },
                     onBack = onBack,
+                    showUndoSnackbars = navigator.currentDestination?.contentKey == null,
                 )
             }
         },
@@ -57,6 +60,7 @@ fun GalleryScaffold(
                         initialJobId = jobId,
                         viewModel = viewModel,
                         repository = repository,
+                        onUseInput = onUseInput,
                         onBack = { scope.launch { navigator.navigateBack() } },
                     )
                 }

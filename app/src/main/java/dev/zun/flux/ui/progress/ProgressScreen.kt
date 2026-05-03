@@ -162,6 +162,11 @@ fun ProgressScreen(
                                 Text("Retry")
                             }
                         }
+                        PollState.Deleted -> Text(
+                            text = "Deleted",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.secondary,
+                        )
                         PollState.Cancelled -> Text(
                             text = "Cancelled",
                             style = MaterialTheme.typography.titleMedium,

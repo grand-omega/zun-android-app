@@ -198,6 +198,8 @@ private class RecordingRepository : JobRepository {
 
     override fun getJobFlow(jobId: String): Flow<JobStatusDto?> = MutableStateFlow(null)
 
+    override fun deletedJobIds(): Flow<Set<String>> = MutableStateFlow(emptySet())
+
     override fun recentInputIds(limit: Int): Flow<List<Int>> = MutableStateFlow(emptyList())
 
     override suspend fun downloadInputToCache(inputId: Int): Uri = Uri.EMPTY

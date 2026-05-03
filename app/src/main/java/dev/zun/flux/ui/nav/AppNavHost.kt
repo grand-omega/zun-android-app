@@ -96,6 +96,10 @@ fun AppNavHost(
             GalleryScaffold(
                 repository = repository,
                 repositoryVersion = repositoryVersion,
+                onUseInput = { uri ->
+                    nav.getBackStackEntry(Routes.HOME).savedStateHandle["capturedUri"] = uri
+                    nav.popBackStack(Routes.HOME, inclusive = false)
+                },
                 onBack = { nav.popBackStack() },
             )
         }
@@ -149,6 +153,8 @@ fun AppNavHost(
             val deletedJobId by savedState
                 .getStateFlow<String?>(KEY_DELETED_JOB_ID, null)
                 .collectAsStateWithLifecycle()
+            val pendingDeletedIds by repository.deletedJobIds()
+                .collectAsStateWithLifecycle(initialValue = emptySet())
             // Track removals so deleted tiles disappear from the grid.
             val removedIds: SnapshotStateList<String> = remember { mutableStateListOf<String>() }
             LaunchedEffect(deletedJobId) {
@@ -156,6 +162,11 @@ fun AppNavHost(
                 if (id != null) {
                     if (id !in removedIds) removedIds.add(id)
                     savedState[KEY_DELETED_JOB_ID] = null
+                }
+            }
+            LaunchedEffect(pendingDeletedIds) {
+                pendingDeletedIds.forEach { id ->
+                    if (id in originalJobIds && id !in removedIds) removedIds.add(id)
                 }
             }
             val visibleJobIds = originalJobIds.filter { it !in removedIds }

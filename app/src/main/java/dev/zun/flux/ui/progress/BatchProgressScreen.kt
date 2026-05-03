@@ -72,21 +72,36 @@ fun BatchProgressScreen(
 ) {
     // null = grid overview, otherwise the index focused in the pager.
     var focusedIndex by rememberSaveable { mutableStateOf<Int?>(null) }
+    val deletedJobIds by repository.deletedJobIds().collectAsStateWithLifecycle(initialValue = emptySet())
+    val activeJobIds = jobIds.filterNot { it in deletedJobIds }
+
+    LaunchedEffect(activeJobIds, focusedIndex) {
+        val index = focusedIndex
+        if (index != null && index !in activeJobIds.indices) {
+            focusedIndex = activeJobIds.indices.lastOrNull()
+        }
+    }
+
+    LaunchedEffect(activeJobIds.isEmpty()) {
+        if (activeJobIds.isEmpty()) onBack()
+    }
 
     BackHandler(focusedIndex != null) { focusedIndex = null }
 
-    if (focusedIndex == null) {
+    if (activeJobIds.isEmpty()) {
+        return
+    } else if (focusedIndex == null) {
         BatchGrid(
-            jobIds = jobIds,
+            jobIds = activeJobIds,
             repository = repository,
             onTileClick = { index, isDone ->
-                if (isDone) onViewResult(jobIds[index]) else focusedIndex = index
+                if (isDone) onViewResult(activeJobIds[index]) else focusedIndex = index
             },
             onBack = onBack,
         )
     } else {
         BatchFocused(
-            jobIds = jobIds,
+            jobIds = activeJobIds,
             initialIndex = focusedIndex!!,
             repository = repository,
             onViewResult = onViewResult,
@@ -226,6 +241,11 @@ private fun BatchTile(
                     color = MaterialTheme.colorScheme.error,
                     icon = Icons.Default.Close,
                     description = "Failed",
+                )
+                PollState.Deleted -> CornerBadge(
+                    color = Color.DarkGray,
+                    icon = Icons.Default.Close,
+                    description = "Deleted",
                 )
                 PollState.Cancelled -> CornerBadge(
                     color = Color.DarkGray,
@@ -407,6 +427,11 @@ private fun BatchPage(
                         Text("Failed: ${s.message}", color = MaterialTheme.colorScheme.error)
                         Button(onClick = { viewModel.retry(jobId) }) { Text("Retry") }
                     }
+                    PollState.Deleted -> Text(
+                        text = "Deleted",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.secondary,
+                    )
                     PollState.Cancelled -> Text(
                         text = "Cancelled",
                         style = MaterialTheme.typography.titleMedium,
@@ -430,6 +455,7 @@ private fun BatchPage(
                 ) {
                     Text("Cancel")
                 }
+                PollState.Deleted -> Unit
                 else -> Unit
             }
         }

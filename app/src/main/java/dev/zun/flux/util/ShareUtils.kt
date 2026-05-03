@@ -57,3 +57,60 @@ suspend fun shareImage(context: Context, source: Any) {
     }
     context.startActivity(Intent.createChooser(intent, "Share Image"))
 }
+
+suspend fun shareImages(context: Context, sources: List<Any>) {
+    val contentUris = sources.mapNotNull { source -> shareableUri(context, source) }
+    if (contentUris.isEmpty()) return
+
+    val intent = if (contentUris.size == 1) {
+        Intent(Intent.ACTION_SEND).apply {
+            putExtra(Intent.EXTRA_STREAM, contentUris.single())
+        }
+    } else {
+        Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+            putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(contentUris))
+        }
+    }.apply {
+        type = "image/jpeg"
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(Intent.createChooser(intent, "Share Images"))
+}
+
+private suspend fun shareableUri(context: Context, source: Any): Uri? {
+    val okHttpClient = (context.applicationContext as? FluxApp)?.okHttpClient
+    return when (source) {
+        is Uri -> {
+            if (source.scheme == "file") {
+                val file = File(source.path ?: return null)
+                FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            } else {
+                source
+            }
+        }
+        is String -> {
+            withContext(Dispatchers.IO) {
+                val file = File(context.cacheDir, "share_${System.currentTimeMillis()}_${source.hashCode()}.jpg")
+                if (okHttpClient != null) {
+                    val request = Request.Builder().url(source).build()
+                    okHttpClient.newCall(request).execute().use { response ->
+                        if (!response.isSuccessful) error("Failed to download image: ${response.code}")
+                        response.body?.byteStream()?.use { input ->
+                            file.outputStream().use { output ->
+                                input.copyTo(output)
+                            }
+                        } ?: error("Empty response body")
+                    }
+                } else {
+                    URL(source).openStream().use { input ->
+                        file.outputStream().use { output ->
+                            input.copyTo(output)
+                        }
+                    }
+                }
+                FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            }
+        }
+        else -> null
+    }
+}

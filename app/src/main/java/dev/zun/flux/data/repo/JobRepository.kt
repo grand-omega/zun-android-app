@@ -88,6 +88,9 @@ interface JobRepository {
 
     fun getJobFlow(jobId: String): Flow<JobStatusDto?>
 
+    /** Job ids hidden locally because the user deleted them but server sync may still be pending. */
+    fun deletedJobIds(): Flow<Set<String>>
+
     /** Most-recent-first distinct input_ids derived from local job history. */
     fun recentInputIds(limit: Int): Flow<List<Int>>
 
