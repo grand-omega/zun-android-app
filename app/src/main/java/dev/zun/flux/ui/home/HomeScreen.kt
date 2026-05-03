@@ -5,12 +5,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -83,7 +80,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
@@ -141,7 +137,6 @@ fun HomeScreen(
     var imageUris by rememberSaveable(stateSaver = UriListSaver) { mutableStateOf<List<Uri>>(emptyList()) }
     var selectedPromptId by rememberSaveable { mutableStateOf<Long?>(null) }
     var customPromptText by rememberSaveable { mutableStateOf("") }
-    var deleteMode by rememberSaveable { mutableStateOf(false) }
     var showSaveDialog by rememberSaveable { mutableStateOf(false) }
     var saveDialogLabel by rememberSaveable { mutableStateOf("") }
     var tryHarder by rememberSaveable { mutableStateOf(false) }
@@ -277,16 +272,6 @@ fun HomeScreen(
         },
         contentWindowInsets = WindowInsets.safeDrawing,
     ) { inner ->
-        val exitModifier = if (deleteMode) {
-            Modifier.pointerInput(Unit) {
-                awaitEachGesture {
-                    awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                    deleteMode = false
-                }
-            }
-        } else {
-            Modifier
-        }
         PullToRefreshBox(
             isRefreshing = isRefreshing,
             onRefresh = { viewModel.manualRefresh() },
@@ -294,7 +279,6 @@ fun HomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(inner)
-                .then(exitModifier)
                 .pointerInput(isRefreshing, refreshThresholdPx) {
                     detectVerticalDragGestures(
                         onDragStart = { pullDistancePx = 0f },
@@ -360,9 +344,6 @@ fun HomeScreen(
                 onCustomPromptChange = { customPromptText = it },
                 tryHarder = tryHarder,
                 onTryHarderChange = { tryHarder = it },
-                deleteMode = deleteMode,
-                onLongPressChip = { deleteMode = true },
-                onExitDeleteMode = { deleteMode = false },
                 onDeletePrompt = { id ->
                     viewModel.deletePrompt(id)
                     if (selectedPromptId == id) selectedPromptId = null
@@ -458,9 +439,6 @@ private fun HomeContent(
     onCustomPromptChange: (String) -> Unit,
     tryHarder: Boolean,
     onTryHarderChange: (Boolean) -> Unit,
-    deleteMode: Boolean,
-    onLongPressChip: () -> Unit,
-    onExitDeleteMode: () -> Unit,
     onDeletePrompt: (Long) -> Unit,
     onSavePromptClick: () -> Unit,
     state: SubmitState,
@@ -477,6 +455,7 @@ private fun HomeContent(
     onPickRecent: (Int) -> Unit,
 ) {
     var showPromptSheet by rememberSaveable { mutableStateOf(false) }
+    var showPromptManageSheet by rememberSaveable { mutableStateOf(false) }
 
     val canSubmit = imageUris.isNotEmpty() &&
         selectedPromptId != null &&
@@ -568,16 +547,25 @@ private fun HomeContent(
             onCustomPromptChange = onCustomPromptChange,
             tryHarder = tryHarder,
             onTryHarderChange = onTryHarderChange,
-            deleteMode = deleteMode,
-            onLongPressChip = onLongPressChip,
-            onExitDeleteMode = onExitDeleteMode,
-            onDeletePrompt = onDeletePrompt,
             onSavePromptClick = onSavePromptClick,
+            onManagePrompts = {
+                showPromptSheet = false
+                showPromptManageSheet = true
+            },
             onSelectPrompt = { id ->
                 onSelectPrompt(id)
                 if (id != CUSTOM_PROMPT_ID) showPromptSheet = false
             },
             onDismiss = { showPromptSheet = false },
+        )
+    }
+
+    if (showPromptManageSheet) {
+        PromptManageSheet(
+            prompts = prompts,
+            selectedPromptId = selectedPromptId,
+            onDeletePrompt = onDeletePrompt,
+            onDismiss = { showPromptManageSheet = false },
         )
     }
 }
@@ -961,11 +949,8 @@ private fun PromptLibrarySheet(
     onCustomPromptChange: (String) -> Unit,
     tryHarder: Boolean,
     onTryHarderChange: (Boolean) -> Unit,
-    deleteMode: Boolean,
-    onLongPressChip: () -> Unit,
-    onExitDeleteMode: () -> Unit,
-    onDeletePrompt: (Long) -> Unit,
     onSavePromptClick: () -> Unit,
+    onManagePrompts: () -> Unit,
     onSelectPrompt: (Long) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -982,10 +967,7 @@ private fun PromptLibrarySheet(
     }
 
     ModalBottomSheet(
-        onDismissRequest = {
-            onExitDeleteMode()
-            onDismiss()
-        },
+        onDismissRequest = onDismiss,
         sheetState = sheetState,
     ) {
         Column(
@@ -1004,9 +986,7 @@ private fun PromptLibrarySheet(
                     text = "Choose a prompt",
                     style = MaterialTheme.typography.titleMedium,
                 )
-                if (deleteMode) {
-                    TextButton(onClick = onExitDeleteMode) { Text("Done") }
-                }
+                TextButton(onClick = onManagePrompts) { Text("Manage") }
             }
 
             // High-quality toggle (was "Try Harder").
@@ -1054,14 +1034,6 @@ private fun PromptLibrarySheet(
                 onSaveClick = onSavePromptClick,
             )
 
-            if (deleteMode) {
-                Text(
-                    text = "Tap × to remove a prompt",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.secondary,
-                )
-            }
-
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(4.dp),
                 modifier = Modifier
@@ -1073,10 +1045,7 @@ private fun PromptLibrarySheet(
                         label = prompt.label,
                         description = prompt.description,
                         selected = selectedPromptId == prompt.id,
-                        showDelete = deleteMode,
                         onClick = { onSelectPrompt(prompt.id) },
-                        onLongClick = onLongPressChip,
-                        onDelete = { onDeletePrompt(prompt.id) },
                     )
                 }
                 if (filtered.isEmpty()) {
@@ -1094,16 +1063,12 @@ private fun PromptLibrarySheet(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun PromptRow(
     label: String,
     description: String?,
     selected: Boolean,
-    showDelete: Boolean,
     onClick: () -> Unit,
-    onLongClick: () -> Unit,
-    onDelete: () -> Unit,
 ) {
     val containerColor = if (selected) {
         MaterialTheme.colorScheme.secondaryContainer
@@ -1115,7 +1080,7 @@ private fun PromptRow(
         color = containerColor,
         modifier = Modifier
             .fillMaxWidth()
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick),
+            .clickable(onClick = onClick),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
@@ -1148,14 +1113,127 @@ private fun PromptRow(
                     )
                 }
             }
-            if (showDelete) {
-                IconButton(onClick = onDelete) {
-                    Icon(
-                        Icons.Default.Close,
-                        contentDescription = "Delete prompt",
-                        tint = MaterialTheme.colorScheme.error,
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PromptManageSheet(
+    prompts: List<PromptDto>,
+    selectedPromptId: Long?,
+    onDeletePrompt: (Long) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val savedPrompts = prompts.filter { it.id != CUSTOM_PROMPT_ID }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    text = "Manage prompts",
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                TextButton(onClick = onDismiss) { Text("Done") }
+            }
+
+            if (savedPrompts.isEmpty()) {
+                Text(
+                    text = "No saved prompts yet",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.padding(vertical = 12.dp),
+                )
+            } else {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 420.dp),
+                ) {
+                    items(savedPrompts, key = { it.id }) { prompt ->
+                        PromptManageRow(
+                            label = prompt.label,
+                            description = prompt.description,
+                            selected = selectedPromptId == prompt.id,
+                            onDelete = { onDeletePrompt(prompt.id) },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PromptManageRow(
+    label: String,
+    description: String?,
+    selected: Boolean,
+    onDelete: () -> Unit,
+) {
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = if (selected) {
+            MaterialTheme.colorScheme.secondaryContainer
+        } else {
+            Color.Transparent
+        },
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = if (selected) {
+                            MaterialTheme.colorScheme.onSecondaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        },
+                    )
+                    if (selected) {
+                        Spacer(Modifier.width(8.dp))
+                        Icon(
+                            Icons.Default.Check,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                }
+                if (!description.isNullOrBlank()) {
+                    Text(
+                        text = description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary,
                     )
                 }
+            }
+            IconButton(onClick = onDelete) {
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = "Delete prompt",
+                    tint = MaterialTheme.colorScheme.error,
+                )
             }
         }
     }
