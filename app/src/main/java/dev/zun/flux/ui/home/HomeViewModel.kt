@@ -8,12 +8,17 @@ import dev.zun.flux.data.api.PromptDto
 import dev.zun.flux.data.repo.ConnectionDiagnosis
 import dev.zun.flux.data.repo.JobRepository
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /** Sentinel for the synthetic "Write your own…" tile. Never sent to the server. */
@@ -65,13 +70,22 @@ sealed interface HealthState {
 
 class HomeViewModel(
     private val repository: JobRepository,
-    private val healthChecksEnabled: Boolean = true,
 ) : ViewModel() {
     private val _state = MutableStateFlow<SubmitState>(SubmitState.Idle)
     val state: StateFlow<SubmitState> = _state.asStateFlow()
 
-    private val _prompts = MutableStateFlow<List<PromptDto>>(emptyList())
-    val prompts: StateFlow<List<PromptDto>> = _prompts.asStateFlow()
+    private val _composer = MutableStateFlow(HomeComposerState())
+    val composer: StateFlow<HomeComposerState> = _composer.asStateFlow()
+
+    val prompts: StateFlow<List<PromptDto>> = repository.promptsState
+        .map { fetched ->
+            clearDeletedPromptSelection(fetched)
+            fetched + CUSTOM_PROMPT
+        }.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = listOf(CUSTOM_PROMPT),
+        )
 
     private val _health = MutableStateFlow<HealthState>(HealthState.Checking)
     val health: StateFlow<HealthState> = _health.asStateFlow()
@@ -81,9 +95,6 @@ class HomeViewModel(
 
     private val _batchProgress = MutableStateFlow<BatchProgress?>(null)
     val batchProgress: StateFlow<BatchProgress?> = _batchProgress.asStateFlow()
-
-    private val _composer = MutableStateFlow(HomeComposerState())
-    val composer: StateFlow<HomeComposerState> = _composer.asStateFlow()
 
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
@@ -96,37 +107,16 @@ class HomeViewModel(
 
     init {
         viewModelScope.launch { fetchPrompts() }
-        if (healthChecksEnabled) {
-            startHealthCheck()
-        }
     }
 
     private suspend fun fetchPrompts() {
-        val fetched =
-            try {
-                repository.listPrompts()
-            } catch (_: Throwable) {
-                emptyList()
-            }
-
-        val customEntry = PromptDto(
-            id = CUSTOM_PROMPT_ID,
-            label = "Write your own...",
-            description = "Enter a custom text prompt",
-        )
-        _prompts.value = fetched + customEntry
-        val selectedPromptId = _composer.value.selectedPromptId
-        if (selectedPromptId != null && selectedPromptId != CUSTOM_PROMPT_ID && fetched.none { it.id == selectedPromptId }) {
-            _composer.value = _composer.value.copy(selectedPromptId = null)
-        }
+        runCatching { repository.listPrompts() }
     }
 
-    private fun startHealthCheck() {
-        viewModelScope.launch {
-            while (true) {
-                performHealthCheck()
-                delay(10_000)
-            }
+    suspend fun runHealthChecks() {
+        while (currentCoroutineContext().isActive) {
+            performHealthCheck()
+            delay(30_000)
         }
     }
 
@@ -276,21 +266,15 @@ class HomeViewModel(
         tryHarder: Boolean,
     ): JobCreatedResponse {
         val workflow = if (tryHarder) TRY_HARDER_WORKFLOW else DEFAULT_CUSTOM_WORKFLOW
-        return if (selectedPromptId == CUSTOM_PROMPT_ID) {
-            repository.submitJob(
-                inputUri = inputUri,
-                promptText = customPromptText,
-                workflow = workflow,
-                onUploadProgress = { progress -> _uploadProgress.value = progress },
-            )
-        } else {
-            repository.submitJob(
-                inputUri = inputUri,
-                promptId = selectedPromptId,
-                workflow = workflow,
-                onUploadProgress = { progress -> _uploadProgress.value = progress },
-            )
-        }
+        val promptId = selectedPromptId.takeUnless { it == CUSTOM_PROMPT_ID }
+        val promptText = customPromptText.takeIf { selectedPromptId == CUSTOM_PROMPT_ID }
+        return repository.submitJob(
+            inputUri = inputUri,
+            promptId = promptId,
+            promptText = promptText,
+            workflow = workflow,
+            onUploadProgress = { progress -> _uploadProgress.value = progress },
+        )
     }
 
     fun acknowledgeDone() {
@@ -308,7 +292,6 @@ class HomeViewModel(
                     text = text.trim(),
                     workflow = DEFAULT_CUSTOM_WORKFLOW,
                 )
-                fetchPrompts()
                 _composer.value = _composer.value.copy(
                     selectedPromptId = created.id,
                     customPromptText = "",
@@ -327,10 +310,24 @@ class HomeViewModel(
                 if (_composer.value.selectedPromptId == promptId) {
                     _composer.value = _composer.value.copy(selectedPromptId = null)
                 }
-                fetchPrompts()
             } catch (t: Throwable) {
                 _promptErrors.trySend(t.message ?: "Failed to delete prompt")
             }
         }
+    }
+
+    private fun clearDeletedPromptSelection(fetchedPrompts: List<PromptDto>) {
+        val selectedPromptId = _composer.value.selectedPromptId
+        if (selectedPromptId != null && selectedPromptId != CUSTOM_PROMPT_ID && fetchedPrompts.none { it.id == selectedPromptId }) {
+            _composer.value = _composer.value.copy(selectedPromptId = null)
+        }
+    }
+
+    private companion object {
+        val CUSTOM_PROMPT = PromptDto(
+            id = CUSTOM_PROMPT_ID,
+            label = "Write your own...",
+            description = "Enter a custom text prompt",
+        )
     }
 }

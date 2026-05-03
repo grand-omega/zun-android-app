@@ -26,19 +26,11 @@ abstract class AppDatabase : RoomDatabase() {
             createdInstance
         }
 
-        private val MIGRATION_1_2 = object : Migration(1, 2) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                ensureCurrentSchema(db)
-            }
-        }
+        private val MIGRATION_1_2 = schemaMigration(1, 2)
+        private val MIGRATION_2_3 = schemaMigration(2, 3)
+        private val MIGRATION_3_4 = schemaMigration(3, 4)
 
-        private val MIGRATION_2_3 = object : Migration(2, 3) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                ensureCurrentSchema(db)
-            }
-        }
-
-        private val MIGRATION_3_4 = object : Migration(3, 4) {
+        private fun schemaMigration(startVersion: Int, endVersion: Int): Migration = object : Migration(startVersion, endVersion) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 ensureCurrentSchema(db)
             }

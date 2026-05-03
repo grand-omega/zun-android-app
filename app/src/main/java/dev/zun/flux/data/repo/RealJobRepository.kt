@@ -2,6 +2,7 @@ package dev.zun.flux.data.repo
 
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import dev.zun.flux.data.api.FluxApi
 import dev.zun.flux.data.api.HealthResponse
 import dev.zun.flux.data.api.JobCreatedResponse
@@ -49,13 +50,13 @@ class RealJobRepository(
         val created = api.createPrompt(
             PromptDto(id = 0L, label = label, text = text, workflow = workflow),
         )
-        runCatching { listPrompts() }
+        refreshPromptsQuietly()
         return created
     }
 
     override suspend fun deletePrompt(promptId: Long) {
         api.deletePrompt(promptId)
-        runCatching { listPrompts() }
+        refreshPromptsQuietly()
     }
 
     override suspend fun submitJob(
@@ -137,12 +138,7 @@ class RealJobRepository(
         } catch (_: Exception) {
             // Ignore background sync errors
         }
-        // Opportunistically refresh prompt cache so label lookup works in the gallery.
-        try {
-            _promptsState.value = api.listPrompts().items
-        } catch (_: Exception) {
-            // Ignore
-        }
+        refreshPromptsQuietly()
     }
 
     override suspend fun syncPendingDeletes() {
@@ -174,4 +170,13 @@ class RealJobRepository(
     override fun resultModel(jobId: String): Any? = buildUrlOrNull("/api/v1/jobs/$jobId/result")
 
     private fun buildUrlOrNull(path: String): String? = settingsManager.serverUrl?.takeUnless { it.isBlank() }?.let { "$it$path" }
+
+    private suspend fun refreshPromptsQuietly() {
+        runCatching { listPrompts() }
+            .onFailure { Log.w(TAG, "Failed to refresh prompts", it) }
+    }
+
+    private companion object {
+        const val TAG = "RealJobRepository"
+    }
 }

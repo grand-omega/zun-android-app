@@ -47,15 +47,11 @@ class SettingsManager(context: Context) {
         set(value) = prefs.edit().putString(KEY_SERVER_URL, value).apply()
 
     var activeRoute: ActiveRoute
-        get() = runCatching {
-            ActiveRoute.valueOf(prefs.getString(KEY_ACTIVE_ROUTE, ActiveRoute.NONE.name) ?: ActiveRoute.NONE.name)
-        }.getOrDefault(ActiveRoute.NONE)
+        get() = enumPref(KEY_ACTIVE_ROUTE, ActiveRoute.NONE)
         set(value) = prefs.edit().putString(KEY_ACTIVE_ROUTE, value.name).apply()
 
     var connectionMode: ConnectionMode
-        get() = runCatching {
-            ConnectionMode.valueOf(prefs.getString(KEY_CONNECTION_MODE, ConnectionMode.AUTO.name) ?: ConnectionMode.AUTO.name)
-        }.getOrDefault(ConnectionMode.AUTO)
+        get() = enumPref(KEY_CONNECTION_MODE, ConnectionMode.AUTO)
         set(value) = prefs.edit().putString(KEY_CONNECTION_MODE, value.name).apply()
 
     var lanUrl: String?
@@ -91,6 +87,10 @@ class SettingsManager(context: Context) {
 
     val isConfigured: Boolean
         get() = (!lanUrl.isNullOrBlank() || !tailscaleUrl.isNullOrBlank()) && !apiToken.isNullOrBlank()
+
+    private inline fun <reified T : Enum<T>> enumPref(key: String, default: T): T = runCatching {
+        enumValueOf<T>(prefs.getString(key, default.name) ?: default.name)
+    }.getOrDefault(default)
 
     companion object {
         private const val KEY_LOCKOUT_DURATION = "lockout_duration_ms"
