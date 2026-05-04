@@ -16,6 +16,9 @@ import dev.zun.flux.data.local.toEntity
 import dev.zun.flux.data.local.toStatusDto
 import dev.zun.flux.data.local.toSummaryDto
 import dev.zun.flux.data.worker.DeleteSyncWorker
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,17 +26,22 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import okhttp3.OkHttpClient
 import retrofit2.HttpException
 
 class RealJobRepository(
     private val context: Context,
     private val api: FluxApi,
     private val settingsManager: SettingsManager,
+    okHttpClient: OkHttpClient,
 ) : JobRepository {
     private val dao = AppDatabase.getDatabase(context).jobDao()
     private val connectionDiagnoser = ConnectionDiagnoser(settingsManager)
     private val jobUploader = JobUploader(context, api)
     private val recentInputCache = RecentInputCache(context, api)
+    private val offlineImageCache = OfflineImageCache(context, okHttpClient)
+    private val cacheScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val _promptsState = MutableStateFlow<List<PromptDto>>(emptyList())
     override val promptsState: StateFlow<List<PromptDto>> = _promptsState.asStateFlow()
@@ -83,6 +91,7 @@ class RealJobRepository(
         val job = api.getJob(jobId)
         if (jobId !in localDeletedIds.value && !dao.isPendingDelete(jobId)) {
             dao.insertJob(job.toEntity())
+            prefetchIfDone(job)
         }
         return job
     }
@@ -95,7 +104,9 @@ class RealJobRepository(
     ): JobListResponse {
         val resp = api.listJobs(status, limit, cursor, inputId)
         val hiddenIds = dao.getPendingDeleteIds().toSet() + localDeletedIds.value
-        dao.insertJobs(resp.items.filterNot { it.id in hiddenIds }.map { it.toEntity() })
+        val visibleItems = resp.items.filterNot { it.id in hiddenIds }
+        dao.insertJobs(visibleItems.map { it.toEntity() })
+        prefetchDone(visibleItems)
         return resp
     }
 
@@ -103,6 +114,7 @@ class RealJobRepository(
         localDeletedIds.update { it + jobId }
         dao.insertPendingDelete(PendingDeleteEntity(jobId = jobId, createdAt = System.currentTimeMillis()))
         dao.deleteJobById(jobId)
+        offlineImageCache.delete(jobId)
         DeleteSyncWorker.enqueue(context)
     }
 
@@ -152,7 +164,9 @@ class RealJobRepository(
         try {
             val resp = api.listJobs(status = "done", limit = 100)
             val hiddenIds = dao.getPendingDeleteIds().toSet() + localDeletedIds.value
-            dao.insertJobs(resp.items.filterNot { it.id in hiddenIds }.map { it.toEntity() })
+            val visibleItems = resp.items.filterNot { it.id in hiddenIds }
+            dao.insertJobs(visibleItems.map { it.toEntity() })
+            prefetchDone(visibleItems)
         } catch (_: Exception) {
             // Ignore background sync errors
         }
@@ -164,10 +178,12 @@ class RealJobRepository(
             try {
                 api.deleteJob(pendingDelete.jobId)
                 dao.deleteJobById(pendingDelete.jobId)
+                offlineImageCache.delete(pendingDelete.jobId)
                 dao.deletePendingDelete(pendingDelete.jobId)
             } catch (e: HttpException) {
                 if (e.code() == 404) {
                     dao.deleteJobById(pendingDelete.jobId)
+                    offlineImageCache.delete(pendingDelete.jobId)
                     dao.deletePendingDelete(pendingDelete.jobId)
                 } else {
                     throw e
@@ -181,13 +197,41 @@ class RealJobRepository(
         return buildUrlOrNull("/api/v1/inputs/$inputId/file")
     }
 
-    override fun thumbModel(jobId: String): Any? = buildUrlOrNull("/api/v1/jobs/$jobId/thumb")
+    override fun thumbModel(jobId: String): Any? = offlineImageCache.localUri(jobId, OfflineImageCache.Kind.Thumb)
+        ?: buildUrlOrNull("/api/v1/jobs/$jobId/thumb")
 
-    override fun previewModel(jobId: String): Any? = buildUrlOrNull("/api/v1/jobs/$jobId/preview")
+    override fun previewModel(jobId: String): Any? = offlineImageCache.localUri(jobId, OfflineImageCache.Kind.Preview)
+        ?: buildUrlOrNull("/api/v1/jobs/$jobId/preview")
 
     override fun resultModel(jobId: String): Any? = buildUrlOrNull("/api/v1/jobs/$jobId/result")
 
     private fun buildUrlOrNull(path: String): String? = settingsManager.serverUrl?.takeUnless { it.isBlank() }?.let { "$it$path" }
+
+    private fun prefetchIfDone(job: JobStatusDto) {
+        if (job.status != "done") return
+        prefetchJobImages(job.id)
+    }
+
+    private fun prefetchDone(jobs: List<JobSummaryDto>) {
+        jobs.asSequence()
+            .filter { it.status == "done" }
+            .forEach { prefetchJobImages(it.id) }
+    }
+
+    private fun prefetchJobImages(jobId: String) {
+        val thumbUrl = buildUrlOrNull("/api/v1/jobs/$jobId/thumb")
+        val previewUrl = buildUrlOrNull("/api/v1/jobs/$jobId/preview")
+        if (thumbUrl != null) {
+            cacheScope.launch {
+                offlineImageCache.prefetch(jobId, OfflineImageCache.Kind.Thumb, thumbUrl)
+            }
+        }
+        if (previewUrl != null) {
+            cacheScope.launch {
+                offlineImageCache.prefetch(jobId, OfflineImageCache.Kind.Preview, previewUrl)
+            }
+        }
+    }
 
     private suspend fun refreshPromptsQuietly() {
         runCatching { listPrompts() }

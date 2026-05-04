@@ -114,7 +114,7 @@ class FluxApp : Application() {
 
         val api = retrofit.create(FluxApi::class.java)
         _repositoryState.value = RepositoryState(
-            repository = RealJobRepository(this, api, settingsManager),
+            repository = RealJobRepository(this, api, settingsManager, okHttpClient),
             version = ++repositoryVersion,
         )
     }
