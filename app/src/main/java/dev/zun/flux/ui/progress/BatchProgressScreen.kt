@@ -60,6 +60,10 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import coil3.compose.AsyncImage
 import dev.zun.flux.data.repo.JobRepository
+import dev.zun.flux.ui.common.LoadingScrim
+import dev.zun.flux.ui.common.PanelShape
+import dev.zun.flux.ui.common.StatusPill
+import dev.zun.flux.ui.common.StatusTone
 import dev.zun.flux.ui.theme.tabular
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -188,7 +192,7 @@ private fun BatchTile(
         if (isDone && resultModel != null) {
             AsyncImage(
                 model = resultModel,
-                contentDescription = null,
+                contentDescription = "Completed generation",
                 modifier = Modifier.fillMaxSize(),
             )
             // Done check in corner.
@@ -211,7 +215,7 @@ private fun BatchTile(
             // Dimmed input + state overlay.
             AsyncImage(
                 model = inputModel,
-                contentDescription = null,
+                contentDescription = "Source image in progress",
                 modifier = Modifier.fillMaxSize().alpha(0.45f),
             )
             when (val s = state) {
@@ -373,26 +377,26 @@ private fun BatchPage(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(280.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(PanelShape)
                     .background(Color.Black),
                 contentAlignment = Alignment.Center,
             ) {
                 if (isDone && resultModel != null) {
                     AsyncImage(
                         model = resultModel,
-                        contentDescription = null,
+                        contentDescription = "Completed generation",
                         modifier = Modifier.fillMaxSize(),
                     )
                 } else {
                     AsyncImage(
                         model = inputModel,
-                        contentDescription = null,
+                        contentDescription = "Source image in progress",
                         modifier = Modifier
                             .fillMaxSize()
                             .alpha(0.6f),
                     )
                     if (state is PollState.Starting || state is PollState.Running) {
-                        CircularProgressIndicator(color = Color.White)
+                        LoadingScrim(modifier = Modifier.fillMaxSize())
                     }
                 }
             }
@@ -408,16 +412,9 @@ private fun BatchPage(
                     )
 
                     is PollState.Running -> {
-                        AssistChip(
-                            onClick = {},
-                            label = { Text(s.dto.status.replaceFirstChar { it.uppercase() }) },
-                            leadingIcon = {
-                                Box(
-                                    modifier = Modifier
-                                        .size(8.dp)
-                                        .background(Color(0xFF1D9E75), CircleShape),
-                                )
-                            },
+                        StatusPill(
+                            label = s.dto.status.replaceFirstChar { it.uppercase() },
+                            tone = StatusTone.Success,
                         )
                         val pct = s.dto.progress?.let { (it * 100).toInt() }
                         if (pct != null) {

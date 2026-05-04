@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import dev.zun.flux.ui.common.PanelShape
 
 const val MAX_BATCH_IMAGES = 20
 
@@ -67,13 +68,13 @@ fun ImageHero(
         imageUris.size == 1 -> Box(
             modifier = Modifier
                 .fillMaxSize()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(PanelShape)
                 .background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center,
         ) {
             AsyncImage(
                 model = imageUris[0],
-                contentDescription = null,
+                contentDescription = "Selected source image",
                 contentScale = ContentScale.Fit,
                 modifier = Modifier.fillMaxSize(),
             )
@@ -103,13 +104,13 @@ fun ImageHero(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(PanelShape)
                     .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center,
             ) {
                 AsyncImage(
                     model = imageUris[0],
-                    contentDescription = null,
+                    contentDescription = "Primary selected source image",
                     contentScale = ContentScale.Fit,
                     modifier = Modifier.fillMaxSize(),
                 )
@@ -127,7 +128,7 @@ private fun EmptyHero(
     onPickRecent: (Int) -> Unit,
 ) {
     Surface(
-        shape = RoundedCornerShape(12.dp),
+        shape = PanelShape,
         color = MaterialTheme.colorScheme.surfaceVariant,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         modifier = Modifier
@@ -149,9 +150,14 @@ private fun EmptyHero(
             )
             Spacer(Modifier.heightIn(min = 8.dp))
             Text(
-                text = "Tap to add a photo",
+                text = "Add a source image",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = "Pick from gallery, capture a new photo, or reuse a recent input.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.heightIn(min = 4.dp))
             Row(
@@ -294,7 +300,7 @@ private fun RecentInputThumbnail(
     val shape = RoundedCornerShape(cornerRadius.dp)
     AsyncImage(
         model = model,
-        contentDescription = "Recent upload",
+        contentDescription = if (selected) "Selected recent source image" else "Recent source image",
         contentScale = ContentScale.Crop,
         modifier = Modifier
             .size(size.dp)
@@ -330,7 +336,7 @@ private fun ImageThumb(uri: Uri, onRemove: () -> Unit) {
     Box(modifier = Modifier.size(96.dp)) {
         AsyncImage(
             model = uri,
-            contentDescription = null,
+            contentDescription = "Selected source image thumbnail",
             contentScale = ContentScale.Crop,
             modifier = Modifier
                 .fillMaxSize()
@@ -377,7 +383,7 @@ private fun AddMoreTile(onClick: () -> Unit) {
                     tint = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    text = "Add more",
+                    text = "Add",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurface,
                 )

@@ -49,6 +49,10 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import coil3.compose.AsyncImage
 import dev.zun.flux.data.api.effectivePromptId
 import dev.zun.flux.data.repo.JobRepository
+import dev.zun.flux.ui.common.LoadingScrim
+import dev.zun.flux.ui.common.PanelShape
+import dev.zun.flux.ui.common.StatusPill
+import dev.zun.flux.ui.common.StatusTone
 import dev.zun.flux.ui.theme.tabular
 import dev.zun.flux.util.resolvePromptLabel
 
@@ -118,16 +122,16 @@ fun ProgressScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(200.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(PanelShape)
                         .background(Color.Black),
                     contentAlignment = Alignment.Center,
                 ) {
                     AsyncImage(
                         model = inputModel,
-                        contentDescription = null,
+                        contentDescription = "Source image being generated",
                         modifier = Modifier.fillMaxSize().alpha(0.6f),
                     )
-                    CircularProgressIndicator(color = Color.White)
+                    LoadingScrim(modifier = Modifier.fillMaxSize())
                 }
 
                 // Status info
@@ -136,16 +140,9 @@ fun ProgressScreen(
                         PollState.Starting -> Text("Starting…", style = MaterialTheme.typography.titleMedium)
 
                         is PollState.Running -> {
-                            AssistChip(
-                                onClick = {},
-                                label = { Text(s.dto.status.replaceFirstChar { it.uppercase() }) },
-                                leadingIcon = {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(8.dp)
-                                            .background(Color(0xFF1D9E75), CircleShape),
-                                    )
-                                },
+                            StatusPill(
+                                label = s.dto.status.replaceFirstChar { it.uppercase() },
+                                tone = StatusTone.Success,
                             )
                             val pct = s.dto.progress?.let { (it * 100).toInt() }
                             if (pct != null) {

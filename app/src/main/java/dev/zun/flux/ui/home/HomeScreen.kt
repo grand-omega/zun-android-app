@@ -72,6 +72,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import dev.zun.flux.FluxApp
 import dev.zun.flux.data.api.PromptDto
 import dev.zun.flux.data.repo.JobRepository
+import dev.zun.flux.ui.common.ControlShape
 import dev.zun.flux.util.cacheInputLocally
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -583,6 +584,18 @@ private fun Composer(
             Text(submitButtonLabel(state, imageCount))
         }
 
+        if (!canSubmit && state !is SubmitState.InFlight) {
+            Text(
+                text = when {
+                    imageCount == 0 -> "Add a source image to generate."
+                    selectedLabel == null -> "Choose a prompt to generate."
+                    else -> "Finish the prompt before generating."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
         val failure = state as? SubmitState.Failed
         if (failure != null) {
             Text("Submit failed: ${failure.message}", color = MaterialTheme.colorScheme.error)
@@ -597,7 +610,7 @@ private fun PromptStrip(
     onClick: () -> Unit,
 ) {
     Surface(
-        shape = RoundedCornerShape(8.dp),
+        shape = ControlShape,
         color = MaterialTheme.colorScheme.surfaceVariant,
         modifier = Modifier
             .fillMaxWidth()

@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.ImageNotSupported
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -42,6 +43,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -74,6 +76,8 @@ import dev.zun.flux.data.api.PromptDto
 import dev.zun.flux.data.api.effectivePromptId
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.data.repo.OfflineImageAvailability
+import dev.zun.flux.ui.common.ActionBarSurface
+import dev.zun.flux.ui.common.MissingImageState
 import dev.zun.flux.util.resolvePromptLabel
 import dev.zun.flux.util.saveToPictures
 import kotlinx.coroutines.Dispatchers
@@ -110,6 +114,7 @@ fun PhotoViewerScreen(
     var zoomedPage by remember { mutableStateOf<String?>(null) }
     var selectingInput by remember { mutableStateOf(false) }
     var viewerNotice by remember { mutableStateOf<String?>(null) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
     val pendingUndo by viewModel.pendingUndo.collectAsState()
 
     val context = LocalContext.current
@@ -203,9 +208,7 @@ fun PhotoViewerScreen(
                     },
                     onDetails = { showDetails = true },
                     onDelete = {
-                        val job = currentJob ?: return@ViewerActionBar
-                        viewModel.deleteJob(job.id)
-                        if (jobs.size <= 1) onBack()
+                        showDeleteConfirm = true
                     },
                 )
             }
@@ -277,6 +280,33 @@ fun PhotoViewerScreen(
                 }
             }
         }
+    }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Delete generation?") },
+            text = { Text("This removes the generation from FluxEdit history. You can undo from the snackbar.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val job = currentJob
+                        showDeleteConfirm = false
+                        if (job != null) {
+                            viewModel.deleteJob(job.id)
+                            if (jobs.size <= 1) onBack()
+                        }
+                    },
+                ) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) {
+                    Text("Cancel")
+                }
+            },
+        )
     }
 }
 
@@ -396,24 +426,11 @@ private fun ZoomableImage(
 
 @Composable
 private fun MissingViewerImage() {
-    Column(
+    MissingImageState(
         modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Icon(
-            imageVector = Icons.Default.ImageNotSupported,
-            contentDescription = null,
-            tint = Color.White.copy(alpha = 0.7f),
-            modifier = Modifier.size(48.dp),
-        )
-        Text(
-            text = "Image unavailable offline",
-            color = Color.White.copy(alpha = 0.8f),
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(top = 12.dp),
-        )
-    }
+        label = "Image unavailable offline",
+        dark = true,
+    )
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -505,46 +522,35 @@ private fun ViewerActionBar(
     onDetails: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    Surface(
-        color = Color.Black.copy(alpha = 0.55f),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (hasInput) {
-                ActionIcon(
-                    icon = Icons.AutoMirrored.Filled.CompareArrows,
-                    label = "Compare",
-                    onClick = onCompare,
-                )
-                ActionIcon(
-                    icon = Icons.Default.Image,
-                    label = if (selectingInput) "Loading" else "Use input",
-                    onClick = onUseInput,
-                    enabled = !selectingInput,
-                )
-            }
+    ActionBarSurface {
+        if (hasInput) {
             ActionIcon(
-                icon = Icons.Default.Download,
-                label = "Save",
-                onClick = onSave,
+                icon = Icons.AutoMirrored.Filled.CompareArrows,
+                label = "Compare",
+                onClick = onCompare,
             )
             ActionIcon(
-                icon = Icons.Default.Info,
-                label = "Details",
-                onClick = onDetails,
-            )
-            ActionIcon(
-                icon = Icons.Default.Delete,
-                label = "Delete",
-                onClick = onDelete,
+                icon = Icons.Default.Image,
+                label = if (selectingInput) "Loading" else "Use input",
+                onClick = onUseInput,
+                enabled = !selectingInput,
             )
         }
+        ActionIcon(
+            icon = Icons.Default.Download,
+            label = "Save",
+            onClick = onSave,
+        )
+        ActionIcon(
+            icon = Icons.Default.Info,
+            label = "Details",
+            onClick = onDetails,
+        )
+        ActionIcon(
+            icon = Icons.Default.Delete,
+            label = "Delete",
+            onClick = onDelete,
+        )
     }
 }
 

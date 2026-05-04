@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -48,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import dev.zun.flux.ui.common.EmptyState
 import java.io.File
 
 @Composable
@@ -76,9 +78,16 @@ fun CameraScreen(
         CameraContent(onCaptured = onCaptured, onBack = onBack)
     } else {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Button(onClick = { launcher.launch(Manifest.permission.CAMERA) }) {
-                Text("Grant camera permission")
-            }
+            EmptyState(
+                icon = Icons.Default.PhotoCamera,
+                title = "Camera access needed",
+                message = "Allow camera access to capture a new source image.",
+                action = {
+                    Button(onClick = { launcher.launch(Manifest.permission.CAMERA) }) {
+                        Text("Allow camera")
+                    }
+                },
+            )
         }
     }
 }

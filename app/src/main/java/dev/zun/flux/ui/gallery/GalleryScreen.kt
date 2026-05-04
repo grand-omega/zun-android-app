@@ -83,6 +83,8 @@ import dev.zun.flux.data.api.PromptDto
 import dev.zun.flux.data.api.effectivePromptId
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.data.repo.OfflineImageAvailability
+import dev.zun.flux.ui.common.EmptyState
+import dev.zun.flux.ui.common.MissingImageState
 import dev.zun.flux.util.formatTimestamp
 import dev.zun.flux.util.resolvePromptLabel
 
@@ -269,23 +271,28 @@ fun GalleryScreen(
                         if (isLoading) {
                             CircularProgressIndicator()
                         } else {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                Text(if (tagFilter != TagFilter.All) "No generations match this tag" else "No generations yet")
-                                TextButton(
-                                    onClick = {
-                                        if (tagFilter != TagFilter.All) {
-                                            viewModel.setTagFilter(TagFilter.All)
-                                        } else {
-                                            onBack()
-                                        }
-                                    },
-                                ) {
-                                    Text(if (tagFilter != TagFilter.All) "Clear filter" else "Create an edit")
-                                }
-                            }
+                            EmptyState(
+                                icon = Icons.Default.ImageNotSupported,
+                                title = if (tagFilter != TagFilter.All) "No matching generations" else "No generations yet",
+                                message = if (tagFilter != TagFilter.All) {
+                                    "Clear the active filter to return to the full gallery."
+                                } else {
+                                    "Create an edit from Home and completed results will appear here."
+                                },
+                                action = {
+                                    TextButton(
+                                        onClick = {
+                                            if (tagFilter != TagFilter.All) {
+                                                viewModel.setTagFilter(TagFilter.All)
+                                            } else {
+                                                onBack()
+                                            }
+                                        },
+                                    ) {
+                                        Text(if (tagFilter != TagFilter.All) "Clear filter" else "Create an edit")
+                                    }
+                                },
+                            )
                         }
                     }
                 } else {
@@ -530,6 +537,7 @@ private fun JobThumbnail(
                     text = resolvePromptLabel(prompts, job.effectivePromptId, job.prompt_text),
                     style = MaterialTheme.typography.labelSmall,
                     color = Color.White,
+                    maxLines = 2,
                     modifier =
                     Modifier
                         .align(Alignment.BottomStart)
@@ -555,7 +563,7 @@ private fun JobThumbnail(
                 ) {
                     Icon(
                         imageVector = Icons.Default.CheckCircle,
-                        contentDescription = null,
+                        contentDescription = "Selected",
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.fillMaxSize(),
                     )
@@ -588,11 +596,6 @@ private fun MissingThumbnail() {
             .background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            imageVector = Icons.Default.ImageNotSupported,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
-            modifier = Modifier.size(32.dp),
-        )
+        MissingImageState(label = "Unavailable", modifier = Modifier.fillMaxSize())
     }
 }

@@ -2,10 +2,8 @@ package dev.zun.flux.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -35,6 +33,10 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import dev.zun.flux.FluxApp
 import dev.zun.flux.data.repo.ConnectionMode
+import dev.zun.flux.ui.common.ScreenPadding
+import dev.zun.flux.ui.common.SettingsGroup
+import dev.zun.flux.ui.common.StatusPill
+import dev.zun.flux.ui.common.StatusTone
 import dev.zun.flux.util.normalizeOptionalServerUrl
 import kotlinx.coroutines.launch
 import java.io.IOException
@@ -63,92 +65,84 @@ fun SetupScreen(
                 .fillMaxSize()
                 .padding(inner)
                 .verticalScroll(rememberScrollState())
-                .padding(24.dp),
+                .padding(ScreenPadding),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
+            verticalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterVertically),
         ) {
             Text(
-                text = "Connect to your Workstation",
+                text = "Connect FluxEdit",
                 style = MaterialTheme.typography.headlineSmall,
-                modifier = Modifier.padding(bottom = 16.dp),
             )
 
             Text(
-                text = "Enter your server details to start editing images.",
+                text = "Enter at least one private server URL and the API token used by Project ZUN.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.secondary,
-                modifier = Modifier.padding(bottom = 32.dp),
             )
 
-            OutlinedTextField(
-                value = lanUrl,
-                onValueChange = {
-                    lanUrl = it
-                    error = null
-                },
-                label = { Text("LAN URL (used at home)") },
-                placeholder = { Text("http://192.168.1.15:8080") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                isError = error != null,
-            )
-
-            Spacer(Modifier.height(16.dp))
-
-            OutlinedTextField(
-                value = tailscaleUrl,
-                onValueChange = {
-                    tailscaleUrl = it
-                    error = null
-                },
-                label = { Text("Tailscale URL (used away)") },
-                placeholder = { Text("http://100.x.y.z:8080") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                isError = error != null,
-            )
-
-            Spacer(Modifier.height(16.dp))
-
-            OutlinedTextField(
-                value = token,
-                onValueChange = {
-                    token = it
-                    error = null
-                },
-                label = { Text("API Token") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                isError = error != null,
-                visualTransformation = if (tokenVisible) {
-                    VisualTransformation.None
-                } else {
-                    PasswordVisualTransformation()
-                },
-                trailingIcon = {
-                    IconButton(onClick = { tokenVisible = !tokenVisible }) {
-                        Icon(
-                            imageVector = if (tokenVisible) {
-                                Icons.Default.VisibilityOff
-                            } else {
-                                Icons.Default.Visibility
-                            },
-                            contentDescription = if (tokenVisible) "Hide token" else "Show token",
-                        )
-                    }
-                },
-            )
-
-            if (error != null) {
-                Text(
-                    text = error!!,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.padding(top = 8.dp).align(Alignment.Start),
+            SettingsGroup(
+                title = "Server",
+                detail = "Auto mode uses LAN first, then Tailscale when LAN is unavailable.",
+            ) {
+                OutlinedTextField(
+                    value = lanUrl,
+                    onValueChange = {
+                        lanUrl = it
+                        error = null
+                    },
+                    label = { Text("LAN URL") },
+                    placeholder = { Text("http://192.168.1.15:8080") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    isError = error != null,
                 )
-            }
 
-            Spacer(Modifier.height(32.dp))
+                OutlinedTextField(
+                    value = tailscaleUrl,
+                    onValueChange = {
+                        tailscaleUrl = it
+                        error = null
+                    },
+                    label = { Text("Tailscale URL") },
+                    placeholder = { Text("https://zun.tailnet-name.ts.net") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    isError = error != null,
+                )
+
+                OutlinedTextField(
+                    value = token,
+                    onValueChange = {
+                        token = it
+                        error = null
+                    },
+                    label = { Text("API Token") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    isError = error != null,
+                    visualTransformation = if (tokenVisible) {
+                        VisualTransformation.None
+                    } else {
+                        PasswordVisualTransformation()
+                    },
+                    trailingIcon = {
+                        IconButton(onClick = { tokenVisible = !tokenVisible }) {
+                            Icon(
+                                imageVector = if (tokenVisible) {
+                                    Icons.Default.VisibilityOff
+                                } else {
+                                    Icons.Default.Visibility
+                                },
+                                contentDescription = if (tokenVisible) "Hide token" else "Show token",
+                            )
+                        }
+                    },
+                )
+
+                error?.let {
+                    StatusPill(label = it, tone = StatusTone.Error)
+                }
+            }
 
             Button(
                 onClick = {
@@ -203,7 +197,7 @@ fun SetupScreen(
             ) {
                 if (isTesting) {
                     CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp), color = MaterialTheme.colorScheme.onPrimary)
-                    Text("Testing...")
+                    Text("Testing connection...")
                 } else {
                     Text("Connect")
                 }
