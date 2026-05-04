@@ -5,6 +5,7 @@
 package dev.zun.flux.data.repo
 
 import android.content.Context
+import androidx.core.content.edit
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 
@@ -35,7 +36,7 @@ class SettingsManager(context: Context) {
 
     var lockoutDurationMs: Long
         get() = prefs.getLong(KEY_LOCKOUT_DURATION, 300_000L)
-        set(value) = prefs.edit().putLong(KEY_LOCKOUT_DURATION, value).apply()
+        set(value) = prefs.edit { putLong(KEY_LOCKOUT_DURATION, value) }
 
     /**
      * The currently active base URL — written by NetworkResolver after probing.
@@ -44,15 +45,15 @@ class SettingsManager(context: Context) {
      */
     var serverUrl: String?
         get() = prefs.getString(KEY_SERVER_URL, null)
-        set(value) = prefs.edit().putString(KEY_SERVER_URL, value).apply()
+        set(value) = prefs.edit { putString(KEY_SERVER_URL, value) }
 
     var activeRoute: ActiveRoute
         get() = enumPref(KEY_ACTIVE_ROUTE, ActiveRoute.NONE)
-        set(value) = prefs.edit().putString(KEY_ACTIVE_ROUTE, value.name).apply()
+        set(value) = prefs.edit { putString(KEY_ACTIVE_ROUTE, value.name) }
 
     var connectionMode: ConnectionMode
         get() = enumPref(KEY_CONNECTION_MODE, ConnectionMode.AUTO)
-        set(value) = prefs.edit().putString(KEY_CONNECTION_MODE, value.name).apply()
+        set(value) = prefs.edit { putString(KEY_CONNECTION_MODE, value.name) }
 
     var lanUrl: String?
         get() {
@@ -61,19 +62,19 @@ class SettingsManager(context: Context) {
             // One-time migration: legacy single-URL installs become LAN-only.
             val legacy = prefs.getString(KEY_SERVER_URL, null)
             if (!legacy.isNullOrBlank()) {
-                prefs.edit().putString(KEY_LAN_URL, legacy).apply()
+                prefs.edit { putString(KEY_LAN_URL, legacy) }
             }
             return prefs.getString(KEY_LAN_URL, null)
         }
-        set(value) = prefs.edit().putString(KEY_LAN_URL, value).apply()
+        set(value) = prefs.edit { putString(KEY_LAN_URL, value) }
 
     var tailscaleUrl: String?
         get() = prefs.getString(KEY_TAILSCALE_URL, null)
-        set(value) = prefs.edit().putString(KEY_TAILSCALE_URL, value).apply()
+        set(value) = prefs.edit { putString(KEY_TAILSCALE_URL, value) }
 
     var apiToken: String?
         get() = prefs.getString(KEY_API_TOKEN, null)
-        set(value) = prefs.edit().putString(KEY_API_TOKEN, value).apply()
+        set(value) = prefs.edit { putString(KEY_API_TOKEN, value) }
 
     /**
      * Wall-clock millis of the most recent successful biometric unlock. Persisted so
@@ -83,7 +84,7 @@ class SettingsManager(context: Context) {
      */
     var lastAuthTimestamp: Long
         get() = prefs.getLong(KEY_LAST_AUTH_TIMESTAMP, 0L)
-        set(value) = prefs.edit().putLong(KEY_LAST_AUTH_TIMESTAMP, value).apply()
+        set(value) = prefs.edit { putLong(KEY_LAST_AUTH_TIMESTAMP, value) }
 
     val isConfigured: Boolean
         get() = (!lanUrl.isNullOrBlank() || !tailscaleUrl.isNullOrBlank()) && !apiToken.isNullOrBlank()

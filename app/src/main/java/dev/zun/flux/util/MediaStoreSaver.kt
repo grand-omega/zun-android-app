@@ -3,7 +3,6 @@ package dev.zun.flux.util
 import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
-import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import dev.zun.flux.FluxApp
@@ -29,13 +28,11 @@ suspend fun saveToPictures(
         ContentValues().apply {
             put(MediaStore.Images.Media.DISPLAY_NAME, displayName)
             put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                put(
-                    MediaStore.Images.Media.RELATIVE_PATH,
-                    Environment.DIRECTORY_PICTURES + "/FluxEdit",
-                )
-                put(MediaStore.Images.Media.IS_PENDING, 1)
-            }
+            put(
+                MediaStore.Images.Media.RELATIVE_PATH,
+                Environment.DIRECTORY_PICTURES + "/FluxEdit",
+            )
+            put(MediaStore.Images.Media.IS_PENDING, 1)
         }
     val dest =
         resolver.insert(
@@ -74,11 +71,9 @@ suspend fun saveToPictures(
             }
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            values.clear()
-            values.put(MediaStore.Images.Media.IS_PENDING, 0)
-            resolver.update(dest, values, null, null)
-        }
+        values.clear()
+        values.put(MediaStore.Images.Media.IS_PENDING, 0)
+        resolver.update(dest, values, null, null)
         dest
     } catch (t: Throwable) {
         resolver.delete(dest, null, null)
