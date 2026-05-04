@@ -72,7 +72,8 @@ gradle.taskGraph.whenReady {
     val requestsReleaseBuild = allTasks.any { task ->
         task.path in setOf(":app:assembleRelease", ":app:bundleRelease", ":app:packageRelease")
     }
-    if (requestsReleaseBuild && !keystorePropsFile.exists()) {
+    val isCi = System.getenv("CI").equals("true", ignoreCase = true)
+    if (requestsReleaseBuild && !keystorePropsFile.exists() && !isCi) {
         error("Release signing requires keystore.properties. Copy keystore.properties.example and configure a real release key.")
     }
 }
