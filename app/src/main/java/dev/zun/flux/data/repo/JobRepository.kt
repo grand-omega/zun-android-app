@@ -24,6 +24,17 @@ sealed interface ConnectionDiagnosis {
     data class Unknown(val message: String) : ConnectionDiagnosis
 }
 
+data class OfflineImageAvailability(
+    val thumbCached: Boolean,
+    val previewCached: Boolean,
+    val resultCached: Boolean,
+)
+
+data class OfflineCacheStats(
+    val bytes: Long,
+    val fileCount: Int,
+)
+
 /**
  * Single seam between the UI and the backend. UI layers depend on this
  * interface; implementations are swapped in [dev.zun.flux.FluxApp].
@@ -126,4 +137,13 @@ interface JobRepository {
 
     /** Original PNG. Use only for save-to-gallery / share / explicit zoom. */
     fun resultModel(jobId: String): Any?
+
+    /** Current private offline image cache state for a job. */
+    fun offlineAvailability(jobId: String): OfflineImageAvailability
+
+    /** Current private offline image cache size. */
+    fun offlineCacheStats(): OfflineCacheStats
+
+    /** Drops cached generated images. Server history remains untouched. */
+    fun clearOfflineImageCache()
 }

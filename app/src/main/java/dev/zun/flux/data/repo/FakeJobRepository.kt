@@ -253,4 +253,14 @@ class FakeJobRepository(
     override fun previewModel(jobId: String): Any? = entries[jobId]?.inputUri
 
     override fun resultModel(jobId: String): Any? = entries[jobId]?.inputUri
+
+    override fun offlineAvailability(jobId: String): OfflineImageAvailability = OfflineImageAvailability(
+        thumbCached = entries.containsKey(jobId),
+        previewCached = entries.containsKey(jobId),
+        resultCached = entries.containsKey(jobId),
+    )
+
+    override fun offlineCacheStats(): OfflineCacheStats = OfflineCacheStats(bytes = 0L, fileCount = 0)
+
+    override fun clearOfflineImageCache() = Unit
 }

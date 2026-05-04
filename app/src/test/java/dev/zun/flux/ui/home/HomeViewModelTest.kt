@@ -9,6 +9,8 @@ import dev.zun.flux.data.api.JobSummaryDto
 import dev.zun.flux.data.api.PromptDto
 import dev.zun.flux.data.repo.ConnectionDiagnosis
 import dev.zun.flux.data.repo.JobRepository
+import dev.zun.flux.data.repo.OfflineCacheStats
+import dev.zun.flux.data.repo.OfflineImageAvailability
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -217,4 +219,14 @@ private class RecordingRepository : JobRepository {
     override fun previewModel(jobId: String): Any? = null
 
     override fun resultModel(jobId: String): Any? = null
+
+    override fun offlineAvailability(jobId: String): OfflineImageAvailability = OfflineImageAvailability(
+        thumbCached = false,
+        previewCached = false,
+        resultCached = false,
+    )
+
+    override fun offlineCacheStats(): OfflineCacheStats = OfflineCacheStats(bytes = 0L, fileCount = 0)
+
+    override fun clearOfflineImageCache() = Unit
 }

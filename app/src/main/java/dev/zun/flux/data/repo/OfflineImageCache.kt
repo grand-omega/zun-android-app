@@ -30,6 +30,22 @@ class OfflineImageCache internal constructor(
 
     private val semaphore = Semaphore(PREFETCH_CONCURRENCY)
 
+    fun availability(jobId: String): OfflineImageAvailability = OfflineImageAvailability(
+        thumbCached = localUri(jobId, Kind.Thumb) != null,
+        previewCached = localUri(jobId, Kind.Preview) != null,
+        resultCached = localUri(jobId, Kind.Result) != null,
+    )
+
+    fun stats(): OfflineCacheStats {
+        val files = rootDir.walkTopDown()
+            .filter { it.isFile }
+            .toList()
+        return OfflineCacheStats(
+            bytes = files.sumOf { it.length() },
+            fileCount = files.size,
+        )
+    }
+
     fun localUri(jobId: String, kind: Kind): Uri? {
         val file = cacheFile(jobId, kind)
         return if (file.exists() && file.length() > 0L) Uri.fromFile(file) else null
@@ -74,6 +90,10 @@ class OfflineImageCache internal constructor(
 
     fun delete(jobId: String) {
         jobDir(jobId).deleteRecursively()
+    }
+
+    fun clear() {
+        rootDir.deleteRecursively()
     }
 
     private fun prune() {
