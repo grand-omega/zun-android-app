@@ -43,40 +43,45 @@ suspend fun saveToPictures(
             values,
         ) ?: error("MediaStore insert returned null")
 
-    resolver.openOutputStream(dest).use { out ->
-        requireNotNull(out) { "Could not open output stream for $dest" }
-        when (source) {
-            is Uri -> {
-                resolver.openInputStream(source).use { input ->
-                    requireNotNull(input) { "Could not read source $source" }
-                    input.copyTo(out)
-                }
-            }
-
-            is String -> {
-                if (okHttpClient != null) {
-                    val request = Request.Builder().url(source).build()
-                    okHttpClient.newCall(request).execute().use { response ->
-                        if (!response.isSuccessful) error("Failed to download image: ${response.code}")
-                        response.body.byteStream().use { input ->
-                            input.copyTo(out)
-                        }
-                    }
-                } else {
-                    URL(source).openStream().use { input ->
+    try {
+        resolver.openOutputStream(dest).use { out ->
+            requireNotNull(out) { "Could not open output stream for $dest" }
+            when (source) {
+                is Uri -> {
+                    resolver.openInputStream(source).use { input ->
+                        requireNotNull(input) { "Could not read source $source" }
                         input.copyTo(out)
                     }
                 }
+
+                is String -> {
+                    if (okHttpClient != null) {
+                        val request = Request.Builder().url(source).build()
+                        okHttpClient.newCall(request).execute().use { response ->
+                            if (!response.isSuccessful) error("Failed to download image: ${response.code}")
+                            response.body.byteStream().use { input ->
+                                input.copyTo(out)
+                            }
+                        }
+                    } else {
+                        URL(source).openStream().use { input ->
+                            input.copyTo(out)
+                        }
+                    }
+                }
+
+                else -> error("Unsupported source type: ${source::class.java}")
             }
-
-            else -> error("Unsupported source type: ${source::class.java}")
         }
-    }
 
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-        values.clear()
-        values.put(MediaStore.Images.Media.IS_PENDING, 0)
-        resolver.update(dest, values, null, null)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            values.clear()
+            values.put(MediaStore.Images.Media.IS_PENDING, 0)
+            resolver.update(dest, values, null, null)
+        }
+        dest
+    } catch (t: Throwable) {
+        resolver.delete(dest, null, null)
+        throw t
     }
-    dest
 }

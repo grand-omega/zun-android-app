@@ -25,6 +25,7 @@ class OfflineImageCache internal constructor(
     enum class Kind(val fileName: String) {
         Thumb("thumb.jpg"),
         Preview("preview.jpg"),
+        Result("result.jpg"),
     }
 
     private val semaphore = Semaphore(PREFETCH_CONCURRENCY)

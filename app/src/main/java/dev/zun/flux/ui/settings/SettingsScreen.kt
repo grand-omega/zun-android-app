@@ -15,6 +15,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -211,8 +212,17 @@ fun SettingsScreen(
                 Button(
                     onClick = viewModel::connect,
                     modifier = Modifier.fillMaxWidth(),
+                    enabled = !connectionDraft.isConnecting,
                 ) {
-                    Text("Connect")
+                    if (connectionDraft.isConnecting) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.padding(end = 8.dp),
+                            color = MaterialTheme.colorScheme.onPrimary,
+                        )
+                        Text("Testing...")
+                    } else {
+                        Text("Connect")
+                    }
                 }
 
                 Text(

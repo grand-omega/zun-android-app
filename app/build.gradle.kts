@@ -8,6 +8,8 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+val keystorePropsFile = rootProject.file("keystore.properties")
+
 android {
     namespace = "dev.zun.flux"
     compileSdk = 36
@@ -21,7 +23,6 @@ android {
         versionName = "1.0.0"
     }
 
-    val keystorePropsFile = rootProject.file("keystore.properties")
     val keystoreProps = Properties().apply {
         if (keystorePropsFile.exists()) keystorePropsFile.inputStream().use { load(it) }
     }
@@ -42,7 +43,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
+            signingConfigs.findByName("release")?.let { signingConfig = it }
         }
     }
 
@@ -64,6 +65,15 @@ android {
 
     lint {
         baseline = file("lint-baseline.xml")
+    }
+}
+
+gradle.taskGraph.whenReady {
+    val requestsReleaseBuild = allTasks.any { task ->
+        task.path in setOf(":app:assembleRelease", ":app:bundleRelease", ":app:packageRelease")
+    }
+    if (requestsReleaseBuild && !keystorePropsFile.exists()) {
+        error("Release signing requires keystore.properties. Copy keystore.properties.example and configure a real release key.")
     }
 }
 

@@ -17,6 +17,7 @@ data class ConnectionDraftState(
     val token: String = "",
     val error: String? = null,
     val status: String = "Current settings are active.",
+    val isConnecting: Boolean = false,
 )
 
 class SettingsViewModel(
@@ -54,21 +55,41 @@ class SettingsViewModel(
                 "Enter an API token"
             }
 
-            settings.lanUrl = lan
-            settings.tailscaleUrl = tailscale
-            settings.connectionMode = draft.connectionMode
-            settings.apiToken = draft.token.trim()
-            updateDraft { copy(error = null, status = "Connecting...") }
+            val oldLan = settings.lanUrl
+            val oldTailscale = settings.tailscaleUrl
+            val oldMode = settings.connectionMode
+            val oldToken = settings.apiToken
+            val oldServerUrl = settings.serverUrl
+            val oldActiveRoute = settings.activeRoute
+
+            updateDraft { copy(error = null, status = "Connecting...", isConnecting = true) }
 
             viewModelScope.launch {
                 try {
+                    settings.lanUrl = lan
+                    settings.tailscaleUrl = tailscale
+                    settings.connectionMode = draft.connectionMode
+                    settings.apiToken = draft.token.trim()
                     app.networkResolver.refreshNow()
-                    updateDraft { copy(status = "Connection settings active.") }
+                    app.repository.listPrompts()
+                    updateDraft { copy(status = "Connection settings active.", isConnecting = false) }
                 } catch (t: Throwable) {
+                    settings.lanUrl = oldLan
+                    settings.tailscaleUrl = oldTailscale
+                    settings.connectionMode = oldMode
+                    settings.apiToken = oldToken
+                    settings.serverUrl = oldServerUrl
+                    settings.activeRoute = oldActiveRoute
+                    app.rebuildRepository()
                     updateDraft {
                         copy(
-                            error = t.message ?: "Reconnect failed",
-                            status = "Saved, reconnect failed",
+                            error = if (t is retrofit2.HttpException && t.code() == 401) {
+                                "Invalid API Token"
+                            } else {
+                                t.message ?: "Reconnect failed"
+                            },
+                            status = "Not saved",
+                            isConnecting = false,
                         )
                     }
                 }
@@ -78,6 +99,7 @@ class SettingsViewModel(
                 copy(
                     error = t.message ?: "Invalid connection settings",
                     status = "Not saved",
+                    isConnecting = false,
                 )
             }
         }

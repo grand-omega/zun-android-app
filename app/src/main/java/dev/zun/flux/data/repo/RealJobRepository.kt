@@ -119,13 +119,31 @@ class RealJobRepository(
     }
 
     override suspend fun restoreJob(jobId: String) {
-        localDeletedIds.update { it - jobId }
-        dao.deletePendingDelete(jobId)
-        runCatching {
-            api.restoreJob(jobId)
-            // Repopulate local copy from server.
-            getJob(jobId)
+        val wasPendingLocalDelete = dao.isPendingDelete(jobId)
+        if (wasPendingLocalDelete) {
+            dao.deletePendingDelete(jobId)
+            localDeletedIds.update { it - jobId }
+            try {
+                // If the worker has not flushed DELETE yet, the server still has
+                // the job. Fetching it is enough to repopulate Room.
+                getJob(jobId)
+                return
+            } catch (t: Throwable) {
+                runCatching {
+                    api.restoreJob(jobId)
+                    getJob(jobId)
+                }.onSuccess {
+                    return
+                }
+                localDeletedIds.update { it + jobId }
+                dao.insertPendingDelete(PendingDeleteEntity(jobId = jobId, createdAt = System.currentTimeMillis()))
+                throw t
+            }
         }
+        api.restoreJob(jobId)
+        localDeletedIds.update { it - jobId }
+        // Repopulate local copy from server.
+        getJob(jobId)
     }
 
     override suspend fun cancelJob(jobId: String) {
@@ -203,7 +221,8 @@ class RealJobRepository(
     override fun previewModel(jobId: String): Any? = offlineImageCache.localUri(jobId, OfflineImageCache.Kind.Preview)
         ?: buildUrlOrNull("/api/v1/jobs/$jobId/preview")
 
-    override fun resultModel(jobId: String): Any? = buildUrlOrNull("/api/v1/jobs/$jobId/result")
+    override fun resultModel(jobId: String): Any? = offlineImageCache.localUri(jobId, OfflineImageCache.Kind.Result)
+        ?: buildUrlOrNull("/api/v1/jobs/$jobId/result")
 
     private fun buildUrlOrNull(path: String): String? = settingsManager.serverUrl?.takeUnless { it.isBlank() }?.let { "$it$path" }
 
@@ -221,6 +240,7 @@ class RealJobRepository(
     private fun prefetchJobImages(jobId: String) {
         val thumbUrl = buildUrlOrNull("/api/v1/jobs/$jobId/thumb")
         val previewUrl = buildUrlOrNull("/api/v1/jobs/$jobId/preview")
+        val resultUrl = buildUrlOrNull("/api/v1/jobs/$jobId/result")
         if (thumbUrl != null) {
             cacheScope.launch {
                 offlineImageCache.prefetch(jobId, OfflineImageCache.Kind.Thumb, thumbUrl)
@@ -229,6 +249,11 @@ class RealJobRepository(
         if (previewUrl != null) {
             cacheScope.launch {
                 offlineImageCache.prefetch(jobId, OfflineImageCache.Kind.Preview, previewUrl)
+            }
+        }
+        if (resultUrl != null) {
+            cacheScope.launch {
+                offlineImageCache.prefetch(jobId, OfflineImageCache.Kind.Result, resultUrl)
             }
         }
     }
