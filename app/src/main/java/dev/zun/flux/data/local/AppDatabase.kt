@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities = [JobEntity::class, PendingDeleteEntity::class], version = 4, exportSchema = false)
+@Database(entities = [JobEntity::class, PendingDeleteEntity::class], version = 4, exportSchema = true)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun jobDao(): JobDao
 
@@ -26,9 +26,9 @@ abstract class AppDatabase : RoomDatabase() {
             createdInstance
         }
 
-        private val MIGRATION_1_2 = schemaMigration(1, 2)
-        private val MIGRATION_2_3 = schemaMigration(2, 3)
-        private val MIGRATION_3_4 = schemaMigration(3, 4)
+        val MIGRATION_1_2 = schemaMigration(1, 2)
+        val MIGRATION_2_3 = schemaMigration(2, 3)
+        val MIGRATION_3_4 = schemaMigration(3, 4)
 
         private fun schemaMigration(startVersion: Int, endVersion: Int): Migration = object : Migration(startVersion, endVersion) {
             override fun migrate(db: SupportSQLiteDatabase) {
