@@ -154,11 +154,6 @@ private fun EmptyHero(
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface,
             )
-            Text(
-                text = "Pick from gallery, capture a new photo, or reuse a recent input.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
             Spacer(Modifier.heightIn(min = 4.dp))
             Row(
                 horizontalArrangement = Arrangement.spacedBy(16.dp),

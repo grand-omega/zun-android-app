@@ -8,7 +8,6 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.fragment.app.FragmentActivity
@@ -51,13 +50,11 @@ class MainActivity : FragmentActivity() {
             ZunFluxTheme {
                 val current = repoState
                 if (auth.isAuthed && current != null) {
-                    key(current.version) {
-                        AppNavHost(
-                            repository = current.repository,
-                            repositoryVersion = current.version,
-                            windowSizeClass = windowSizeClass,
-                        )
-                    }
+                    AppNavHost(
+                        repository = current.repository,
+                        repositoryVersion = current.version,
+                        windowSizeClass = windowSizeClass,
+                    )
                 } else {
                     LockScreen(
                         message = unlockMessage,
