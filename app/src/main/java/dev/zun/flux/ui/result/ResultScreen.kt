@@ -57,6 +57,7 @@ import coil3.compose.AsyncImage
 import dev.zun.flux.data.api.JobStatusDto
 import dev.zun.flux.data.api.effectivePromptId
 import dev.zun.flux.data.repo.JobRepository
+import dev.zun.flux.ui.common.ControlShape
 import dev.zun.flux.ui.gallery.BeforeAfterSlider
 import dev.zun.flux.ui.home.CUSTOM_PROMPT_ID
 import dev.zun.flux.ui.home.PromptLibrarySheet
@@ -97,6 +98,7 @@ fun ResultScreen(
     var regenerating by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
     var showDetails by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
     var showPromptSheet by remember { mutableStateOf(false) }
     var showPromptManageSheet by remember { mutableStateOf(false) }
     var showSavePromptDialog by remember { mutableStateOf(false) }
@@ -215,7 +217,7 @@ fun ResultScreen(
                             text = { Text("Delete") },
                             onClick = {
                                 showMenu = false
-                                deleteResult()
+                                showDeleteConfirm = true
                             },
                         )
                     }
@@ -382,6 +384,27 @@ fun ResultScreen(
         )
     }
 
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Delete generation?") },
+            text = { Text("This removes the generation from FluxEdit history and the server delete queue will sync in the background.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteConfirm = false
+                        deleteResult()
+                    },
+                ) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") }
+            },
+        )
+    }
+
     if (showPromptManageSheet) {
         PromptManageSheet(
             prompts = prompts,
@@ -491,7 +514,7 @@ private fun PromptStrip(
     editEnabled: Boolean,
 ) {
     Surface(
-        shape = RoundedCornerShape(8.dp),
+        shape = ControlShape,
         color = MaterialTheme.colorScheme.surfaceVariant,
         modifier = Modifier.fillMaxWidth(),
     ) {

@@ -4,17 +4,17 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import dev.zun.flux.ui.common.EmptyState
+import dev.zun.flux.ui.common.StatusPill
+import dev.zun.flux.ui.common.StatusTone
 
 @Composable
 fun LockScreen(
@@ -26,19 +26,13 @@ fun LockScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
     ) {
-        Icon(
-            Icons.Default.Lock,
-            contentDescription = null,
-            modifier = Modifier.size(64.dp),
-            tint = MaterialTheme.colorScheme.primary,
+        EmptyState(
+            icon = Icons.Default.Lock,
+            title = "FluxEdit is locked",
+            message = "Unlock to view private images, prompts, and server settings.",
         )
-        Text("FluxEdit is locked", style = MaterialTheme.typography.headlineSmall)
         message?.let {
-            Text(
-                text = it,
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodyMedium,
-            )
+            StatusPill(label = it, tone = StatusTone.Error)
         }
         Button(onClick = onUnlockClick) {
             Text("Unlock")

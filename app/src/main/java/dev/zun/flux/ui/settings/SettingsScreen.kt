@@ -14,10 +14,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -48,6 +48,10 @@ import dev.zun.flux.BuildConfig
 import dev.zun.flux.FluxApp
 import dev.zun.flux.data.repo.ActiveRoute
 import dev.zun.flux.data.repo.ConnectionMode
+import dev.zun.flux.ui.common.ScreenPadding
+import dev.zun.flux.ui.common.SettingsGroup
+import dev.zun.flux.ui.common.StatusPill
+import dev.zun.flux.ui.common.StatusTone
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,6 +70,7 @@ fun SettingsScreen(
     val offlineCache by viewModel.offlineCache.collectAsStateWithLifecycle()
 
     var tokenVisible by remember { mutableStateOf(false) }
+    var showClearCacheConfirm by remember { mutableStateOf(false) }
 
     val lockoutOptions = listOf(
         0L to "Always lock",
@@ -93,48 +98,47 @@ fun SettingsScreen(
                 .fillMaxSize()
                 .padding(inner)
                 .verticalScroll(rememberScrollState())
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp),
+                .padding(ScreenPadding),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            // Security Section
-            Text("Security", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-
-            Column(modifier = Modifier.selectableGroup()) {
-                Text("Lock app after backgrounding for:", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom = 8.dp))
-                lockoutOptions.forEach { (duration, label) ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .selectable(
+            SettingsGroup(
+                title = "Security",
+                detail = "Controls when FluxEdit asks for biometric or device unlock after backgrounding.",
+            ) {
+                Column(modifier = Modifier.selectableGroup()) {
+                    lockoutOptions.forEach { (duration, label) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .selectable(
+                                    selected = lockoutDuration == duration,
+                                    onClick = {
+                                        lockoutDuration = duration
+                                        settingsManager.lockoutDurationMs = duration
+                                    },
+                                    role = Role.RadioButton,
+                                )
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(
                                 selected = lockoutDuration == duration,
-                                onClick = {
-                                    lockoutDuration = duration
-                                    settingsManager.lockoutDurationMs = duration
-                                },
-                                role = Role.RadioButton,
+                                onClick = null,
                             )
-                            .padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        RadioButton(
-                            selected = lockoutDuration == duration,
-                            onClick = null,
-                        )
-                        Text(
-                            text = label,
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.padding(start = 16.dp),
-                        )
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.bodyLarge,
+                                modifier = Modifier.padding(start = 16.dp),
+                            )
+                        }
                     }
                 }
             }
 
-            HorizontalDivider()
-
-            // Connection Section
-            Text("Connection", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            SettingsGroup(
+                title = "Connection",
+                detail = "Changes are tested before replacing the active server route.",
+            ) {
                 Column(modifier = Modifier.selectableGroup()) {
                     Text("Mode", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom = 4.dp))
                     connectionModeOptions.forEach { (mode, label) ->
@@ -179,11 +183,7 @@ fun SettingsScreen(
 
                 val connectionError = connectionDraft.error
                 if (connectionError != null) {
-                    Text(
-                        text = connectionError,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.labelMedium,
-                    )
+                    StatusPill(label = connectionError, tone = StatusTone.Error)
                 }
 
                 OutlinedTextField(
@@ -221,31 +221,22 @@ fun SettingsScreen(
                             modifier = Modifier.padding(end = 8.dp),
                             color = MaterialTheme.colorScheme.onPrimary,
                         )
-                        Text("Testing...")
+                        Text("Testing connection...")
                     } else {
                         Text("Connect")
                     }
                 }
 
-                Text(
-                    text = connectionDraft.status,
-                    color = MaterialTheme.colorScheme.secondary,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
+                StatusPill(label = connectionDraft.status, tone = StatusTone.Neutral)
             }
 
-            HorizontalDivider()
-
-            Text("Offline Cache", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            SettingsGroup(
+                title = "Offline Cache",
+                detail = "Keeps recently viewed images usable when the server is unavailable.",
+            ) {
                 InfoRow("Cached Images", "${offlineCache.stats.fileCount} files")
                 InfoRow("Cache Size", formatBytes(offlineCache.stats.bytes))
-                Text(
-                    text = offlineCache.status,
-                    color = MaterialTheme.colorScheme.secondary,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
+                StatusPill(label = offlineCache.status, tone = StatusTone.Neutral)
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                     Button(
                         onClick = viewModel::refreshOfflineCache,
@@ -263,7 +254,7 @@ fun SettingsScreen(
                         }
                     }
                     OutlinedButton(
-                        onClick = viewModel::clearOfflineCache,
+                        onClick = { showClearCacheConfirm = true },
                         modifier = Modifier.weight(1f),
                     ) {
                         Text("Clear")
@@ -271,12 +262,7 @@ fun SettingsScreen(
                 }
             }
 
-            HorizontalDivider()
-
-            // App Info Section
-            Text("App Info", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            SettingsGroup(title = "App Info") {
                 InfoRow("Version", BuildConfig.VERSION_NAME)
                 InfoRow("Build", BuildConfig.VERSION_CODE.toString())
                 InfoRow("Package", BuildConfig.APPLICATION_ID)
@@ -287,6 +273,29 @@ fun SettingsScreen(
                 InfoRow("Tailscale URL", settingsManager.tailscaleUrl ?: "(not set)", isMonospace = true)
             }
         }
+    }
+
+    if (showClearCacheConfirm) {
+        AlertDialog(
+            onDismissRequest = { showClearCacheConfirm = false },
+            title = { Text("Clear offline cache?") },
+            text = { Text("Cached image files will be removed from this device. Server history and settings stay unchanged.") },
+            confirmButton = {
+                androidx.compose.material3.TextButton(
+                    onClick = {
+                        showClearCacheConfirm = false
+                        viewModel.clearOfflineCache()
+                    },
+                ) {
+                    Text("Clear", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { showClearCacheConfirm = false }) {
+                    Text("Cancel")
+                }
+            },
+        )
     }
 }
 
