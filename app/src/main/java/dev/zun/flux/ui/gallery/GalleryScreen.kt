@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
@@ -117,6 +118,7 @@ fun GalleryScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showFilterMenu by remember { mutableStateOf(false) }
+    var showImageMetadata by remember { mutableStateOf(false) }
 
     BackHandler(isSelectionMode) {
         viewModel.clearSelection()
@@ -190,6 +192,21 @@ fun GalleryScreen(
                         }
                     },
                     actions = {
+                        IconButton(onClick = { showImageMetadata = !showImageMetadata }) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.Label,
+                                contentDescription = if (showImageMetadata) {
+                                    "Hide image labels"
+                                } else {
+                                    "Show image labels"
+                                },
+                                tint = if (showImageMetadata) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                            )
+                        }
                         Box {
                             IconButton(onClick = { showFilterMenu = true }) {
                                 Icon(Icons.Default.FilterList, contentDescription = "Filter by tag")
@@ -367,6 +384,7 @@ fun GalleryScreen(
                                         prompts = prompts,
                                         model = repository.thumbModel(job.id),
                                         availability = repository.offlineAvailability(job.id),
+                                        showMetadata = showImageMetadata,
                                         isSelected = isSelected,
                                         isSelectionMode = isSelectionMode,
                                         onClick = {
@@ -441,6 +459,7 @@ private fun JobThumbnail(
     prompts: List<PromptDto>,
     model: Any?,
     availability: OfflineImageAvailability,
+    showMetadata: Boolean,
     isSelected: Boolean,
     isSelectionMode: Boolean,
     onClick: () -> Unit,
@@ -497,13 +516,16 @@ private fun JobThumbnail(
                 },
             )
 
-            if (!isSelectionMode) {
-                OfflineBadge(
+            if (!isSelectionMode && availability.resultCached) {
+                CachedIcon(
                     availability = availability,
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .padding(4.dp),
                 )
+            }
+
+            if (!isSelectionMode && showMetadata) {
                 Text(
                     text = resolvePromptLabel(prompts, job.effectivePromptId, job.prompt_text),
                     style = MaterialTheme.typography.labelSmall,
@@ -544,37 +566,16 @@ private fun JobThumbnail(
 }
 
 @Composable
-private fun OfflineBadge(
+private fun CachedIcon(
     availability: OfflineImageAvailability,
     modifier: Modifier = Modifier,
 ) {
-    val label = when {
-        availability.resultCached -> "Cached"
-        availability.previewCached -> "Preview"
-        else -> "Needs server"
-    }
-    val background = if (availability.resultCached) {
-        MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.92f)
-    } else {
-        Color.Black.copy(alpha = 0.55f)
-    }
-    Row(
-        modifier = modifier
-            .background(background, RoundedCornerShape(4.dp))
-            .padding(horizontal = 4.dp, vertical = 2.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
+    Box(modifier = modifier) {
         Icon(
             imageVector = Icons.Default.CloudOff,
-            contentDescription = null,
-            tint = if (availability.resultCached) MaterialTheme.colorScheme.onTertiaryContainer else Color.White,
-            modifier = Modifier.size(12.dp),
-        )
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = if (availability.resultCached) MaterialTheme.colorScheme.onTertiaryContainer else Color.White,
+            contentDescription = if (availability.resultCached) "Cached offline" else null,
+            tint = Color.White.copy(alpha = 0.82f),
+            modifier = Modifier.size(16.dp),
         )
     }
 }
