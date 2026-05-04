@@ -28,6 +28,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.CompareArrows
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Image
@@ -117,6 +118,7 @@ fun PhotoViewerScreen(
 
     val currentJob = jobs.getOrNull(pagerState.currentPage)
     val hasInput = currentJob?.input_id != null
+    val currentAvailability = currentJob?.let { repository.offlineAvailability(it.id) }
 
     LaunchedEffect(pendingUndo) {
         val undo = pendingUndo ?: return@LaunchedEffect
@@ -205,6 +207,11 @@ fun PhotoViewerScreen(
                         val job = currentJob ?: return@ViewerActionBar
                         viewModel.deleteJob(job.id)
                         if (jobs.size <= 1) onBack()
+                    },
+                    offlineLabel = when {
+                        currentAvailability?.resultCached == true -> "Cached offline"
+                        currentAvailability?.previewCached == true -> "Preview cached"
+                        else -> "Needs server"
                     },
                 )
             }
@@ -486,6 +493,7 @@ private fun DetailRow(
 private fun ViewerActionBar(
     hasInput: Boolean,
     selectingInput: Boolean,
+    offlineLabel: String,
     onCompare: () -> Unit,
     onUseInput: () -> Unit,
     onSave: () -> Unit,
@@ -530,6 +538,26 @@ private fun ViewerActionBar(
                 icon = Icons.Default.Delete,
                 label = "Delete",
                 onClick = onDelete,
+            )
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 8.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Default.CloudOff,
+                contentDescription = null,
+                tint = Color.White.copy(alpha = 0.7f),
+                modifier = Modifier.size(14.dp),
+            )
+            Text(
+                text = offlineLabel,
+                color = Color.White.copy(alpha = 0.78f),
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.padding(start = 4.dp),
             )
         }
     }

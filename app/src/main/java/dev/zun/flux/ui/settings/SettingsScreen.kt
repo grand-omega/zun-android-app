@@ -21,6 +21,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
@@ -62,6 +63,7 @@ fun SettingsScreen(
     val settingsManager = app.settingsManager
     var lockoutDuration by remember { mutableLongStateOf(settingsManager.lockoutDurationMs) }
     val connectionDraft by viewModel.connectionDraft.collectAsStateWithLifecycle()
+    val offlineCache by viewModel.offlineCache.collectAsStateWithLifecycle()
 
     var tokenVisible by remember { mutableStateOf(false) }
 
@@ -234,6 +236,43 @@ fun SettingsScreen(
 
             HorizontalDivider()
 
+            Text("Offline Cache", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                InfoRow("Cached Images", "${offlineCache.stats.fileCount} files")
+                InfoRow("Cache Size", formatBytes(offlineCache.stats.bytes))
+                Text(
+                    text = offlineCache.status,
+                    color = MaterialTheme.colorScheme.secondary,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                    Button(
+                        onClick = viewModel::refreshOfflineCache,
+                        enabled = !offlineCache.isRefreshing,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        if (offlineCache.isRefreshing) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.padding(end = 8.dp),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                            )
+                            Text("Caching...")
+                        } else {
+                            Text("Refresh Cache")
+                        }
+                    }
+                    OutlinedButton(
+                        onClick = viewModel::clearOfflineCache,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text("Clear")
+                    }
+                }
+            }
+
+            HorizontalDivider()
+
             // App Info Section
             Text("App Info", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
 
@@ -267,6 +306,15 @@ private fun activeRouteLabel(route: ActiveRoute): String = when (route) {
     ActiveRoute.NONE -> "(none)"
     ActiveRoute.LAN -> "LAN"
     ActiveRoute.TAILSCALE -> "Tailscale"
+}
+
+private fun formatBytes(bytes: Long): String {
+    val mb = bytes / (1024.0 * 1024.0)
+    return if (mb < 1024) {
+        "%.1f MB".format(mb)
+    } else {
+        "%.2f GB".format(mb / 1024.0)
+    }
 }
 
 @Composable

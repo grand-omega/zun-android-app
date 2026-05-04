@@ -27,6 +27,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FilterList
@@ -80,6 +81,7 @@ import dev.zun.flux.data.api.JobSummaryDto
 import dev.zun.flux.data.api.PromptDto
 import dev.zun.flux.data.api.effectivePromptId
 import dev.zun.flux.data.repo.JobRepository
+import dev.zun.flux.data.repo.OfflineImageAvailability
 import dev.zun.flux.util.formatTimestamp
 import dev.zun.flux.util.resolvePromptLabel
 
@@ -364,6 +366,7 @@ fun GalleryScreen(
                                         job = job,
                                         prompts = prompts,
                                         model = repository.thumbModel(job.id),
+                                        availability = repository.offlineAvailability(job.id),
                                         isSelected = isSelected,
                                         isSelectionMode = isSelectionMode,
                                         onClick = {
@@ -437,6 +440,7 @@ private fun JobThumbnail(
     job: JobSummaryDto,
     prompts: List<PromptDto>,
     model: Any?,
+    availability: OfflineImageAvailability,
     isSelected: Boolean,
     isSelectionMode: Boolean,
     onClick: () -> Unit,
@@ -494,6 +498,12 @@ private fun JobThumbnail(
             )
 
             if (!isSelectionMode) {
+                OfflineBadge(
+                    availability = availability,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(4.dp),
+                )
                 Text(
                     text = resolvePromptLabel(prompts, job.effectivePromptId, job.prompt_text),
                     style = MaterialTheme.typography.labelSmall,
@@ -530,6 +540,42 @@ private fun JobThumbnail(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun OfflineBadge(
+    availability: OfflineImageAvailability,
+    modifier: Modifier = Modifier,
+) {
+    val label = when {
+        availability.resultCached -> "Cached"
+        availability.previewCached -> "Preview"
+        else -> "Needs server"
+    }
+    val background = if (availability.resultCached) {
+        MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.92f)
+    } else {
+        Color.Black.copy(alpha = 0.55f)
+    }
+    Row(
+        modifier = modifier
+            .background(background, RoundedCornerShape(4.dp))
+            .padding(horizontal = 4.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Icon(
+            imageVector = Icons.Default.CloudOff,
+            contentDescription = null,
+            tint = if (availability.resultCached) MaterialTheme.colorScheme.onTertiaryContainer else Color.White,
+            modifier = Modifier.size(12.dp),
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = if (availability.resultCached) MaterialTheme.colorScheme.onTertiaryContainer else Color.White,
+        )
     }
 }
 

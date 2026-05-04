@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.zun.flux.FluxApp
 import dev.zun.flux.data.repo.ConnectionMode
+import dev.zun.flux.data.repo.OfflineCacheStats
 import dev.zun.flux.util.normalizeOptionalServerUrl
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,6 +22,12 @@ data class ConnectionDraftState(
     val isConnecting: Boolean = false,
 )
 
+data class OfflineCacheState(
+    val stats: OfflineCacheStats = OfflineCacheStats(bytes = 0L, fileCount = 0),
+    val isRefreshing: Boolean = false,
+    val status: String = "Offline cache ready.",
+)
+
 class SettingsViewModel(
     private val app: FluxApp,
 ) : ViewModel() {
@@ -35,6 +42,11 @@ class SettingsViewModel(
         ),
     )
     val connectionDraft: StateFlow<ConnectionDraftState> = _connectionDraft.asStateFlow()
+
+    private val _offlineCache = MutableStateFlow(
+        OfflineCacheState(stats = app.repository.offlineCacheStats()),
+    )
+    val offlineCache: StateFlow<OfflineCacheState> = _offlineCache.asStateFlow()
 
     fun updateLanUrl(value: String) = updateDraft { copy(lanUrl = value, error = null, status = "Unsaved changes") }
 
@@ -100,6 +112,32 @@ class SettingsViewModel(
                 )
             }
         }
+    }
+
+    fun refreshOfflineCache() {
+        _offlineCache.value = _offlineCache.value.copy(isRefreshing = true, status = "Refreshing offline cache...")
+        viewModelScope.launch {
+            try {
+                app.repository.syncHistory()
+                _offlineCache.value = OfflineCacheState(
+                    stats = app.repository.offlineCacheStats(),
+                    status = "Offline cache refresh started. Images continue caching in the background.",
+                )
+            } catch (t: Throwable) {
+                _offlineCache.value = _offlineCache.value.copy(
+                    isRefreshing = false,
+                    status = t.toConnectionMessage(),
+                )
+            }
+        }
+    }
+
+    fun clearOfflineCache() {
+        app.repository.clearOfflineImageCache()
+        _offlineCache.value = OfflineCacheState(
+            stats = app.repository.offlineCacheStats(),
+            status = "Offline image cache cleared.",
+        )
     }
 
     private fun updateDraft(block: ConnectionDraftState.() -> ConnectionDraftState) {

@@ -8,6 +8,7 @@ import okhttp3.Protocol
 import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -58,6 +59,25 @@ class OfflineImageCacheTest {
         cache.prefetch("job-1", OfflineImageCache.Kind.Result, "https://example.test/result")
 
         assertTrue(temp.root.resolve("offline_images/job-1/result.jpg").exists())
+    }
+
+    @Test
+    fun statsAndClear_reportAndRemoveCachedFiles() = runTest {
+        val cache = OfflineImageCache(
+            rootDir = temp.newFolder("offline_images"),
+            okHttpClient = imageClient { "cached".encodeToByteArray() },
+            maxBytes = 1_000,
+        )
+        cache.prefetch("job-1", OfflineImageCache.Kind.Result, "https://example.test/result")
+
+        val stats = cache.stats()
+        assertTrue(stats.fileCount > 0)
+        assertTrue(stats.bytes > 0)
+
+        cache.clear()
+
+        assertEquals(0, cache.stats().fileCount)
+        assertEquals(0L, cache.stats().bytes)
     }
 
     @Test

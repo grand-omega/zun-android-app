@@ -224,6 +224,14 @@ class RealJobRepository(
     override fun resultModel(jobId: String): Any? = offlineImageCache.localUri(jobId, OfflineImageCache.Kind.Result)
         ?: buildUrlOrNull("/api/v1/jobs/$jobId/result")
 
+    override fun offlineAvailability(jobId: String): OfflineImageAvailability = offlineImageCache.availability(jobId)
+
+    override fun offlineCacheStats(): OfflineCacheStats = offlineImageCache.stats()
+
+    override fun clearOfflineImageCache() {
+        offlineImageCache.clear()
+    }
+
     private fun buildUrlOrNull(path: String): String? = settingsManager.serverUrl?.takeUnless { it.isBlank() }?.let { "$it$path" }
 
     private fun prefetchIfDone(job: JobStatusDto) {
