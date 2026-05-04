@@ -28,7 +28,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.CompareArrows
-import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Image
@@ -74,6 +73,7 @@ import dev.zun.flux.data.api.JobSummaryDto
 import dev.zun.flux.data.api.PromptDto
 import dev.zun.flux.data.api.effectivePromptId
 import dev.zun.flux.data.repo.JobRepository
+import dev.zun.flux.data.repo.OfflineImageAvailability
 import dev.zun.flux.util.resolvePromptLabel
 import dev.zun.flux.util.saveToPictures
 import kotlinx.coroutines.Dispatchers
@@ -118,7 +118,6 @@ fun PhotoViewerScreen(
 
     val currentJob = jobs.getOrNull(pagerState.currentPage)
     val hasInput = currentJob?.input_id != null
-    val currentAvailability = currentJob?.let { repository.offlineAvailability(it.id) }
 
     LaunchedEffect(pendingUndo) {
         val undo = pendingUndo ?: return@LaunchedEffect
@@ -208,11 +207,6 @@ fun PhotoViewerScreen(
                         viewModel.deleteJob(job.id)
                         if (jobs.size <= 1) onBack()
                     },
-                    offlineLabel = when {
-                        currentAvailability?.resultCached == true -> "Cached offline"
-                        currentAvailability?.previewCached == true -> "Preview cached"
-                        else -> "Needs server"
-                    },
                 )
             }
         },
@@ -261,6 +255,7 @@ fun PhotoViewerScreen(
                         JobDetailsSheet(
                             job = currentJob,
                             prompts = prompts,
+                            availability = repository.offlineAvailability(currentJob.id),
                             onClose = { showDetails = false },
                         )
                     }
@@ -426,6 +421,7 @@ private fun MissingViewerImage() {
 private fun JobDetailsSheet(
     job: JobSummaryDto,
     prompts: List<PromptDto>,
+    availability: OfflineImageAvailability,
     onClose: () -> Unit,
 ) {
     Surface(
@@ -452,10 +448,8 @@ private fun JobDetailsSheet(
                     .combinedClickable(onClick = onClose, onLongClick = {}),
             )
 
-            Text(
-                text = resolvePromptLabel(prompts, job.effectivePromptId, job.prompt_text),
-                style = MaterialTheme.typography.headlineSmall,
-            )
+            val promptLabel = resolvePromptLabel(prompts, job.effectivePromptId, job.prompt_text)
+            Text(text = promptLabel, style = MaterialTheme.typography.headlineSmall)
 
             Column(
                 modifier = Modifier.padding(top = 16.dp),
@@ -468,6 +462,11 @@ private fun JobDetailsSheet(
                 )
                 job.duration_seconds?.let {
                     DetailRow("Duration", "${it}s")
+                }
+                DetailRow("Offline", availability.toDetailText())
+                DetailRow("Prompt", promptLabel)
+                job.prompt_text?.takeIf { it.isNotBlank() }?.let {
+                    DetailRow("Prompt text", it)
                 }
             }
         }
@@ -489,11 +488,17 @@ private fun DetailRow(
     }
 }
 
+private fun OfflineImageAvailability.toDetailText(): String = when {
+    resultCached -> "Original cached"
+    previewCached -> "Preview cached"
+    thumbCached -> "Thumbnail cached"
+    else -> "Needs server"
+}
+
 @Composable
 private fun ViewerActionBar(
     hasInput: Boolean,
     selectingInput: Boolean,
-    offlineLabel: String,
     onCompare: () -> Unit,
     onUseInput: () -> Unit,
     onSave: () -> Unit,
@@ -538,26 +543,6 @@ private fun ViewerActionBar(
                 icon = Icons.Default.Delete,
                 label = "Delete",
                 onClick = onDelete,
-            )
-        }
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 8.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = Icons.Default.CloudOff,
-                contentDescription = null,
-                tint = Color.White.copy(alpha = 0.7f),
-                modifier = Modifier.size(14.dp),
-            )
-            Text(
-                text = offlineLabel,
-                color = Color.White.copy(alpha = 0.78f),
-                style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier.padding(start = 4.dp),
             )
         }
     }
