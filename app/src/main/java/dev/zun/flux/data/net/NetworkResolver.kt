@@ -35,18 +35,12 @@ class NetworkResolver(
         val lan = settings.lanUrl?.takeUnless { it.isBlank() }
         val ts = settings.tailscaleUrl?.takeUnless { it.isBlank() }
 
-        val chosen = when (settings.connectionMode) {
-            ConnectionMode.AUTO -> when {
-                lan != null && probe(lan) -> lan to ActiveRoute.LAN
-                ts != null -> ts to ActiveRoute.TAILSCALE
-                lan != null -> lan to ActiveRoute.LAN
-                else -> null
-            }
-
-            ConnectionMode.LAN_ONLY -> lan?.let { it to ActiveRoute.LAN }
-
-            ConnectionMode.TAILSCALE_ONLY -> ts?.let { it to ActiveRoute.TAILSCALE }
-        }
+        val chosen = chooseActiveRoute(
+            mode = settings.connectionMode,
+            lanUrl = lan,
+            tailscaleUrl = ts,
+            isLanReachable = lan?.let { probe(it) } ?: false,
+        )
 
         if (chosen == null) {
             if (settings.serverUrl != null || settings.activeRoute != ActiveRoute.NONE) {
@@ -89,4 +83,22 @@ class NetworkResolver(
     private companion object {
         const val PROBE_TIMEOUT_MS = 400
     }
+}
+
+internal fun chooseActiveRoute(
+    mode: ConnectionMode,
+    lanUrl: String?,
+    tailscaleUrl: String?,
+    isLanReachable: Boolean,
+): Pair<String, ActiveRoute>? = when (mode) {
+    ConnectionMode.AUTO -> when {
+        lanUrl != null && isLanReachable -> lanUrl to ActiveRoute.LAN
+        tailscaleUrl != null -> tailscaleUrl to ActiveRoute.TAILSCALE
+        lanUrl != null -> lanUrl to ActiveRoute.LAN
+        else -> null
+    }
+
+    ConnectionMode.LAN_ONLY -> lanUrl?.let { it to ActiveRoute.LAN }
+
+    ConnectionMode.TAILSCALE_ONLY -> tailscaleUrl?.let { it to ActiveRoute.TAILSCALE }
 }

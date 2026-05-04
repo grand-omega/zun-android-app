@@ -11,6 +11,7 @@ import dev.zun.flux.data.repo.ConnectionDiagnosis
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.data.repo.OfflineCacheStats
 import dev.zun.flux.data.repo.OfflineImageAvailability
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -119,6 +120,85 @@ class HomeViewModelTest {
 
         assertEquals(emptyList<Uri>(), viewModel.composer.value.inputUris)
     }
+
+    @Test
+    fun submit_tryHarderCustomPromptUsesExperimentalWorkflow() = runTest {
+        runCurrent()
+        viewModel.addInputUris(listOf(Uri.EMPTY), maxImages = 20)
+        viewModel.selectPrompt(CUSTOM_PROMPT_ID)
+        viewModel.updateCustomPrompt("make it sharper")
+        viewModel.setTryHarder(true)
+
+        viewModel.submit()
+        advanceUntilIdle()
+
+        assertNull(repository.lastPromptId)
+        assertEquals("make it sharper", repository.lastPromptText)
+        assertEquals("flux2_klein_9b_kv_experimental", repository.lastWorkflow)
+    }
+
+    @Test
+    fun submit_customPromptUsesDefaultWorkflowWhenTryHarderIsOff() = runTest {
+        runCurrent()
+        viewModel.addInputUris(listOf(Uri.EMPTY), maxImages = 20)
+        viewModel.selectPrompt(CUSTOM_PROMPT_ID)
+        viewModel.updateCustomPrompt("make it brighter")
+
+        viewModel.submit()
+        advanceUntilIdle()
+
+        assertEquals("flux2_klein_edit", repository.lastWorkflow)
+    }
+
+    @Test
+    fun submit_failedSingleUploadKeepsInputsForRetry() = runTest {
+        runCurrent()
+        repository.failingUris += Uri.EMPTY
+        viewModel.addInputUris(listOf(Uri.EMPTY), maxImages = 20)
+        viewModel.selectPrompt(2L)
+
+        viewModel.submit()
+        advanceUntilIdle()
+
+        assertEquals(SubmitState.Failed("Upload failed"), viewModel.state.value)
+        assertEquals(listOf(Uri.EMPTY), viewModel.composer.value.inputUris)
+        assertNull(viewModel.uploadProgress.value)
+        assertNull(viewModel.batchProgress.value)
+    }
+
+    @Test
+    fun submit_ignoresSecondSubmitWhileInFlight() = runTest {
+        runCurrent()
+        val holdSubmit = CompletableDeferred<Unit>()
+        repository.holdSubmit = holdSubmit
+        viewModel.addInputUris(listOf(Uri.EMPTY), maxImages = 20)
+        viewModel.selectPrompt(2L)
+
+        viewModel.submit()
+        runCurrent()
+        viewModel.submit()
+
+        assertEquals(1, repository.submitCalls)
+        assertTrue(viewModel.state.value is SubmitState.InFlight)
+
+        holdSubmit.complete(Unit)
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun acknowledgeDone_doesNotClearInputsAfterFailedSubmit() = runTest {
+        runCurrent()
+        repository.failingUris += Uri.EMPTY
+        viewModel.addInputUris(listOf(Uri.EMPTY), maxImages = 20)
+        viewModel.selectPrompt(2L)
+
+        viewModel.submit()
+        advanceUntilIdle()
+        viewModel.acknowledgeDone()
+
+        assertEquals(listOf(Uri.EMPTY), viewModel.composer.value.inputUris)
+        assertEquals(SubmitState.Idle, viewModel.state.value)
+    }
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -147,6 +227,13 @@ private class RecordingRepository : JobRepository {
         private set
     var lastPromptText: String? = null
         private set
+    var lastWorkflow: String? = null
+        private set
+    var submitCalls = 0
+        private set
+    var holdSubmit: CompletableDeferred<Unit>? = null
+    val failingUris = mutableSetOf<Uri>()
+    private var nextJobNumber = 1
 
     override suspend fun health(): HealthResponse = HealthResponse(status = "ok")
 
@@ -171,10 +258,16 @@ private class RecordingRepository : JobRepository {
         workflow: String?,
         onUploadProgress: ((Float) -> Unit)?,
     ): JobCreatedResponse {
+        submitCalls++
         lastPromptId = promptId
         lastPromptText = promptText
+        lastWorkflow = workflow
+        holdSubmit?.await()
+        if (inputUri in failingUris) {
+            error("Upload failed")
+        }
         onUploadProgress?.invoke(1f)
-        return JobCreatedResponse(job_id = "job-1", input_id = 1)
+        return JobCreatedResponse(job_id = "job-${nextJobNumber++}", input_id = 1)
     }
 
     override suspend fun getJob(jobId: String): JobStatusDto = JobStatusDto(

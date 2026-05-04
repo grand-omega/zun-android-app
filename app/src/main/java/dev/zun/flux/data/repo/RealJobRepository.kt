@@ -104,10 +104,11 @@ class RealJobRepository(
     ): JobListResponse {
         val resp = api.listJobs(status, limit, cursor, inputId)
         val hiddenIds = dao.getPendingDeleteIds().toSet() + localDeletedIds.value
-        val visibleItems = resp.items.filterNot { it.id in hiddenIds }
+        val visibleResp = resp.withoutHiddenJobs(hiddenIds)
+        val visibleItems = visibleResp.items
         dao.insertJobs(visibleItems.map { it.toEntity() })
         prefetchDone(visibleItems)
-        return resp
+        return visibleResp
     }
 
     override suspend fun deleteJob(jobId: String) {
@@ -274,4 +275,9 @@ class RealJobRepository(
     private companion object {
         const val TAG = "RealJobRepository"
     }
+}
+
+internal fun JobListResponse.withoutHiddenJobs(hiddenIds: Set<String>): JobListResponse {
+    if (hiddenIds.isEmpty()) return this
+    return copy(items = items.filterNot { it.id in hiddenIds })
 }
