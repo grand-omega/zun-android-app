@@ -37,6 +37,7 @@ import dev.zun.flux.FluxApp
 import dev.zun.flux.data.repo.ConnectionMode
 import dev.zun.flux.util.normalizeOptionalServerUrl
 import kotlinx.coroutines.launch
+import java.io.IOException
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -191,12 +192,7 @@ fun SetupScreen(
                                 throw t
                             }
                         } catch (t: Throwable) {
-                            error =
-                                if (t is retrofit2.HttpException && t.code() == 401) {
-                                    "Invalid API Token"
-                                } else {
-                                    "Connection failed: ${t.message ?: "Unknown error"}"
-                                }
+                            error = t.toSetupConnectionMessage()
                         } finally {
                             isTesting = false
                         }
@@ -214,4 +210,11 @@ fun SetupScreen(
             }
         }
     }
+}
+
+private fun Throwable.toSetupConnectionMessage(): String = when {
+    this is retrofit2.HttpException && code() == 401 -> "Invalid API token."
+    this is retrofit2.HttpException -> "Server responded with HTTP ${code()}. Check that the URL points to the FluxEdit API."
+    this is IOException -> "Could not reach the server. Check Wi-Fi, Tailscale, and the server URL."
+    else -> message ?: "Connection check failed."
 }

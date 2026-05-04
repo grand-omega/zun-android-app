@@ -46,7 +46,18 @@ class NetworkResolver(
             ConnectionMode.LAN_ONLY -> lan?.let { it to ActiveRoute.LAN }
 
             ConnectionMode.TAILSCALE_ONLY -> ts?.let { it to ActiveRoute.TAILSCALE }
-        } ?: return@withLock
+        }
+
+        if (chosen == null) {
+            if (settings.serverUrl != null || settings.activeRoute != ActiveRoute.NONE) {
+                withContext(Dispatchers.Main) {
+                    settings.serverUrl = null
+                    settings.activeRoute = ActiveRoute.NONE
+                    onActiveUrlChanged()
+                }
+            }
+            return@withLock
+        }
 
         if (chosen.first != settings.serverUrl || chosen.second != settings.activeRoute) {
             withContext(Dispatchers.Main) {

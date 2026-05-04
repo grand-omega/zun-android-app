@@ -184,12 +184,14 @@ class GalleryViewModel(
         viewModelScope.launch {
             _isSaving.value = true
             val savedIds = mutableSetOf<String>()
+            var failures = 0
             ids.forEach { id ->
                 try {
                     val model = repository.resultModel(id) ?: return@forEach
                     saveToPictures(context, model, "flux-$id.jpg")
                     savedIds += id
                 } catch (_: Throwable) {
+                    failures++
                 }
             }
             clearSelection()
@@ -197,7 +199,11 @@ class GalleryViewModel(
             if (savedIds.isNotEmpty()) {
                 _postSaveDelete.value = savedIds
             } else {
-                _eventMessage.value = "No images saved"
+                _eventMessage.value = if (failures > 0) {
+                    "Save failed. Connect to the server for uncached originals."
+                } else {
+                    "No images saved"
+                }
             }
         }
     }
@@ -217,7 +223,7 @@ class GalleryViewModel(
                     _eventMessage.value = "No images to share"
                 }
             } catch (t: Throwable) {
-                _eventMessage.value = "Share failed: ${t.message}"
+                _eventMessage.value = "Share failed. Connect to the server for uncached originals."
             } finally {
                 _isSharing.value = false
             }

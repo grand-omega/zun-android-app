@@ -108,6 +108,7 @@ fun PhotoViewerScreen(
     var showUI by remember { mutableStateOf(true) }
     var zoomedPage by remember { mutableStateOf<String?>(null) }
     var selectingInput by remember { mutableStateOf(false) }
+    var viewerNotice by remember { mutableStateOf<String?>(null) }
     val pendingUndo by viewModel.pendingUndo.collectAsState()
 
     val context = LocalContext.current
@@ -129,6 +130,12 @@ fun PhotoViewerScreen(
         } else {
             viewModel.clearPendingUndo()
         }
+    }
+
+    LaunchedEffect(viewerNotice) {
+        val notice = viewerNotice ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(notice)
+        viewerNotice = null
     }
 
     Scaffold(
@@ -189,7 +196,7 @@ fun PhotoViewerScreen(
                                 saveToPictures(context, src, "flux-${job.id}.jpg")
                                 Toast.makeText(context, "Saved to Gallery", Toast.LENGTH_SHORT).show()
                             } catch (e: Exception) {
-                                Toast.makeText(context, "Save failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                                viewerNotice = "Save failed. Connect to the server for uncached originals."
                             }
                         }
                     },
