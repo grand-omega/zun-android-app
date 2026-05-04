@@ -48,6 +48,19 @@ class OfflineImageCacheTest {
     }
 
     @Test
+    fun resultKind_usesStableResultFileName() = runTest {
+        val cache = OfflineImageCache(
+            rootDir = temp.newFolder("offline_images"),
+            okHttpClient = imageClient { "result".encodeToByteArray() },
+            maxBytes = 1_000,
+        )
+
+        cache.prefetch("job-1", OfflineImageCache.Kind.Result, "https://example.test/result")
+
+        assertTrue(temp.root.resolve("offline_images/job-1/result.jpg").exists())
+    }
+
+    @Test
     fun prefetch_prunesOldestFilesWhenCacheExceedsLimit() = runTest {
         var counter = 0
         val cache = OfflineImageCache(

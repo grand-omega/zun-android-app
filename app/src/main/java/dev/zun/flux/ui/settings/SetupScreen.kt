@@ -34,6 +34,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import dev.zun.flux.FluxApp
+import dev.zun.flux.data.repo.ConnectionMode
 import dev.zun.flux.util.normalizeOptionalServerUrl
 import kotlinx.coroutines.launch
 
@@ -159,17 +160,36 @@ fun SetupScreen(
                             require(lan != null || ts != null) {
                                 "Enter at least one server URL"
                             }
-                            settings.lanUrl = lan
-                            settings.tailscaleUrl = ts
-                            settings.apiToken = token.trim()
+                            val oldLan = settings.lanUrl
+                            val oldTailscale = settings.tailscaleUrl
+                            val oldToken = settings.apiToken
+                            val oldServerUrl = settings.serverUrl
+                            val oldActiveRoute = settings.activeRoute
+                            val oldMode = settings.connectionMode
 
-                            // Resolve the active route once after the user taps Connect.
-                            app.networkResolver.refreshNow()
+                            try {
+                                settings.lanUrl = lan
+                                settings.tailscaleUrl = ts
+                                settings.connectionMode = ConnectionMode.AUTO
+                                settings.apiToken = token.trim()
 
-                            // Validate token & connectivity (listPrompts requires auth).
-                            app.repository.listPrompts()
+                                // Resolve the active route once after the user taps Connect.
+                                app.networkResolver.refreshNow()
 
-                            onSuccess()
+                                // Validate token & connectivity (listPrompts requires auth).
+                                app.repository.listPrompts()
+
+                                onSuccess()
+                            } catch (t: Throwable) {
+                                settings.lanUrl = oldLan
+                                settings.tailscaleUrl = oldTailscale
+                                settings.connectionMode = oldMode
+                                settings.apiToken = oldToken
+                                settings.serverUrl = oldServerUrl
+                                settings.activeRoute = oldActiveRoute
+                                app.rebuildRepository()
+                                throw t
+                            }
                         } catch (t: Throwable) {
                             error =
                                 if (t is retrofit2.HttpException && t.code() == 401) {

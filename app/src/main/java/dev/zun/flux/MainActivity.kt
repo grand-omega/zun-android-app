@@ -9,6 +9,8 @@ import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSiz
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -22,6 +24,8 @@ import dev.zun.flux.ui.theme.ZunFluxTheme
 private const val TAG = "MainActivity"
 
 class MainActivity : FragmentActivity() {
+    private var unlockMessage by mutableStateOf<String?>(null)
+
     @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -55,7 +59,10 @@ class MainActivity : FragmentActivity() {
                         )
                     }
                 } else {
-                    LockScreen(onUnlockClick = { tryUnlock(auth) })
+                    LockScreen(
+                        message = unlockMessage,
+                        onUnlockClick = { tryUnlock(auth) },
+                    )
                 }
             }
         }
@@ -64,17 +71,19 @@ class MainActivity : FragmentActivity() {
     private fun tryUnlock(auth: dev.zun.flux.ui.auth.AuthStateHolder) {
         promptBiometric { result ->
             when (result) {
-                BiometricResult.Success -> auth.markAuthed()
+                BiometricResult.Success -> {
+                    unlockMessage = null
+                    auth.markAuthed()
+                }
 
                 BiometricResult.Unavailable -> {
-                    Log.i(TAG, "Biometric hardware unavailable or unsupported. Skipping gate.")
-                    auth.markAuthed()
+                    Log.w(TAG, "Biometric or device credential auth unavailable. Keeping app locked.")
+                    unlockMessage = "Set up a screen lock or biometric credential to use FluxEdit."
                 }
 
                 is BiometricResult.Error -> {
                     Log.e(TAG, "Biometric error: ${result.message}")
-                    // In a real app, maybe show a toast or exit if it's a hard error
-                    // For now, let the user retry via the button on LockScreen
+                    unlockMessage = result.message
                 }
             }
         }

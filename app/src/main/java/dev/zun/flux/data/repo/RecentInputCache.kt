@@ -11,9 +11,21 @@ class RecentInputCache(
     suspend fun downloadInputToCache(inputId: Int): Uri {
         val outFile = cacheFile(inputId)
         if (!outFile.exists() || outFile.length() == 0L) {
+            outFile.parentFile?.mkdirs()
+            val tempFile = java.io.File(outFile.parentFile, "${outFile.name}.tmp")
             val body = api.downloadInputFile(inputId)
-            body.byteStream().use { input ->
-                outFile.outputStream().use { output -> input.copyTo(output) }
+            try {
+                body.byteStream().use { input ->
+                    tempFile.outputStream().use { output -> input.copyTo(output) }
+                }
+                if (tempFile.length() == 0L) error("Downloaded input was empty")
+                if (!tempFile.renameTo(outFile)) {
+                    tempFile.copyTo(outFile, overwrite = true)
+                    tempFile.delete()
+                }
+            } catch (t: Throwable) {
+                tempFile.delete()
+                throw t
             }
         }
         return Uri.fromFile(outFile)

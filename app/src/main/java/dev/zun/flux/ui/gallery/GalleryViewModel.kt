@@ -157,14 +157,19 @@ class GalleryViewModel(
 
     fun undoDelete(ids: Set<String>) {
         viewModelScope.launch {
+            val restoredIds = mutableSetOf<String>()
             ids.forEach { id ->
                 try {
                     repository.restoreJob(id)
-                } catch (_: Throwable) {
+                    restoredIds += id
+                } catch (t: Throwable) {
+                    _eventMessage.value = "Restore failed: ${t.message ?: "Unknown error"}"
                 }
             }
             _pendingUndo.value = null
-            _eventMessage.value = "Restored ${ids.size} generation${if (ids.size == 1) "" else "s"}"
+            if (restoredIds.isNotEmpty()) {
+                _eventMessage.value = "Restored ${restoredIds.size} generation${if (restoredIds.size == 1) "" else "s"}"
+            }
         }
     }
 

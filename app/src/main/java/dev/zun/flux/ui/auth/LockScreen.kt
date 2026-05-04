@@ -17,7 +17,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun LockScreen(onUnlockClick: () -> Unit) {
+fun LockScreen(
+    message: String? = null,
+    onUnlockClick: () -> Unit,
+) {
     Column(
         modifier = Modifier.fillMaxSize().padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -30,6 +33,13 @@ fun LockScreen(onUnlockClick: () -> Unit) {
             tint = MaterialTheme.colorScheme.primary,
         )
         Text("FluxEdit is locked", style = MaterialTheme.typography.headlineSmall)
+        message?.let {
+            Text(
+                text = it,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
         Button(onClick = onUnlockClick) {
             Text("Unlock")
         }

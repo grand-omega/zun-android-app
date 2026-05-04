@@ -31,23 +31,21 @@ fun prepareImageForUpload(
     val exif = ExifInterface(originalBytes.inputStream())
     val rotation = getRotationDegrees(exif)
 
-    // 2. Calculate scale
-    val w = options.outWidth
-    val h = options.outHeight
-    val longestSide = max(w, h)
-
-    val scale = if (longestSide > maxDimension) {
-        maxDimension.toFloat() / longestSide
-    } else {
-        1f
-    }
-
-    // 3. Decode and scale
+    // 2. Decode with coarse sampling first.
     val decodeOptions = BitmapFactory.Options().apply {
         inSampleSize = calculateInSampleSize(options, maxDimension, maxDimension)
     }
     var bitmap = BitmapFactory.decodeByteArray(originalBytes, 0, originalBytes.size, decodeOptions)
         ?: error("Failed to decode bitmap")
+
+    // 3. Calculate the precise final scale from the decoded dimensions, not
+    // the original dimensions, to avoid applying the sample reduction twice.
+    val longestDecodedSide = max(bitmap.width, bitmap.height)
+    val scale = if (longestDecodedSide > maxDimension) {
+        maxDimension.toFloat() / longestDecodedSide
+    } else {
+        1f
+    }
 
     val outputFile = File(context.cacheDir, "upload_preprocessed_${System.currentTimeMillis()}.jpg")
     try {
