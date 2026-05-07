@@ -2,24 +2,22 @@ package dev.zun.flux.data.repo
 
 import android.content.Context
 import android.net.Uri
+import dev.zun.flux.Tuning
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 
-private const val MAX_OFFLINE_IMAGE_CACHE_BYTES = 1_000L * 1024L * 1024L
-private const val PREFETCH_CONCURRENCY = 3
-
 class OfflineImageCache internal constructor(
     private val rootDir: File,
     private val okHttpClient: OkHttpClient,
-    private val maxBytes: Long = MAX_OFFLINE_IMAGE_CACHE_BYTES,
+    private val maxBytes: Long = Tuning.OFFLINE_IMAGE_CACHE_MAX_BYTES,
 ) {
     constructor(
         context: Context,
         okHttpClient: OkHttpClient,
-        maxBytes: Long = MAX_OFFLINE_IMAGE_CACHE_BYTES,
+        maxBytes: Long = Tuning.OFFLINE_IMAGE_CACHE_MAX_BYTES,
     ) : this(File(context.filesDir, "offline_images"), okHttpClient, maxBytes)
 
     enum class Kind(val fileName: String) {
@@ -28,7 +26,7 @@ class OfflineImageCache internal constructor(
         Result("result.jpg"),
     }
 
-    private val semaphore = Semaphore(PREFETCH_CONCURRENCY)
+    private val semaphore = Semaphore(Tuning.OFFLINE_PREFETCH_CONCURRENCY)
 
     fun availability(jobId: String): OfflineImageAvailability = OfflineImageAvailability(
         thumbCached = localUri(jobId, Kind.Thumb) != null,

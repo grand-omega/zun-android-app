@@ -40,6 +40,9 @@ jobs:
     - name: Build Unsigned Release APK
       run: ./gradlew assembleRelease --stacktrace -Porg.gradle.java.installations.auto-download=false -Porg.gradle.java.installations.auto-detect=true
 
+    - name: Run Unit Tests
+      run: ./gradlew testDebugUnitTest --stacktrace -Porg.gradle.java.installations.auto-download=false -Porg.gradle.java.installations.auto-detect=true
+
     - name: Run Lint
       run: ./gradlew lintDebug --stacktrace -Porg.gradle.java.installations.auto-download=false -Porg.gradle.java.installations.auto-detect=true
 

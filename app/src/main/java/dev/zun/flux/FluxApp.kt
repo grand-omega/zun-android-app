@@ -5,6 +5,8 @@ import android.net.ConnectivityManager
 import android.net.Network
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
+import coil3.disk.DiskCache
+import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import dev.zun.flux.data.api.FluxApi
 import dev.zun.flux.data.net.NetworkResolver
@@ -59,8 +61,8 @@ class FluxApp : Application() {
         okHttpClient =
             OkHttpClient
                 .Builder()
-                .connectTimeout(30, TimeUnit.SECONDS)
-                .readTimeout(60, TimeUnit.SECONDS)
+                .connectTimeout(Tuning.HTTP_CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .readTimeout(Tuning.HTTP_READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                 .addInterceptor { chain ->
                     val token = settingsManager.apiToken ?: ""
                     chain.proceed(
@@ -77,6 +79,15 @@ class FluxApp : Application() {
                 .components {
                     add(OkHttpNetworkFetcherFactory(callFactory = { okHttpClient }))
                 }
+                // OfflineImageCache already persists thumb/preview/result to disk; Coil's
+                // disk cache would just double-bookkeep. Keep a small memory cache so
+                // recently-shown tiles don't decode again on scroll.
+                .memoryCache {
+                    MemoryCache.Builder()
+                        .maxSizeBytes(Tuning.COIL_MEMORY_CACHE_BYTES)
+                        .build()
+                }
+                .diskCache(null as DiskCache?)
                 .build()
         }
 

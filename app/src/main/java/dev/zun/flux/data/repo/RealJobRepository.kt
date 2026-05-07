@@ -13,6 +13,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.workDataOf
+import dev.zun.flux.Tuning
 import dev.zun.flux.data.api.FluxApi
 import dev.zun.flux.data.api.HealthResponse
 import dev.zun.flux.data.api.JobCreatedResponse
@@ -251,7 +252,7 @@ class RealJobRepository(
 
     override fun pagedJobs(promptId: Long?, customOnly: Boolean): Flow<PagingData<JobSummaryDto>> = Pager(
         config = PagingConfig(
-            pageSize = 50,
+            pageSize = Tuning.GALLERY_PAGE_SIZE,
             enablePlaceholders = false,
         ),
         pagingSourceFactory = {
