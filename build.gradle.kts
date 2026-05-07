@@ -7,6 +7,20 @@ plugins {
     alias(libs.plugins.spotless)
 }
 
+tasks.register<Exec>("installGitHooks") {
+    description = "Point git at the tracked .githooks directory."
+    group = "build setup"
+    workingDir = rootDir
+    commandLine("git", "config", "core.hooksPath", ".githooks")
+    isIgnoreExitValue = true
+}
+
+subprojects {
+    afterEvaluate {
+        tasks.findByName("preBuild")?.dependsOn(rootProject.tasks.named("installGitHooks"))
+    }
+}
+
 spotless {
     kotlin {
         target("**/*.kt")
