@@ -1,6 +1,4 @@
-// androidx.security-crypto is deprecated by Google with no drop-in replacement;
-// suppress until we migrate to Keystore/Tink directly.
-@file:Suppress("DEPRECATION")
+@file:Suppress("DEPRECATION") // legacy EncryptedSharedPreferences read for one-time migration
 
 package dev.zun.flux.data.repo
 
@@ -21,28 +19,30 @@ enum class ActiveRoute {
     TAILSCALE,
 }
 
+/**
+ * Persisted user settings. Splits storage by sensitivity:
+ *
+ *  - Non-sensitive (URLs, mode, timestamps) → plain SharedPreferences. Cheap reads,
+ *    no Keystore round-trip on every access.
+ *  - Sensitive (API token) → [KeystoreSecureStore], encrypted with an AES-256/GCM
+ *    key held in the Android Keystore.
+ *
+ * On first run after upgrading, [migrateLegacySecureSettings] copies any values
+ * from the deprecated [EncryptedSharedPreferences] file to the new layout and
+ * removes the legacy file.
+ */
 class SettingsManager(context: Context) {
-    private val masterKey = MasterKey.Builder(context)
-        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-        .build()
+    private val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+    private val secureStore = KeystoreSecureStore(context)
 
-    private val prefs = EncryptedSharedPreferences.create(
-        context,
-        "secure_settings",
-        masterKey,
-        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
-    )
+    init {
+        migrateLegacySecureSettings(context)
+    }
 
     var lockoutDurationMs: Long
         get() = prefs.getLong(KEY_LOCKOUT_DURATION, 300_000L)
         set(value) = prefs.edit { putLong(KEY_LOCKOUT_DURATION, value) }
 
-    /**
-     * The currently active base URL — written by NetworkResolver after probing.
-     * Retrofit's baseUrl and Coil image URLs both read this. Treat as read-only
-     * outside of NetworkResolver.
-     */
     var serverUrl: String?
         get() = prefs.getString(KEY_SERVER_URL, null)
         set(value) = prefs.edit { putString(KEY_SERVER_URL, value) }
@@ -56,16 +56,7 @@ class SettingsManager(context: Context) {
         set(value) = prefs.edit { putString(KEY_CONNECTION_MODE, value.name) }
 
     var lanUrl: String?
-        get() {
-            val v = prefs.getString(KEY_LAN_URL, null)
-            if (v != null) return v
-            // One-time migration: legacy single-URL installs become LAN-only.
-            val legacy = prefs.getString(KEY_SERVER_URL, null)
-            if (!legacy.isNullOrBlank()) {
-                prefs.edit { putString(KEY_LAN_URL, legacy) }
-            }
-            return prefs.getString(KEY_LAN_URL, null)
-        }
+        get() = prefs.getString(KEY_LAN_URL, null)
         set(value) = prefs.edit { putString(KEY_LAN_URL, value) }
 
     var tailscaleUrl: String?
@@ -73,15 +64,9 @@ class SettingsManager(context: Context) {
         set(value) = prefs.edit { putString(KEY_TAILSCALE_URL, value) }
 
     var apiToken: String?
-        get() = prefs.getString(KEY_API_TOKEN, null)
-        set(value) = prefs.edit { putString(KEY_API_TOKEN, value) }
+        get() = secureStore.get(KEY_API_TOKEN)
+        set(value) = secureStore.put(KEY_API_TOKEN, value)
 
-    /**
-     * Wall-clock millis of the most recent successful biometric unlock. Persisted so
-     * the [lockoutDurationMs] grace window survives process death — Android often kills
-     * the app while the Photo Picker (or any heavyweight foreground activity) is on
-     * top, and an in-memory timestamp would fall back to 0 and re-prompt every time.
-     */
     var lastAuthTimestamp: Long
         get() = prefs.getLong(KEY_LAST_AUTH_TIMESTAMP, 0L)
         set(value) = prefs.edit { putLong(KEY_LAST_AUTH_TIMESTAMP, value) }
@@ -93,7 +78,46 @@ class SettingsManager(context: Context) {
         enumValueOf<T>(prefs.getString(key, default.name) ?: default.name)
     }.getOrDefault(default)
 
+    private fun migrateLegacySecureSettings(context: Context) {
+        if (prefs.getBoolean(KEY_LEGACY_MIGRATED, false)) return
+        val legacyFile = context.getSharedPreferences(LEGACY_PREFS_NAME, Context.MODE_PRIVATE)
+        if (legacyFile.all.isEmpty()) {
+            prefs.edit { putBoolean(KEY_LEGACY_MIGRATED, true) }
+            return
+        }
+        runCatching {
+            val masterKey = MasterKey.Builder(context)
+                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                .build()
+            val legacy = EncryptedSharedPreferences.create(
+                context,
+                LEGACY_PREFS_NAME,
+                masterKey,
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
+            )
+            legacy.getString(KEY_LAN_URL, null)?.let { lanUrl = it }
+            legacy.getString(KEY_TAILSCALE_URL, null)?.let { tailscaleUrl = it }
+            legacy.getString(KEY_SERVER_URL, null)?.let { serverUrl = it }
+            legacy.getString(KEY_ACTIVE_ROUTE, null)?.let { prefs.edit { putString(KEY_ACTIVE_ROUTE, it) } }
+            legacy.getString(KEY_CONNECTION_MODE, null)?.let { prefs.edit { putString(KEY_CONNECTION_MODE, it) } }
+            if (legacy.contains(KEY_LOCKOUT_DURATION)) {
+                lockoutDurationMs = legacy.getLong(KEY_LOCKOUT_DURATION, 300_000L)
+            }
+            if (legacy.contains(KEY_LAST_AUTH_TIMESTAMP)) {
+                lastAuthTimestamp = legacy.getLong(KEY_LAST_AUTH_TIMESTAMP, 0L)
+            }
+            legacy.getString(KEY_API_TOKEN, null)?.let { apiToken = it }
+        }
+        // Best-effort wipe of the legacy file so secrets don't linger on disk.
+        context.deleteSharedPreferences(LEGACY_PREFS_NAME)
+        prefs.edit { putBoolean(KEY_LEGACY_MIGRATED, true) }
+    }
+
     companion object {
+        private const val LEGACY_PREFS_NAME = "secure_settings"
+        private const val KEY_LEGACY_MIGRATED = "legacy_secure_migrated"
+
         private const val KEY_LOCKOUT_DURATION = "lockout_duration_ms"
         private const val KEY_SERVER_URL = "server_url"
         private const val KEY_ACTIVE_ROUTE = "active_route"

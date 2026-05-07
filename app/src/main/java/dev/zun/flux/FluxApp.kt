@@ -10,6 +10,7 @@ import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import dev.zun.flux.data.api.FluxApi
 import dev.zun.flux.data.diag.Diagnostics
+import dev.zun.flux.data.net.CertPinStore
 import dev.zun.flux.data.net.NetworkResolver
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.data.repo.PinnedPromptsStore
@@ -40,7 +41,7 @@ class FluxApp : Application() {
     val repository: JobRepository
         get() = _repositoryState.value?.repository ?: error("Repository has not been initialized")
 
-    lateinit var okHttpClient: OkHttpClient
+    var okHttpClient: OkHttpClient = OkHttpClient()
         private set
 
     lateinit var settingsManager: SettingsManager
@@ -55,6 +56,9 @@ class FluxApp : Application() {
     lateinit var pinnedPrompts: PinnedPromptsStore
         private set
 
+    lateinit var certPinStore: CertPinStore
+        private set
+
     val diagnostics = Diagnostics()
 
     override fun onCreate() {
@@ -63,26 +67,10 @@ class FluxApp : Application() {
         settingsManager = SettingsManager(this)
         authStateHolder = AuthStateHolder(settingsManager)
         pinnedPrompts = PinnedPromptsStore(this)
+        certPinStore = CertPinStore(this)
         networkResolver = NetworkResolver(settingsManager) { rebuildRepository() }
 
-        // Interceptor that reads the current token from settings
-        okHttpClient =
-            OkHttpClient
-                .Builder()
-                .connectTimeout(Tuning.HTTP_CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                .readTimeout(Tuning.HTTP_READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                .addInterceptor { chain ->
-                    val token = settingsManager.apiToken ?: ""
-                    chain.proceed(
-                        chain
-                            .request()
-                            .newBuilder()
-                            .header("Authorization", "Bearer $token")
-                            .build(),
-                    )
-                }
-                .addInterceptor(diagnostics.okHttpInterceptor())
-                .build()
+        rebuildOkHttp()
 
         SingletonImageLoader.setSafe {
             ImageLoader.Builder(this)
@@ -114,6 +102,24 @@ class FluxApp : Application() {
             }
         })
         networkResolver.refresh()
+    }
+
+    /** Rebuild OkHttpClient — called when cert pins change so the new pinner takes effect. */
+    fun rebuildOkHttp() {
+        okHttpClient = OkHttpClient.Builder()
+            .connectTimeout(Tuning.HTTP_CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .readTimeout(Tuning.HTTP_READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .addInterceptor { chain ->
+                val token = settingsManager.apiToken ?: ""
+                chain.proceed(
+                    chain.request().newBuilder()
+                        .header("Authorization", "Bearer $token")
+                        .build(),
+                )
+            }
+            .addInterceptor(diagnostics.okHttpInterceptor())
+            .certificatePinner(certPinStore.toCertificatePinner())
+            .build()
     }
 
     /** Rebuild Retrofit when the active base URL changes. */

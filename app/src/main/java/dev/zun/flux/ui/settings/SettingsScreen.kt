@@ -48,6 +48,7 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import dev.zun.flux.BuildConfig
 import dev.zun.flux.FluxApp
+import dev.zun.flux.data.net.captureCertificatePin
 import dev.zun.flux.data.repo.ActiveRoute
 import dev.zun.flux.data.repo.ConnectionMode
 import dev.zun.flux.data.worker.JobUploadWorker
@@ -55,6 +56,9 @@ import dev.zun.flux.ui.common.ScreenPadding
 import dev.zun.flux.ui.common.SettingsGroup
 import dev.zun.flux.ui.common.StatusPill
 import dev.zun.flux.ui.common.StatusTone
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -75,10 +79,14 @@ fun SettingsScreen(
     val connectionDraft by viewModel.connectionDraft.collectAsStateWithLifecycle()
     val offlineCache by viewModel.offlineCache.collectAsStateWithLifecycle()
     val diagnostics by app.diagnostics.state.collectAsStateWithLifecycle()
+    val certPins by app.certPinStore.pins.collectAsStateWithLifecycle()
     val uploadQueueFlow = remember(app) {
         WorkManager.getInstance(app).getWorkInfosByTagFlow(JobUploadWorker.TAG)
     }
     val uploadQueue by uploadQueueFlow.collectAsStateWithLifecycle(initialValue = emptyList())
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var pinningInProgress by remember { mutableStateOf(false) }
+    var pinResult by remember { mutableStateOf<String?>(null) }
 
     var tokenVisible by remember { mutableStateOf(false) }
     var showClearCacheConfirm by remember { mutableStateOf(false) }
@@ -271,6 +279,80 @@ fun SettingsScreen(
                         Text("Clear")
                     }
                 }
+            }
+
+            SettingsGroup(
+                title = "Certificate Pinning",
+                detail = "Pin your servers' certificates so a compromised CA can't impersonate them. Re-pin after cert renewal.",
+            ) {
+                if (certPins.isEmpty()) {
+                    StatusPill(label = "No pins active", tone = StatusTone.Warning)
+                } else {
+                    certPins.forEach { (host, pin) ->
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                text = host,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            Text(
+                                text = pin,
+                                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                    Button(
+                        onClick = {
+                            pinningInProgress = true
+                            pinResult = null
+                            scope.launch {
+                                val urls = listOfNotNull(
+                                    settingsManager.lanUrl?.takeUnless { it.isBlank() },
+                                    settingsManager.tailscaleUrl?.takeUnless { it.isBlank() },
+                                )
+                                val captured = withContext(Dispatchers.IO) {
+                                    urls.mapNotNull { captureCertificatePin(app.okHttpClient, it) }
+                                }
+                                if (captured.isEmpty()) {
+                                    pinResult = "No HTTPS certificates captured. Pin only applies to https:// URLs."
+                                } else {
+                                    captured.forEach { (host, pin) -> app.certPinStore.setPin(host, pin) }
+                                    app.rebuildOkHttp()
+                                    app.rebuildRepository()
+                                    pinResult = "Pinned ${captured.size} host${if (captured.size == 1) "" else "s"}."
+                                }
+                                pinningInProgress = false
+                            }
+                        },
+                        enabled = !pinningInProgress,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        if (pinningInProgress) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.padding(end = 8.dp),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                            )
+                            Text("Pinning…")
+                        } else {
+                            Text("Pin Current")
+                        }
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            app.certPinStore.clearAll()
+                            app.rebuildOkHttp()
+                            app.rebuildRepository()
+                            pinResult = "All pins cleared."
+                        },
+                        enabled = !pinningInProgress && certPins.isNotEmpty(),
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text("Clear")
+                    }
+                }
+                pinResult?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
             }
 
             SettingsGroup(
