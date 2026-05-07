@@ -291,6 +291,10 @@ private class RecordingRepository : JobRepository {
         pendingUploads[uuid] ?: JobUploadStatus.Pending,
     )
 
+    override suspend fun cancelJobUpload(uuid: java.util.UUID) {
+        pendingUploads.remove(uuid)
+    }
+
     override suspend fun submitStagedJob(
         filePath: String,
         promptId: Long?,

@@ -35,6 +35,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -121,9 +122,20 @@ class RealJobRepository(
                     .setRequiredNetworkType(NetworkType.CONNECTED)
                     .build(),
             )
+            .addTag(STAGED_PATH_TAG_PREFIX + staged.absolutePath)
             .build()
         WorkManager.getInstance(context).enqueue(request)
         return request.id
+    }
+
+    override suspend fun cancelJobUpload(uuid: java.util.UUID) {
+        val workManager = WorkManager.getInstance(context)
+        val info = workManager.getWorkInfoByIdFlow(uuid).first()
+        workManager.cancelWorkById(uuid)
+        info?.tags
+            ?.firstOrNull { it.startsWith(STAGED_PATH_TAG_PREFIX) }
+            ?.removePrefix(STAGED_PATH_TAG_PREFIX)
+            ?.let { java.io.File(it).delete() }
     }
 
     override fun observeJobUpload(uuid: java.util.UUID): Flow<JobUploadStatus> = WorkManager.getInstance(context).getWorkInfoByIdFlow(uuid).map { info ->
@@ -381,6 +393,7 @@ class RealJobRepository(
 
     private companion object {
         const val TAG = "RealJobRepository"
+        const val STAGED_PATH_TAG_PREFIX = "staged_path:"
     }
 }
 

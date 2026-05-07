@@ -107,6 +107,12 @@ interface JobRepository {
     fun observeJobUpload(uuid: java.util.UUID): Flow<JobUploadStatus>
 
     /**
+     * Cancels a pending or running upload enqueued via [enqueueJobUpload] and
+     * deletes its staged file if still present. Idempotent.
+     */
+    suspend fun cancelJobUpload(uuid: java.util.UUID)
+
+    /**
      * Submit a previously-staged file. Used by [JobUploadWorker]; UI code
      * should call [enqueueJobUpload] instead.
      */
