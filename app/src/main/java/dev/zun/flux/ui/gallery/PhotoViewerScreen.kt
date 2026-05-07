@@ -222,6 +222,12 @@ fun PhotoViewerScreen(
                 .fillMaxSize()
                 .padding(inner),
         ) {
+            if (jobs.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    androidx.compose.material3.CircularProgressIndicator(color = Color.White)
+                }
+                return@Box
+            }
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier.fillMaxSize(),

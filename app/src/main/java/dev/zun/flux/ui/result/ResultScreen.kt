@@ -107,6 +107,8 @@ fun ResultScreen(
     var customPromptText by remember(jobId) { mutableStateOf("") }
     var tryHarder by remember(jobId) { mutableStateOf(false) }
     val prompts by repository.promptsState.collectAsState()
+    val app = context.applicationContext as dev.zun.flux.FluxApp
+    val pinnedIds by app.pinnedPrompts.ids.collectAsState()
     val isWide = windowSizeClass.widthSizeClass >= WindowWidthSizeClass.Medium
 
     LaunchedEffect(jobDto?.id) {
@@ -381,6 +383,8 @@ fun ResultScreen(
                 if (id != CUSTOM_PROMPT_ID) showPromptSheet = false
             },
             onDismiss = { showPromptSheet = false },
+            pinnedIds = pinnedIds,
+            onTogglePin = { app.pinnedPrompts.toggle(it) },
         )
     }
 

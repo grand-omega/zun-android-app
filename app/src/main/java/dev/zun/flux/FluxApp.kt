@@ -9,8 +9,10 @@ import coil3.disk.DiskCache
 import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import dev.zun.flux.data.api.FluxApi
+import dev.zun.flux.data.diag.Diagnostics
 import dev.zun.flux.data.net.NetworkResolver
 import dev.zun.flux.data.repo.JobRepository
+import dev.zun.flux.data.repo.PinnedPromptsStore
 import dev.zun.flux.data.repo.RealJobRepository
 import dev.zun.flux.data.repo.SettingsManager
 import dev.zun.flux.ui.auth.AuthStateHolder
@@ -50,11 +52,17 @@ class FluxApp : Application() {
     lateinit var networkResolver: NetworkResolver
         private set
 
+    lateinit var pinnedPrompts: PinnedPromptsStore
+        private set
+
+    val diagnostics = Diagnostics()
+
     override fun onCreate() {
         super.onCreate()
 
         settingsManager = SettingsManager(this)
         authStateHolder = AuthStateHolder(settingsManager)
+        pinnedPrompts = PinnedPromptsStore(this)
         networkResolver = NetworkResolver(settingsManager) { rebuildRepository() }
 
         // Interceptor that reads the current token from settings
@@ -72,7 +80,9 @@ class FluxApp : Application() {
                             .header("Authorization", "Bearer $token")
                             .build(),
                     )
-                }.build()
+                }
+                .addInterceptor(diagnostics.okHttpInterceptor())
+                .build()
 
         SingletonImageLoader.setSafe {
             ImageLoader.Builder(this)

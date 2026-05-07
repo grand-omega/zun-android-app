@@ -267,9 +267,24 @@ fun GalleryScreen(
                 modifier = Modifier.fillMaxSize(),
             ) {
                 val isInitialLoading = pagedItems.loadState.refresh is LoadState.Loading
+                val refreshError = pagedItems.loadState.refresh as? LoadState.Error
                 val isEmpty = pagedItems.itemCount == 0 &&
                     pagedItems.loadState.refresh is LoadState.NotLoading
-                if (isEmpty) {
+                if (refreshError != null && pagedItems.itemCount == 0) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        EmptyState(
+                            icon = Icons.Default.CloudOff,
+                            title = "Couldn't load gallery",
+                            message = refreshError.error.message
+                                ?: "Check your connection and try again.",
+                            action = {
+                                TextButton(onClick = { pagedItems.retry() }) {
+                                    Text("Retry")
+                                }
+                            },
+                        )
+                    }
+                } else if (isEmpty) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         if (isLoading || isInitialLoading) {
                             CircularProgressIndicator()
