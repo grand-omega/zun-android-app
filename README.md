@@ -44,10 +44,9 @@ keytool -genkey -v -keystore flux-release.jks -alias flux \
 cp keystore.properties.example keystore.properties
 ```
 
-Both `flux-release.jks` and `keystore.properties` are gitignored. If
-`keystore.properties` is absent, release falls back to the debug keystore — fine
-for quick testing, but the resulting APK cannot replace a build signed with any
-other key.
+Both `flux-release.jks` and `keystore.properties` are gitignored. Release builds
+require `keystore.properties`; Gradle fails the build if it is absent so a
+production APK is never published unsigned or debug-signed by accident.
 
 Build and install:
 ```bash

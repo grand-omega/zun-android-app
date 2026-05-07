@@ -40,10 +40,26 @@ jobs:
 
     # Decode the release keystore + write keystore.properties on tag builds.
     # The repo signing block in app/build.gradle.kts will pick these up
-    # automatically and produce a signed APK. Non-tag builds skip this and
-    # fall through to an unsigned release APK (or just debug).
+    # automatically and produce a signed APK. Tag builds must be signed.
+    - name: Require release signing secrets
+      if: startsWith(github.ref, 'refs/tags/v')
+      env:
+        ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        KEYSTORE_STORE_PASSWORD: ${{ secrets.KEYSTORE_STORE_PASSWORD }}
+        KEYSTORE_KEY_ALIAS: ${{ secrets.KEYSTORE_KEY_ALIAS }}
+        KEYSTORE_KEY_PASSWORD: ${{ secrets.KEYSTORE_KEY_PASSWORD }}
+      run: |
+        missing=0
+        for name in ANDROID_KEYSTORE_BASE64 KEYSTORE_STORE_PASSWORD KEYSTORE_KEY_ALIAS KEYSTORE_KEY_PASSWORD; do
+          if [[ -z "${!name}" ]]; then
+            echo "::error::$name is required for signed tag releases"
+            missing=1
+          fi
+        done
+        exit "$missing"
+
     - name: Decode release keystore
-      if: startsWith(github.ref, 'refs/tags/v') && env.ANDROID_KEYSTORE_BASE64 != ''
+      if: startsWith(github.ref, 'refs/tags/v')
       env:
         ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
       run: |
@@ -79,26 +95,20 @@ jobs:
     - name: Stage release APK for release upload
       if: startsWith(github.ref, 'refs/tags/v')
       run: |
-        # When signing succeeded the artifact is app-release.apk; otherwise it's
-        # app-release-unsigned.apk. Pick whichever exists so the workflow doesn't
-        # fail when secrets are missing.
         signed="app/build/outputs/apk/release/app-release.apk"
-        unsigned="app/build/outputs/apk/release/app-release-unsigned.apk"
-        if [[ -f "$signed" ]]; then
-          cp "$signed" "flux-edit-${{ github.ref_name }}.apk"
-        elif [[ -f "$unsigned" ]]; then
-          cp "$unsigned" "flux-edit-${{ github.ref_name }}-unsigned.apk"
+        if [[ ! -f "$signed" ]]; then
+          echo "::error::Signed release APK not found at $signed"
+          exit 1
         fi
+        cp "$signed" "flux-edit-${{ github.ref_name }}.apk"
 
     - name: Create Release
       if: startsWith(github.ref, 'refs/tags/v')
       uses: softprops/action-gh-release@v2
       with:
-        files: |
-          flux-edit-${{ github.ref_name }}.apk
-          flux-edit-${{ github.ref_name }}-unsigned.apk
+        files: flux-edit-${{ github.ref_name }}.apk
         name: ${{ github.ref_name }}
         draft: false
         prerelease: false
         generate_release_notes: true
-        fail_on_unmatched_files: false
+        fail_on_unmatched_files: true
