@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
+import okio.Path.Companion.toOkioPath
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import java.util.concurrent.TimeUnit
@@ -72,20 +73,27 @@ class FluxApp : Application() {
 
         rebuildOkHttp()
 
-        SingletonImageLoader.setSafe {
-            ImageLoader.Builder(this)
+        SingletonImageLoader.setSafe { ctx ->
+            ImageLoader.Builder(ctx)
                 .components {
                     add(OkHttpNetworkFetcherFactory(callFactory = { okHttpClient }))
                 }
-                // OfflineImageCache already persists thumb/preview/result to disk; Coil's
-                // disk cache would just double-bookkeep. Keep a small memory cache so
-                // recently-shown tiles don't decode again on scroll.
+                // Memory cache holds a few full-res bitmaps so scroll-back and Telephoto
+                // sub-pixel zoom don't re-decode at lower resolution.
                 .memoryCache {
                     MemoryCache.Builder()
                         .maxSizeBytes(Tuning.COIL_MEMORY_CACHE_BYTES)
                         .build()
                 }
-                .diskCache(null as DiskCache?)
+                // URL-keyed disk cache is separate from OfflineImageCache (job-keyed). Both
+                // exist on purpose: Coil's cache lets the zoomable viewer re-decode at
+                // higher resolution from local bytes without re-downloading.
+                .diskCache {
+                    DiskCache.Builder()
+                        .directory(cacheDir.resolve("coil_image_cache").toOkioPath())
+                        .maxSizeBytes(Tuning.COIL_DISK_CACHE_BYTES)
+                        .build()
+                }
                 .build()
         }
 

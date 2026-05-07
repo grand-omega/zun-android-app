@@ -39,9 +39,15 @@ object Tuning {
      *  lower = less competition with foreground network requests. */
     const val OFFLINE_PREFETCH_CONCURRENCY = 3
 
-    /** Coil in-memory cache size in bytes. Kept small because [data.repo.OfflineImageCache]
-     *  already persists to disk; Coil only needs to short-circuit *recently shown* images. */
-    const val COIL_MEMORY_CACHE_BYTES = 50L * 1024L * 1024L
+    /** Coil in-memory cache size in bytes. Sized to comfortably hold a few full-resolution
+     *  bitmaps (one 4K ARGB_8888 bitmap is ~32–64 MB) so that scroll-back and zoom revisits
+     *  don't re-decode and re-downsample. */
+    const val COIL_MEMORY_CACHE_BYTES = 256L * 1024L * 1024L
+
+    /** Coil's URL-keyed disk cache. Separate from [OFFLINE_IMAGE_CACHE_MAX_BYTES] (which is
+     *  job-keyed and long-lived); Coil's cache is short-lived but lets sub-pixel zoom in the
+     *  photo viewer re-decode at higher resolution without re-downloading. */
+    const val COIL_DISK_CACHE_BYTES = 256L * 1024L * 1024L
 
     // --- Paging ---------------------------------------------------------------
 
