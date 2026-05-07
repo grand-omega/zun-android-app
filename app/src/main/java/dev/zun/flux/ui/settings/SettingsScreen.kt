@@ -8,8 +8,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -27,7 +25,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -40,7 +37,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -129,7 +125,7 @@ fun SettingsScreen(
                 title = "Security",
                 detail = "Controls when FluxEdit asks for biometric or device unlock after backgrounding.",
             ) {
-                LockoutDropdown(
+                OptionDropdown(
                     options = lockoutOptions,
                     selected = lockoutDuration,
                     onSelected = {
@@ -143,29 +139,12 @@ fun SettingsScreen(
                 title = "Connection",
                 detail = "Changes are tested before replacing the active server route.",
             ) {
-                Column(modifier = Modifier.selectableGroup()) {
-                    Text("Mode", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom = 4.dp))
-                    connectionModeOptions.forEach { (mode, label) ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .selectable(
-                                    selected = connectionDraft.connectionMode == mode,
-                                    onClick = { viewModel.updateConnectionMode(mode) },
-                                    role = Role.RadioButton,
-                                )
-                                .padding(vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            RadioButton(selected = connectionDraft.connectionMode == mode, onClick = null)
-                            Text(
-                                text = label,
-                                style = MaterialTheme.typography.bodyLarge,
-                                modifier = Modifier.padding(start = 16.dp),
-                            )
-                        }
-                    }
-                }
+                Text("Mode", style = MaterialTheme.typography.bodyMedium)
+                OptionDropdown(
+                    options = connectionModeOptions,
+                    selected = connectionDraft.connectionMode,
+                    onSelected = viewModel::updateConnectionMode,
+                )
 
                 OutlinedTextField(
                     value = connectionDraft.lanUrl,
@@ -425,13 +404,14 @@ private fun activeRouteLabel(route: ActiveRoute): String = when (route) {
 }
 
 @Composable
-private fun LockoutDropdown(
-    options: List<Pair<Long, String>>,
-    selected: Long,
-    onSelected: (Long) -> Unit,
+private fun <T> OptionDropdown(
+    options: List<Pair<T, String>>,
+    selected: T,
+    onSelected: (T) -> Unit,
+    placeholder: String = "Custom",
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val currentLabel = options.firstOrNull { it.first == selected }?.second ?: "Custom"
+    val currentLabel = options.firstOrNull { it.first == selected }?.second ?: placeholder
 
     Box(modifier = Modifier.fillMaxWidth()) {
         TextButton(
@@ -459,11 +439,11 @@ private fun LockoutDropdown(
             expanded = expanded,
             onDismissRequest = { expanded = false },
         ) {
-            options.forEach { (duration, label) ->
+            options.forEach { (value, label) ->
                 DropdownMenuItem(
                     text = { Text(label) },
                     onClick = {
-                        onSelected(duration)
+                        onSelected(value)
                         expanded = false
                     },
                 )
