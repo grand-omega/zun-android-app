@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Pre-push hook: mirror CI checks so pushes that would fail in
+# .github/workflows/android.yml are caught locally first.
+#
+# Bypass with `git push --no-verify` if you need to push work-in-progress.
+# Skip entirely with `SKIP_PREPUSH=1 git push`.
+
+set -e
+
+if [[ "${SKIP_PREPUSH:-}" == "1" ]]; then
+    echo "pre-push: SKIP_PREPUSH=1, skipping checks"
+    exit 0
+fi
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+
+echo "pre-push: running spotlessCheck, testDebugUnitTest, assembleDebug, lintDebug"
+./gradlew --quiet \
+    spotlessCheck \
+    testDebugUnitTest \
+    assembleDebug \
+    lintDebug
