@@ -11,6 +11,7 @@ import dev.zun.flux.data.api.PromptDto
 import dev.zun.flux.data.repo.ConnectionDiagnosis
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.data.repo.JobTagStats
+import dev.zun.flux.data.repo.JobUploadStatus
 import dev.zun.flux.data.repo.OfflineCacheStats
 import dev.zun.flux.data.repo.OfflineImageAvailability
 import kotlinx.coroutines.CompletableDeferred
@@ -271,6 +272,38 @@ private class RecordingRepository : JobRepository {
         onUploadProgress?.invoke(1f)
         return JobCreatedResponse(job_id = "job-${nextJobNumber++}", input_id = 1)
     }
+
+    private val pendingUploads = mutableMapOf<java.util.UUID, JobUploadStatus>()
+
+    override suspend fun enqueueJobUpload(
+        inputUri: Uri,
+        promptId: Long?,
+        promptText: String?,
+        workflow: String?,
+    ): java.util.UUID {
+        val resp = submitJob(inputUri, promptId, promptText, workflow, onUploadProgress = null)
+        val workId = java.util.UUID.randomUUID()
+        pendingUploads[workId] = JobUploadStatus.Succeeded(jobId = resp.job_id, inputId = resp.input_id)
+        return workId
+    }
+
+    override fun observeJobUpload(uuid: java.util.UUID): Flow<JobUploadStatus> = MutableStateFlow(
+        pendingUploads[uuid] ?: JobUploadStatus.Pending,
+    )
+
+    override suspend fun submitStagedJob(
+        filePath: String,
+        promptId: Long?,
+        promptText: String?,
+        workflow: String?,
+        onUploadProgress: ((Float) -> Unit)?,
+    ): JobCreatedResponse = submitJob(
+        inputUri = Uri.parse("file://$filePath"),
+        promptId = promptId,
+        promptText = promptText,
+        workflow = workflow,
+        onUploadProgress = onUploadProgress,
+    )
 
     override suspend fun getJob(jobId: String): JobStatusDto = JobStatusDto(
         id = jobId,

@@ -40,6 +40,7 @@ class FakeJobRepository(
     private val entries = ConcurrentHashMap<String, Entry>()
     private val cancelledIds = ConcurrentHashMap.newKeySet<String>()
     private val deletedIds = ConcurrentHashMap.newKeySet<String>()
+    private val completedUploads = ConcurrentHashMap<java.util.UUID, JobCreatedResponse>()
     private val updates = MutableStateFlow(0)
     private val nextInputId = AtomicInteger(1)
 
@@ -112,6 +113,45 @@ class FakeJobRepository(
         updates.value++
         return JobCreatedResponse(job_id = id, input_id = inputId)
     }
+
+    override suspend fun enqueueJobUpload(
+        inputUri: Uri,
+        promptId: Long?,
+        promptText: String?,
+        workflow: String?,
+    ): java.util.UUID {
+        // The fake fulfills the contract synchronously: it submits and stores
+        // the result keyed by the returned UUID for [observeJobUpload].
+        val resp = submitJob(inputUri, promptId, promptText, workflow, onUploadProgress = null)
+        val workId = java.util.UUID.randomUUID()
+        completedUploads[workId] = resp
+        return workId
+    }
+
+    override fun observeJobUpload(uuid: java.util.UUID): Flow<JobUploadStatus> {
+        val resp = completedUploads[uuid]
+        return MutableStateFlow(
+            if (resp != null) {
+                JobUploadStatus.Succeeded(jobId = resp.job_id, inputId = resp.input_id)
+            } else {
+                JobUploadStatus.Pending
+            },
+        )
+    }
+
+    override suspend fun submitStagedJob(
+        filePath: String,
+        promptId: Long?,
+        promptText: String?,
+        workflow: String?,
+        onUploadProgress: ((Float) -> Unit)?,
+    ): JobCreatedResponse = submitJob(
+        inputUri = Uri.fromFile(java.io.File(filePath)),
+        promptId = promptId,
+        promptText = promptText,
+        workflow = workflow,
+        onUploadProgress = onUploadProgress,
+    )
 
     override suspend fun getJob(jobId: String): JobStatusDto {
         if (deletedIds.contains(jobId)) error("Job was deleted")
