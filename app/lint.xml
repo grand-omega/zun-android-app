@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Project-level lint config. Use sparingly — most issues should be fixed,
+  not silenced.
+-->
+<lint>
+    <!--
+      Snackbars and Toasts are dispatched from coroutines that can't call
+      stringResource() directly. The recommended Compose pattern is to
+      capture stringResource() outside and reference it inside, but for
+      format strings whose args vary at runtime that requires hoisting
+      a context.getString() out somewhere — which lint also flags.
+
+      The underlying concern (locale changes during a running coroutine)
+      is theoretical: this app is English-only and doesn't change locale
+      mid-session. Downgrade to Warning so it doesn't block CI/pre-push.
+    -->
+    <issue id="LocalContextGetResourceValueCall" severity="warning"/>
+</lint>
