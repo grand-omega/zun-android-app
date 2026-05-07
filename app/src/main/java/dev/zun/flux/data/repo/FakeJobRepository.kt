@@ -253,6 +253,31 @@ class FakeJobRepository(
         updates.value++
     }
 
+    /**
+     * Test helper: seed the repository with already-finished jobs so they appear
+     * in [getJobsFlow] and [pagedJobs] without going through the queued/running
+     * timeline. The IDs are inserted in order; their `created_at` is staggered
+     * so date separators behave normally.
+     */
+    fun seedDoneJobs(ids: List<String>) {
+        val now = System.currentTimeMillis() / 1000
+        // 10 minutes of headroom puts them past queuedDuration + runningDuration
+        // for any reasonable constructor args.
+        val baseAt = now - 600
+        ids.forEachIndexed { idx, id ->
+            entries[id] = Entry(
+                id = id,
+                inputUri = Uri.parse("content://test/$id"),
+                inputId = nextInputId.getAndIncrement(),
+                promptId = 1L,
+                promptText = null,
+                workflow = "flux2_klein_edit",
+                createdAt = baseAt - idx,
+            )
+        }
+        updates.value++
+    }
+
     override fun getJobsFlow(): Flow<List<JobSummaryDto>> = updates.map {
         listJobs(status = "done", limit = 100, cursor = null, inputId = null).items
     }
