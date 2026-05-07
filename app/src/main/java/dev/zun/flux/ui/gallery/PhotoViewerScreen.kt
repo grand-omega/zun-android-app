@@ -8,11 +8,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.calculatePan
-import androidx.compose.foundation.gestures.calculateZoom
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,7 +26,6 @@ import androidx.compose.material.icons.automirrored.filled.CompareArrows
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.ImageNotSupported
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -50,7 +44,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -58,19 +51,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
-import coil3.compose.SubcomposeAsyncImage
-import coil3.compose.SubcomposeAsyncImageContent
+import coil3.request.ImageRequest
 import dev.zun.flux.data.api.JobSummaryDto
 import dev.zun.flux.data.api.PromptDto
 import dev.zun.flux.data.api.effectivePromptId
@@ -83,6 +70,10 @@ import dev.zun.flux.util.saveToPictures
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import me.saket.telephoto.zoomable.ZoomSpec
+import me.saket.telephoto.zoomable.coil3.ZoomableAsyncImage
+import me.saket.telephoto.zoomable.rememberZoomableImageState
+import me.saket.telephoto.zoomable.rememberZoomableState
 import java.text.SimpleDateFormat
 import java.util.Date
 
@@ -310,7 +301,6 @@ fun PhotoViewerScreen(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ZoomableImage(
     model: Any?,
@@ -318,109 +308,50 @@ private fun ZoomableImage(
     onZoomedChange: (Boolean) -> Unit,
     shouldReset: Boolean,
 ) {
-    var scale by remember { mutableFloatStateOf(1f) }
-    var offset by remember { mutableStateOf(Offset.Zero) }
-    var viewportSize by remember { mutableStateOf(androidx.compose.ui.geometry.Size.Zero) }
-
-    fun clampOffset(
-        candidate: Offset,
-        currentScale: Float,
-    ): Offset {
-        if (currentScale <= 1f) return Offset.Zero
-        val maxX = (viewportSize.width * (currentScale - 1f)) / 2f
-        val maxY = (viewportSize.height * (currentScale - 1f)) / 2f
-        return Offset(
-            x = candidate.x.coerceIn(-maxX, maxX),
-            y = candidate.y.coerceIn(-maxY, maxY),
-        )
-    }
+    val zoomableState = rememberZoomableState(zoomSpec = ZoomSpec(maxZoomFactor = 5f))
+    val zoomableImageState = rememberZoomableImageState(zoomableState)
+    var loadError by remember(model) { mutableStateOf(false) }
 
     LaunchedEffect(shouldReset) {
         if (shouldReset) {
-            scale = 1f
-            offset = Offset.Zero
-            onZoomedChange(false)
+            zoomableState.resetZoom(withAnimation = false)
         }
     }
 
-    LaunchedEffect(scale) {
-        onZoomedChange(scale > 1.01f)
+    LaunchedEffect(zoomableState.zoomFraction) {
+        val frac = zoomableState.zoomFraction
+        onZoomedChange(frac != null && frac > 0.01f)
     }
 
     Box(
-        modifier =
-        Modifier
-            .fillMaxSize()
-            .onSizeChanged { size ->
-                viewportSize = androidx.compose.ui.geometry.Size(size.width.toFloat(), size.height.toFloat())
-                offset = clampOffset(offset, scale)
-            }
-            .pointerInput(viewportSize, scale) {
-                detectTapGestures(
-                    onTap = { onClick() },
-                    onDoubleTap = { tap ->
-                        if (scale > 1.01f) {
-                            scale = 1f
-                            offset = Offset.Zero
-                        } else {
-                            val targetScale = 2.5f
-                            val center = Offset(viewportSize.width / 2f, viewportSize.height / 2f)
-                            scale = targetScale
-                            offset = clampOffset((center - tap) * (targetScale - 1f), targetScale)
-                        }
-                    },
-                )
-            }
-            .pointerInput(Unit) {
-                awaitEachGesture {
-                    awaitFirstDown(requireUnconsumed = false)
-                    do {
-                        val event = awaitPointerEvent()
-                        val pressedCount = event.changes.count { it.pressed }
-                        val shouldHandle = pressedCount >= 2 || scale > 1.01f
-                        if (shouldHandle) {
-                            val nextScale = (scale * event.calculateZoom()).coerceIn(1f, 5f)
-                            val nextOffset = if (nextScale > 1.01f) {
-                                offset + event.calculatePan()
-                            } else {
-                                Offset.Zero
-                            }
-                            scale = nextScale
-                            offset = clampOffset(nextOffset, nextScale)
-                            event.changes.forEach { change ->
-                                if (change.positionChanged()) change.consume()
-                            }
-                        }
-                    } while (event.changes.any { it.pressed })
-                }
-            },
+        modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center,
     ) {
-        SubcomposeAsyncImage(
-            model = model,
-            contentDescription = null,
-            contentScale = ContentScale.Fit,
-            modifier =
-            Modifier
-                .fillMaxSize()
-                .graphicsLayer(
-                    scaleX = scale,
-                    scaleY = scale,
-                    translationX = offset.x,
-                    translationY = offset.y,
-                ),
-            loading = {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    androidx.compose.material3.CircularProgressIndicator(color = Color.White)
-                }
-            },
-            error = {
-                MissingViewerImage()
-            },
-            success = {
-                SubcomposeAsyncImageContent()
-            },
-        )
+        if (loadError) {
+            MissingViewerImage()
+        } else {
+            val context = LocalContext.current
+            val request = remember(model) {
+                ImageRequest.Builder(context)
+                    .data(model)
+                    .listener(
+                        onSuccess = { _, _ -> loadError = false },
+                        onError = { _, _ -> loadError = true },
+                    )
+                    .build()
+            }
+            ZoomableAsyncImage(
+                model = request,
+                contentDescription = null,
+                state = zoomableImageState,
+                contentScale = ContentScale.Fit,
+                onClick = { onClick() },
+                modifier = Modifier.fillMaxSize(),
+            )
+            if (!zoomableImageState.isImageDisplayed && !zoomableImageState.isPlaceholderDisplayed) {
+                androidx.compose.material3.CircularProgressIndicator(color = Color.White)
+            }
+        }
     }
 }
 
