@@ -85,7 +85,7 @@ class SettingsManager(context: Context) {
             prefs.edit { putBoolean(KEY_LEGACY_MIGRATED, true) }
             return
         }
-        runCatching {
+        val migrated = runCatching {
             val masterKey = MasterKey.Builder(context)
                 .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
                 .build()
@@ -96,9 +96,16 @@ class SettingsManager(context: Context) {
                 EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
                 EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
             )
-            legacy.getString(KEY_LAN_URL, null)?.let { lanUrl = it }
+            val legacyLan = legacy.getString(KEY_LAN_URL, null)
+            val legacyServer = legacy.getString(KEY_SERVER_URL, null)
+            // Pre-split installs only had KEY_SERVER_URL. Treat that as the LAN URL so
+            // setup stays valid; otherwise the resolver clears serverUrl on next pass
+            // and forces the user back through setup.
+            val effectiveLan = legacyLan?.takeUnless { it.isBlank() }
+                ?: legacyServer?.takeUnless { it.isBlank() }
+            effectiveLan?.let { lanUrl = it }
             legacy.getString(KEY_TAILSCALE_URL, null)?.let { tailscaleUrl = it }
-            legacy.getString(KEY_SERVER_URL, null)?.let { serverUrl = it }
+            legacyServer?.let { serverUrl = it }
             legacy.getString(KEY_ACTIVE_ROUTE, null)?.let { prefs.edit { putString(KEY_ACTIVE_ROUTE, it) } }
             legacy.getString(KEY_CONNECTION_MODE, null)?.let { prefs.edit { putString(KEY_CONNECTION_MODE, it) } }
             if (legacy.contains(KEY_LOCKOUT_DURATION)) {
@@ -108,10 +115,14 @@ class SettingsManager(context: Context) {
                 lastAuthTimestamp = legacy.getLong(KEY_LAST_AUTH_TIMESTAMP, 0L)
             }
             legacy.getString(KEY_API_TOKEN, null)?.let { apiToken = it }
+        }.isSuccess
+
+        // Only commit the "migration done" flag (and wipe the legacy file) on success.
+        // Otherwise a transient decrypt failure would silently nuke the user's token.
+        if (migrated) {
+            context.deleteSharedPreferences(LEGACY_PREFS_NAME)
+            prefs.edit { putBoolean(KEY_LEGACY_MIGRATED, true) }
         }
-        // Best-effort wipe of the legacy file so secrets don't linger on disk.
-        context.deleteSharedPreferences(LEGACY_PREFS_NAME)
-        prefs.edit { putBoolean(KEY_LEGACY_MIGRATED, true) }
     }
 
     companion object {
