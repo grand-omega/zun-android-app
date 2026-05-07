@@ -57,6 +57,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLocale
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import coil3.request.ImageRequest
@@ -237,16 +238,22 @@ fun PhotoViewerScreen(
                 val job = jobs.getOrNull(page) ?: return@HorizontalPager
                 val previewModel = repository.previewModel(job.id)
 
-                ZoomableImage(
-                    model = previewModel,
-                    onClick = { showUI = !showUI },
-                    onZoomedChange = { isZoomed ->
-                        if (pagerState.currentPage == page) {
-                            zoomedPage = if (isZoomed) job.id else null
-                        }
-                    },
-                    shouldReset = pagerState.currentPage != page,
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .testTag("viewer_page_${job.id}"),
+                ) {
+                    ZoomableImage(
+                        model = previewModel,
+                        onClick = { showUI = !showUI },
+                        onZoomedChange = { isZoomed ->
+                            if (pagerState.currentPage == page) {
+                                zoomedPage = if (isZoomed) job.id else null
+                            }
+                        },
+                        shouldReset = pagerState.currentPage != page,
+                    )
+                }
             }
 
             // Details Overlay (Modal)

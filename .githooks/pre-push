@@ -15,6 +15,22 @@ fi
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd "$REPO_ROOT"
 
+# JAVA_HOME may point at a stale path (e.g. an uninstalled Android Studio snap)
+# from a long-lived shell session. Probe sensible fallbacks before invoking
+# Gradle so a forgotten `source config.fish` doesn't block pushes.
+if [[ -n "${JAVA_HOME:-}" && ! -x "${JAVA_HOME}/bin/java" ]]; then
+    for candidate in \
+        /opt/android-studio/jbr \
+        /snap/android-studio/current/jbr \
+        /usr/lib/jvm/default-java; do
+        if [[ -x "${candidate}/bin/java" ]]; then
+            echo "pre-push: JAVA_HOME=$JAVA_HOME is invalid, falling back to $candidate"
+            export JAVA_HOME="$candidate"
+            break
+        fi
+    done
+fi
+
 echo "pre-push: running spotlessCheck, testDebugUnitTest, assembleDebug, lintDebug"
 ./gradlew --quiet \
     spotlessCheck \
