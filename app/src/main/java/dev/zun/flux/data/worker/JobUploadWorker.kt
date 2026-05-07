@@ -78,5 +78,9 @@ class JobUploadWorker(
         const val KEY_JOB_ID = "job_id"
         const val KEY_INPUT_ID = "input_id"
         const val KEY_ERROR = "error"
+
+        /** Tag applied to every job upload, so callers can query queue depth via
+         *  [WorkManager.getWorkInfosByTagFlow]. */
+        const val TAG = "job_upload"
     }
 }

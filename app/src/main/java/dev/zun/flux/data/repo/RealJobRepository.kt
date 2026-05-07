@@ -124,6 +124,7 @@ class RealJobRepository(
                     .build(),
             )
             .addTag(STAGED_PATH_TAG_PREFIX + staged.absolutePath)
+            .addTag(JobUploadWorker.TAG)
             .build()
         WorkManager.getInstance(context).enqueue(request)
         return request.id

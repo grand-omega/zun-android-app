@@ -44,14 +44,20 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
 import dev.zun.flux.BuildConfig
 import dev.zun.flux.FluxApp
 import dev.zun.flux.data.repo.ActiveRoute
 import dev.zun.flux.data.repo.ConnectionMode
+import dev.zun.flux.data.worker.JobUploadWorker
 import dev.zun.flux.ui.common.ScreenPadding
 import dev.zun.flux.ui.common.SettingsGroup
 import dev.zun.flux.ui.common.StatusPill
 import dev.zun.flux.ui.common.StatusTone
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -68,6 +74,11 @@ fun SettingsScreen(
     var lockoutDuration by remember { mutableLongStateOf(settingsManager.lockoutDurationMs) }
     val connectionDraft by viewModel.connectionDraft.collectAsStateWithLifecycle()
     val offlineCache by viewModel.offlineCache.collectAsStateWithLifecycle()
+    val diagnostics by app.diagnostics.state.collectAsStateWithLifecycle()
+    val uploadQueueFlow = remember(app) {
+        WorkManager.getInstance(app).getWorkInfosByTagFlow(JobUploadWorker.TAG)
+    }
+    val uploadQueue by uploadQueueFlow.collectAsStateWithLifecycle(initialValue = emptyList())
 
     var tokenVisible by remember { mutableStateOf(false) }
     var showClearCacheConfirm by remember { mutableStateOf(false) }
@@ -262,12 +273,41 @@ fun SettingsScreen(
                 }
             }
 
+            SettingsGroup(
+                title = "Diagnostics",
+                detail = "Snapshot of recent network activity. Useful when something feels off.",
+            ) {
+                InfoRow("Active Route", activeRouteLabel(settingsManager.activeRoute))
+                InfoRow("Last Successful Request", relativeTimeOrDash(diagnostics.lastSuccessAtMs))
+                val pendingUploads = uploadQueue.count {
+                    it.state == WorkInfo.State.ENQUEUED || it.state == WorkInfo.State.RUNNING
+                }
+                InfoRow("Upload Queue", "$pendingUploads pending")
+                if (diagnostics.recentErrors.isNotEmpty()) {
+                    Text(
+                        text = "Recent Errors",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.secondary,
+                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        diagnostics.recentErrors.forEach { err ->
+                            Text(
+                                text = "${formatClock(err.timestampMs)}  ${err.path}  —  ${err.message}",
+                                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                } else {
+                    StatusPill(label = "No errors recorded", tone = StatusTone.Success)
+                }
+            }
+
             SettingsGroup(title = "App Info") {
                 InfoRow("Version", BuildConfig.VERSION_NAME)
                 InfoRow("Build", BuildConfig.VERSION_CODE.toString())
                 InfoRow("Package", BuildConfig.APPLICATION_ID)
                 InfoRow("Mode", connectionModeLabel(settingsManager.connectionMode))
-                InfoRow("Active Route", activeRouteLabel(settingsManager.activeRoute))
                 InfoRow("Active URL", settingsManager.serverUrl ?: "(none)", isMonospace = true)
                 InfoRow("LAN URL", settingsManager.lanUrl ?: "(not set)", isMonospace = true)
                 InfoRow("Tailscale URL", settingsManager.tailscaleUrl ?: "(not set)", isMonospace = true)
@@ -316,6 +356,20 @@ private fun activeRouteLabel(route: ActiveRoute): String = when (route) {
     ActiveRoute.LAN -> "LAN"
     ActiveRoute.TAILSCALE -> "Tailscale"
 }
+
+private fun relativeTimeOrDash(timestampMs: Long?): String {
+    if (timestampMs == null) return "—"
+    val deltaSec = (System.currentTimeMillis() - timestampMs) / 1000
+    return when {
+        deltaSec < 5 -> "just now"
+        deltaSec < 60 -> "${deltaSec}s ago"
+        deltaSec < 3600 -> "${deltaSec / 60}m ago"
+        deltaSec < 86_400 -> "${deltaSec / 3600}h ago"
+        else -> "${deltaSec / 86_400}d ago"
+    }
+}
+
+private fun formatClock(timestampMs: Long): String = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(timestampMs))
 
 private fun formatBytes(bytes: Long): String {
     val mb = bytes / (1024.0 * 1024.0)

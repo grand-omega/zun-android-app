@@ -18,7 +18,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -54,17 +56,24 @@ fun PromptLibrarySheet(
     onManagePrompts: () -> Unit,
     onSelectPrompt: (Long) -> Unit,
     onDismiss: () -> Unit,
+    pinnedIds: Set<Long> = emptySet(),
+    onTogglePin: (Long) -> Unit = {},
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var query by remember { mutableStateOf("") }
 
     val builtIns = prompts.filter { it.id != CUSTOM_PROMPT_ID }
-    val filtered = remember(query, builtIns) {
+    val matched = remember(query, builtIns) {
         if (query.isBlank()) {
             builtIns
         } else {
             builtIns.filter { it.label.contains(query.trim(), ignoreCase = true) }
         }
+    }
+    // Pinned first, original order preserved within each group.
+    val ordered = remember(matched, pinnedIds) {
+        val (pinned, rest) = matched.partition { it.id in pinnedIds }
+        pinned + rest
     }
 
     ModalBottomSheet(
@@ -139,15 +148,17 @@ fun PromptLibrarySheet(
                     .fillMaxWidth()
                     .heightIn(max = 360.dp),
             ) {
-                items(filtered, key = { it.id }) { prompt ->
+                items(ordered, key = { it.id }) { prompt ->
                     PromptRow(
                         label = prompt.label,
                         description = prompt.description,
                         selected = selectedPromptId == prompt.id,
+                        pinned = prompt.id in pinnedIds,
                         onClick = { onSelectPrompt(prompt.id) },
+                        onTogglePin = { onTogglePin(prompt.id) },
                     )
                 }
-                if (filtered.isEmpty()) {
+                if (ordered.isEmpty()) {
                     item {
                         Text(
                             text = "No prompts match \"$query\"",
@@ -167,7 +178,9 @@ private fun PromptRow(
     label: String,
     description: String?,
     selected: Boolean,
+    pinned: Boolean,
     onClick: () -> Unit,
+    onTogglePin: () -> Unit,
 ) {
     val containerColor = if (selected) {
         MaterialTheme.colorScheme.secondaryContainer
@@ -211,6 +224,18 @@ private fun PromptRow(
                         color = MaterialTheme.colorScheme.secondary,
                     )
                 }
+            }
+            IconButton(onClick = onTogglePin) {
+                Icon(
+                    imageVector = if (pinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
+                    contentDescription = if (pinned) "Unpin prompt" else "Pin prompt",
+                    tint = if (pinned) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    modifier = Modifier.size(18.dp),
+                )
             }
         }
     }

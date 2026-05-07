@@ -117,6 +117,7 @@ fun HomeScreen(
 
     val context = androidx.compose.ui.platform.LocalContext.current
     val app = context.applicationContext as FluxApp
+    val pinnedIds by app.pinnedPrompts.ids.collectAsStateWithLifecycle()
     val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
     val density = LocalDensity.current
     val refreshThresholdPx = with(density) { 96.dp.toPx() }
@@ -331,6 +332,8 @@ fun HomeScreen(
                 recents = recents,
                 isFetchingRecent = isFetchingRecent,
                 onPickRecent = onPickRecent,
+                pinnedIds = pinnedIds,
+                onTogglePin = { app.pinnedPrompts.toggle(it) },
             )
             if (isRefreshing || pullDistancePx > 0f) {
                 Surface(
@@ -419,6 +422,8 @@ private fun HomeContent(
     recents: List<Triple<Int, Any?, Boolean>>,
     isFetchingRecent: Boolean,
     onPickRecent: (Int) -> Unit,
+    pinnedIds: Set<Long>,
+    onTogglePin: (Long) -> Unit,
 ) {
     var showPromptSheet by rememberSaveable { mutableStateOf(false) }
     var showPromptManageSheet by rememberSaveable { mutableStateOf(false) }
@@ -525,6 +530,8 @@ private fun HomeContent(
                 if (id != CUSTOM_PROMPT_ID) showPromptSheet = false
             },
             onDismiss = { showPromptSheet = false },
+            pinnedIds = pinnedIds,
+            onTogglePin = onTogglePin,
         )
     }
 
