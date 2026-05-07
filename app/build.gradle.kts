@@ -10,6 +10,50 @@ plugins {
 
 val keystorePropsFile = rootProject.file("keystore.properties")
 
+/**
+ * Run a command and return its trimmed stdout, or null on any failure
+ * (missing binary, non-zero exit, etc.). Used for git-derived version
+ * metadata so a missing .git dir or shallow clone doesn't break the build —
+ * callers fall back to a hardcoded default.
+ *
+ * Uses [providers.exec] so the call is configuration-cache safe under
+ * Gradle 9+ (ProcessBuilder at configuration time is forbidden).
+ */
+fun execOrNull(vararg args: String): String? = runCatching {
+    val out = providers.exec {
+        commandLine(*args)
+        workingDir = rootProject.projectDir
+        isIgnoreExitValue = true
+    }
+    if (out.result.get().exitValue != 0) return@runCatching null
+    out.standardOutput.asText.get().trim().takeIf { it.isNotEmpty() }
+}.getOrNull()
+
+/**
+ * versionCode = number of commits in HEAD's history. Monotonically increases,
+ * never resets, satisfies Play Store's "must be a positive integer that
+ * increases each release" rule. Override with VERSION_CODE_OVERRIDE env var
+ * for CI tag builds where the working copy might be a shallow checkout.
+ */
+val resolvedVersionCode: Int = (
+    System.getenv("VERSION_CODE_OVERRIDE")?.toIntOrNull()
+        ?: execOrNull("git", "rev-list", "--count", "HEAD")?.toIntOrNull()
+        ?: 1
+    )
+
+/**
+ * versionName from `git describe --tags --dirty --always`. Examples:
+ *   v1.0.0                     (clean tag)
+ *   v1.0.0-3-gabc1234          (3 commits past v1.0.0)
+ *   v1.0.0-3-gabc1234-dirty    (uncommitted changes)
+ *   abc1234                    (no tags yet, falls back to short SHA)
+ */
+val resolvedVersionName: String = (
+    System.getenv("VERSION_NAME_OVERRIDE")
+        ?: execOrNull("git", "describe", "--tags", "--dirty", "--always")
+        ?: "1.0.0-dev"
+    )
+
 android {
     namespace = "dev.zun.flux"
     compileSdk = 36
@@ -19,8 +63,8 @@ android {
         applicationId = "dev.zun.flux"
         minSdk = 30
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = resolvedVersionCode
+        versionName = resolvedVersionName
     }
 
     val keystoreProps = Properties().apply {

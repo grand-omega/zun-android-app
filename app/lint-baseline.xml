@@ -1,4 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Baseline rationale (audited 2026-05):
+
+  - OldTargetApi / GradleDependency: SDK 37 is available but 36 is current and
+    stable for our minSdk = 30 install base. Bump deferred until we have a
+    concrete reason (a 37-only API or Play Store deadline). Keep baselined.
+
+  - AcceptsUserCertificates / InsecureBaseConfiguration: scoped to the debug
+    variant's network_security_config.xml. Cleartext + user CAs are required
+    for local dev against self-hosted servers (HTTP LAN URLs, mitmproxy
+    inspection). The release variant ships with cleartextTrafficPermitted=false
+    and system trust anchors only. Intentional; keep baselined.
+-->
 <issues format="6" by="lint 9.2.0" type="baseline" client="gradle" dependencies="false" name="AGP (9.2.0)" variant="all" version="9.2.0">
 
     <issue
