@@ -99,13 +99,18 @@ class FluxApp : Application() {
 
         rebuildRepository()
 
-        // Re-pick LAN vs Tailscale on every default-network change.
+        // Re-pick LAN vs Tailscale on every default-network change. Network changes
+        // must bypass the resolver's debounce cache — otherwise a Wi-Fi → cellular
+        // transition shortly after a successful probe keeps the stale URL until the
+        // window expires, and LAN↔Tailscale failover stops working.
         val cm = getSystemService(ConnectivityManager::class.java)
         cm?.registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
+                networkResolver.invalidateCache()
                 networkResolver.refresh()
             }
             override fun onLost(network: Network) {
+                networkResolver.invalidateCache()
                 networkResolver.refresh()
             }
         })
