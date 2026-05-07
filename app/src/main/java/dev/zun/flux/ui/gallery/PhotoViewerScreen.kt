@@ -48,6 +48,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -89,16 +90,25 @@ fun PhotoViewerScreen(
 ) {
     val jobs by viewModel.jobs.collectAsState()
     val prompts by viewModel.prompts.collectAsState()
-    val initialIndex =
-        remember(initialJobId, jobs) {
-            jobs.indexOfFirst { it.id == initialJobId }.coerceAtLeast(0)
-        }
 
     val pagerState =
         rememberPagerState(
-            initialPage = initialIndex,
+            initialPage = 0,
             pageCount = { jobs.size },
         )
+
+    // jobs may still be loading on first entry, so the index isn't resolvable
+    // at composition time. Scroll once it is — but only once, so user swipes
+    // aren't yanked back.
+    var didInitialScroll by rememberSaveable(initialJobId) { mutableStateOf(false) }
+    LaunchedEffect(jobs, initialJobId) {
+        if (didInitialScroll) return@LaunchedEffect
+        val idx = jobs.indexOfFirst { it.id == initialJobId }
+        if (idx >= 0) {
+            pagerState.scrollToPage(idx)
+            didInitialScroll = true
+        }
+    }
 
     var showDetails by remember { mutableStateOf(false) }
     var showCompare by remember { mutableStateOf(false) }
