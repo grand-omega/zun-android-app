@@ -65,6 +65,7 @@ import dev.zun.flux.ui.home.PromptManageSheet
 import dev.zun.flux.util.resolvePromptLabel
 import dev.zun.flux.util.saveToPictures
 import dev.zun.flux.util.shareImage
+import dev.zun.flux.util.toUserMessage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -162,7 +163,7 @@ fun ResultScreen(
                 } catch (t: Throwable) {
                     Toast.makeText(
                         context,
-                        "Regenerate failed: ${t.message}",
+                        t.toUserMessage("regenerate"),
                         Toast.LENGTH_SHORT,
                     ).show()
                 } finally {
@@ -180,7 +181,7 @@ fun ResultScreen(
             } catch (t: Throwable) {
                 Toast.makeText(
                     context,
-                    "Delete failed: ${t.message}",
+                    t.toUserMessage("delete"),
                     Toast.LENGTH_SHORT,
                 ).show()
             }
@@ -318,7 +319,7 @@ fun ResultScreen(
                                     saveToPictures(context, src, "flux-$jobId.jpg")
                                     "Saved to Pictures/FluxEdit"
                                 } catch (t: Throwable) {
-                                    "Save failed: ${t.message}"
+                                    t.toUserMessage("save")
                                 }
                             saving = false
                             Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
@@ -339,7 +340,7 @@ fun ResultScreen(
                             } catch (t: Throwable) {
                                 Toast.makeText(
                                     context,
-                                    "Share failed: ${t.message}",
+                                    t.toUserMessage("share"),
                                     Toast.LENGTH_SHORT,
                                 ).show()
                             }
@@ -421,7 +422,7 @@ fun ResultScreen(
                     } catch (t: Throwable) {
                         Toast.makeText(
                             context,
-                            "Delete prompt failed: ${t.message}",
+                            t.toUserMessage("delete prompt"),
                             Toast.LENGTH_SHORT,
                         ).show()
                     }
@@ -471,7 +472,7 @@ fun ResultScreen(
                             } catch (t: Throwable) {
                                 Toast.makeText(
                                     context,
-                                    "Save prompt failed: ${t.message}",
+                                    t.toUserMessage("save prompt"),
                                     Toast.LENGTH_SHORT,
                                 ).show()
                             }

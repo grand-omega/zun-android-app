@@ -8,6 +8,7 @@ import dev.zun.flux.data.api.PromptDto
 import dev.zun.flux.data.repo.ConnectionDiagnosis
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.data.repo.JobUploadStatus
+import dev.zun.flux.util.toUserMessage
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.currentCoroutineContext
@@ -237,7 +238,7 @@ class HomeViewModel(
                     val resp = submitOne(inputUri, selectedPromptId, customPromptText, tryHarder)
                     SubmitState.Done(resp.job_id)
                 } catch (t: Throwable) {
-                    SubmitState.Failed(t.message ?: t::class.simpleName.orEmpty())
+                    SubmitState.Failed(t.toUserMessage("submit"))
                 } finally {
                     _uploadProgress.value = null
                 }

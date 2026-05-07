@@ -158,7 +158,7 @@ fun ProgressScreen(
                         is PollState.Done -> Text("Done", style = MaterialTheme.typography.titleMedium)
 
                         is PollState.Failed -> {
-                            Text("Failed: ${s.message}", color = MaterialTheme.colorScheme.error)
+                            Text(s.message, color = MaterialTheme.colorScheme.error)
                             Button(onClick = { viewModel.retry(jobId) }) {
                                 Text("Retry")
                             }

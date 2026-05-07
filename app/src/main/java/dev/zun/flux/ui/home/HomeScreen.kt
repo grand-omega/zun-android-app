@@ -605,7 +605,7 @@ private fun Composer(
 
         val failure = state as? SubmitState.Failed
         if (failure != null) {
-            Text("Submit failed: ${failure.message}", color = MaterialTheme.colorScheme.error)
+            Text(failure.message, color = MaterialTheme.colorScheme.error)
         }
     }
 }

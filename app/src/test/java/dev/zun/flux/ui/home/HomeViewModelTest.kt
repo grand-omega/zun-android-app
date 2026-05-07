@@ -163,7 +163,7 @@ class HomeViewModelTest {
         viewModel.submit()
         advanceUntilIdle()
 
-        assertEquals(SubmitState.Failed("Upload failed"), viewModel.state.value)
+        assertEquals(SubmitState.Failed("Couldn't submit: Upload failed"), viewModel.state.value)
         assertEquals(listOf(Uri.EMPTY), viewModel.composer.value.inputUris)
         assertNull(viewModel.uploadProgress.value)
         assertNull(viewModel.batchProgress.value)

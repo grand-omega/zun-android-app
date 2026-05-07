@@ -14,6 +14,7 @@ import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.util.formatTimestamp
 import dev.zun.flux.util.saveToPictures
 import dev.zun.flux.util.shareImages
+import dev.zun.flux.util.toUserMessage
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -203,7 +204,7 @@ class GalleryViewModel(
                     repository.restoreJob(id)
                     restoredIds += id
                 } catch (t: Throwable) {
-                    _eventMessage.value = "Restore failed: ${t.message ?: "Unknown error"}"
+                    _eventMessage.value = t.toUserMessage("restore")
                 }
             }
             _pendingUndo.value = null
