@@ -2,10 +2,12 @@ package dev.zun.flux.ui.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.zun.flux.BuildConfig
 import dev.zun.flux.FluxApp
 import dev.zun.flux.data.repo.ConnectionMode
 import dev.zun.flux.data.repo.OfflineCacheStats
-import dev.zun.flux.util.normalizeOptionalServerUrl
+import dev.zun.flux.util.normalizeOptionalLanServerUrl
+import dev.zun.flux.util.normalizeOptionalTailscaleServerUrl
 import dev.zun.flux.util.toUserMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -59,8 +61,16 @@ class SettingsViewModel(
     fun connect() {
         val draft = _connectionDraft.value
         try {
-            val lan = normalizeOptionalServerUrl(draft.lanUrl)
-            val tailscale = normalizeOptionalServerUrl(draft.tailscaleUrl)
+            val lan = runCatching {
+                normalizeOptionalLanServerUrl(draft.lanUrl, allowHttp = BuildConfig.DEBUG)
+            }.getOrElse {
+                throw IllegalArgumentException("Primary server: ${it.message}")
+            }
+            val tailscale = runCatching {
+                normalizeOptionalTailscaleServerUrl(draft.tailscaleUrl, allowHttp = BuildConfig.DEBUG)
+            }.getOrElse {
+                throw IllegalArgumentException("Fallback server: ${it.message}")
+            }
             require(lan != null || tailscale != null) {
                 "Enter at least one server URL"
             }

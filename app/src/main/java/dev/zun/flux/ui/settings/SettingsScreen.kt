@@ -154,7 +154,7 @@ fun SettingsScreen(
                     label = { Text(stringResource(R.string.settings_lan_url_label)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    isError = connectionDraft.error?.startsWith("LAN URL:") == true,
+                    isError = connectionDraft.error?.startsWith("Primary server:") == true,
                 )
 
                 OutlinedTextField(
@@ -163,7 +163,7 @@ fun SettingsScreen(
                     label = { Text(stringResource(R.string.settings_tailscale_url_label)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    isError = connectionDraft.error?.startsWith("Tailscale URL:") == true,
+                    isError = connectionDraft.error?.startsWith("Fallback server:") == true,
                 )
 
                 val connectionError = connectionDraft.error

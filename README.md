@@ -14,6 +14,10 @@ Server URL and API token are **not** baked into the APK. Install the app, then
 enter them on the in-app **Setup** screen — they are persisted in
 `EncryptedSharedPreferences`.
 
+Setup accepts either a full URL or a bare host/IP. Bare entries are normalized
+to HTTPS, so `zun.tailnet-name.ts.net` becomes
+`https://zun.tailnet-name.ts.net`.
+
 > Release builds disallow cleartext HTTP (see `network_security_config.xml`).
 > Use an HTTPS endpoint (e.g. Tailscale MagicDNS) for release, or use a debug
 > build when targeting a plain `http://…` dev server.

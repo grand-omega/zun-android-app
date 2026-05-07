@@ -2,6 +2,10 @@ package dev.zun.flux.util
 
 import retrofit2.HttpException
 import java.io.IOException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
+import javax.net.ssl.SSLHandshakeException
+import javax.net.ssl.SSLPeerUnverifiedException
 
 /**
  * Map a [Throwable] to a user-facing message in the form
@@ -20,6 +24,12 @@ fun Throwable.toUserMessage(action: String): String {
         this is HttpException && code() == 404 -> "server says it doesn't exist"
         this is HttpException && code() in 500..599 -> "server error (HTTP ${code()})"
         this is HttpException -> "HTTP ${code()}"
+        this is SSLPeerUnverifiedException -> "TLS certificate does not match this hostname"
+        this is SSLHandshakeException -> "TLS certificate is not trusted"
+        this is UnknownHostException -> "server hostname cannot be resolved"
+        this is SocketTimeoutException -> "server timed out"
+        this is IOException && message?.contains("CLEARTEXT", ignoreCase = true) == true -> "release builds require https:// server URLs"
+        this is IOException && message?.contains("Unable to resolve host", ignoreCase = true) == true -> "server hostname cannot be resolved"
         this is IOException -> "network unavailable"
         else -> message?.takeIf { it.isNotBlank() && it.length < 80 } ?: "unknown error"
     }

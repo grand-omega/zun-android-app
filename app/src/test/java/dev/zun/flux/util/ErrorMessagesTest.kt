@@ -9,6 +9,10 @@ import org.junit.Test
 import retrofit2.HttpException
 import retrofit2.Response
 import java.io.IOException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
+import javax.net.ssl.SSLHandshakeException
+import javax.net.ssl.SSLPeerUnverifiedException
 
 class ErrorMessagesTest {
 
@@ -16,6 +20,36 @@ class ErrorMessagesTest {
     fun `IOException maps to network unavailable`() {
         val msg = IOException("connect timed out").toUserMessage("regenerate")
         assertEquals("Couldn't regenerate: network unavailable", msg)
+    }
+
+    @Test
+    fun `cleartext block maps to https requirement`() {
+        val msg = IOException("CLEARTEXT communication to 192.168.1.10 not permitted").toUserMessage("connect")
+        assertEquals("Couldn't connect: release builds require https:// server URLs", msg)
+    }
+
+    @Test
+    fun `unknown host maps to dns failure`() {
+        val msg = UnknownHostException("flux.invalid").toUserMessage("connect")
+        assertEquals("Couldn't connect: server hostname cannot be resolved", msg)
+    }
+
+    @Test
+    fun `timeout maps to server timed out`() {
+        val msg = SocketTimeoutException("timeout").toUserMessage("connect")
+        assertEquals("Couldn't connect: server timed out", msg)
+    }
+
+    @Test
+    fun `hostname certificate mismatch is explicit`() {
+        val msg = SSLPeerUnverifiedException("Hostname 192.168.1.10 not verified").toUserMessage("connect")
+        assertEquals("Couldn't connect: TLS certificate does not match this hostname", msg)
+    }
+
+    @Test
+    fun `untrusted certificate is explicit`() {
+        val msg = SSLHandshakeException("Trust anchor for certification path not found").toUserMessage("connect")
+        assertEquals("Couldn't connect: TLS certificate is not trusted", msg)
     }
 
     @Test

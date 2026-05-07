@@ -32,6 +32,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import dev.zun.flux.BuildConfig
 import dev.zun.flux.FluxApp
 import dev.zun.flux.R
 import dev.zun.flux.data.repo.ConnectionMode
@@ -39,7 +40,8 @@ import dev.zun.flux.ui.common.ScreenPadding
 import dev.zun.flux.ui.common.SettingsGroup
 import dev.zun.flux.ui.common.StatusPill
 import dev.zun.flux.ui.common.StatusTone
-import dev.zun.flux.util.normalizeOptionalServerUrl
+import dev.zun.flux.util.normalizeOptionalLanServerUrl
+import dev.zun.flux.util.normalizeOptionalTailscaleServerUrl
 import dev.zun.flux.util.toUserMessage
 import kotlinx.coroutines.launch
 
@@ -50,8 +52,8 @@ fun SetupScreen(
     onSuccess: () -> Unit,
 ) {
     val settings = app.settingsManager
-    var lanUrl by remember { mutableStateOf(settings.lanUrl ?: "http://") }
-    var tailscaleUrl by remember { mutableStateOf(settings.tailscaleUrl ?: "http://") }
+    var lanUrl by remember { mutableStateOf(settings.lanUrl ?: "") }
+    var tailscaleUrl by remember { mutableStateOf(settings.tailscaleUrl ?: "") }
     var token by remember { mutableStateOf(settings.apiToken ?: "") }
 
     var isTesting by remember { mutableStateOf(false) }
@@ -152,8 +154,16 @@ fun SetupScreen(
                     error = null
                     scope.launch {
                         try {
-                            val lan = normalizeOptionalServerUrl(lanUrl)
-                            val ts = normalizeOptionalServerUrl(tailscaleUrl)
+                            val lan = runCatching {
+                                normalizeOptionalLanServerUrl(lanUrl, allowHttp = BuildConfig.DEBUG)
+                            }.getOrElse {
+                                throw IllegalArgumentException("Primary server: ${it.message}")
+                            }
+                            val ts = runCatching {
+                                normalizeOptionalTailscaleServerUrl(tailscaleUrl, allowHttp = BuildConfig.DEBUG)
+                            }.getOrElse {
+                                throw IllegalArgumentException("Fallback server: ${it.message}")
+                            }
                             require(lan != null || ts != null) {
                                 "Enter at least one server URL"
                             }

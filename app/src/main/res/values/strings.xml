@@ -205,13 +205,13 @@
     <!-- Setup -->
     <string name="setup_title">FluxEdit Setup</string>
     <string name="setup_heading">Connect FluxEdit</string>
-    <string name="setup_description">Enter at least one private server URL and the API token used by Project ZUN.</string>
+    <string name="setup_description">Enter your private server and the API token used by Project ZUN.</string>
     <string name="setup_server_title">Server</string>
-    <string name="setup_server_detail">Auto mode uses LAN first, then Tailscale when LAN is unavailable.</string>
-    <string name="setup_lan_url_label">LAN URL</string>
-    <string name="setup_lan_url_placeholder">http://192.168.1.15:8080</string>
-    <string name="setup_tailscale_url_label">Tailscale URL</string>
-    <string name="setup_tailscale_url_placeholder">https://zun.tailnet-name.ts.net</string>
+    <string name="setup_server_detail">Use your Caddy or Tailscale HTTPS hostname. Bare hostnames are saved as https://. Leave fallback blank unless you use a second route.</string>
+    <string name="setup_lan_url_label">Primary server</string>
+    <string name="setup_lan_url_placeholder">flux.yourdomain.com</string>
+    <string name="setup_tailscale_url_label">Fallback server (optional)</string>
+    <string name="setup_tailscale_url_placeholder">server.tailnet-name.ts.net</string>
     <string name="setup_token_label">API Token</string>
     <string name="setup_token_show">Show token</string>
     <string name="setup_token_hide">Hide token</string>
@@ -228,10 +228,10 @@
     <string name="settings_lockout_10m">10 minutes</string>
     <string name="settings_lockout_30m">30 minutes</string>
     <string name="settings_connection_title">Connection</string>
-    <string name="settings_connection_detail">Changes are tested before replacing the active server route.</string>
+    <string name="settings_connection_detail">Changes are tested before replacing the active server route. Release builds require HTTPS.</string>
     <string name="settings_connection_mode_label">Mode</string>
-    <string name="settings_lan_url_label">LAN URL (used at home)</string>
-    <string name="settings_tailscale_url_label">Tailscale URL (used away)</string>
+    <string name="settings_lan_url_label">Primary server</string>
+    <string name="settings_tailscale_url_label">Fallback server</string>
     <string name="settings_token_label">API Token</string>
     <string name="settings_token_show">Show token</string>
     <string name="settings_token_hide">Hide token</string>
