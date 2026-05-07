@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.zun.flux.data.api.JobStatusDto
 import dev.zun.flux.data.repo.JobRepository
+import dev.zun.flux.util.toUserMessage
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -73,7 +74,7 @@ class ProgressViewModel(
                     _state.value = if (_state.value is PollState.Deleted) {
                         PollState.Deleted
                     } else {
-                        PollState.Failed(t.message ?: "Failed to check job status")
+                        PollState.Failed(t.toUserMessage("check job status"))
                     }
                     return@launch
                 }

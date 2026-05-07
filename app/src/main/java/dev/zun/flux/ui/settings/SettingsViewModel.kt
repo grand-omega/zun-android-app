@@ -6,11 +6,11 @@ import dev.zun.flux.FluxApp
 import dev.zun.flux.data.repo.ConnectionMode
 import dev.zun.flux.data.repo.OfflineCacheStats
 import dev.zun.flux.util.normalizeOptionalServerUrl
+import dev.zun.flux.util.toUserMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import java.io.IOException
 
 data class ConnectionDraftState(
     val lanUrl: String = "",
@@ -97,7 +97,7 @@ class SettingsViewModel(
                     app.rebuildRepository()
                     updateDraft {
                         copy(
-                            error = t.toConnectionMessage(),
+                            error = t.toUserMessage("connect"),
                             status = "Not saved",
                             isConnecting = false,
                         )
@@ -127,7 +127,7 @@ class SettingsViewModel(
             } catch (t: Throwable) {
                 _offlineCache.value = _offlineCache.value.copy(
                     isRefreshing = false,
-                    status = t.toConnectionMessage(),
+                    status = t.toUserMessage("connect"),
                 )
             }
         }
@@ -143,12 +143,5 @@ class SettingsViewModel(
 
     private fun updateDraft(block: ConnectionDraftState.() -> ConnectionDraftState) {
         _connectionDraft.value = _connectionDraft.value.block()
-    }
-
-    private fun Throwable.toConnectionMessage(): String = when {
-        this is retrofit2.HttpException && code() == 401 -> "Invalid API token."
-        this is retrofit2.HttpException -> "Server responded with HTTP ${code()}. Check that the URL points to the FluxEdit API."
-        this is IOException -> "Could not reach the server. Check Wi-Fi, Tailscale, and the selected connection mode."
-        else -> message ?: "Connection check failed."
     }
 }

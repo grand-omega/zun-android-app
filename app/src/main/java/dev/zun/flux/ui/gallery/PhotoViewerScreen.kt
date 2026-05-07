@@ -70,6 +70,7 @@ import dev.zun.flux.ui.common.ActionBarSurface
 import dev.zun.flux.ui.common.MissingImageState
 import dev.zun.flux.util.resolvePromptLabel
 import dev.zun.flux.util.saveToPictures
+import dev.zun.flux.util.toUserMessage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -189,7 +190,7 @@ fun PhotoViewerScreen(
                             } catch (t: Throwable) {
                                 Toast.makeText(
                                     context,
-                                    "Couldn't load original input: ${t.message}",
+                                    t.toUserMessage("load the original input"),
                                     Toast.LENGTH_SHORT,
                                 ).show()
                             } finally {
