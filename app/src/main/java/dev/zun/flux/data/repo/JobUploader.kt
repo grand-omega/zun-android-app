@@ -15,6 +15,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.File
 import java.io.IOException
 
 class JobUploader(
@@ -23,8 +24,19 @@ class JobUploader(
 ) {
     private val json = Json { ignoreUnknownKeys = true }
 
-    suspend fun submitJob(
-        inputUri: Uri,
+    /**
+     * Down-scale + EXIF-rotate the user's image into a private cache file
+     * suitable for upload. Caller owns the returned [File] and must delete it.
+     */
+    suspend fun stageImage(uri: Uri): File = prepareImageForUpload(context, uri)
+
+    /**
+     * Submits an already-staged image. Use this when the upload is being
+     * driven by something with its own retry policy (WorkManager). [file] is
+     * not deleted; that's the caller's responsibility.
+     */
+    suspend fun submitStagedJob(
+        file: File,
         promptId: Long?,
         promptText: String?,
         workflow: String?,
@@ -37,65 +49,75 @@ class JobUploader(
             "workflow is required when promptText is set"
         }
 
-        val file = prepareImageForUpload(context, inputUri)
-        try {
-            val sha = sha256Hex(file)
-            val inputName = file.name
-            var attempt = 0
-            var lastError: Exception? = null
+        val sha = sha256Hex(file)
+        val inputName = file.name
+        var attempt = 0
+        var lastError: Exception? = null
 
-            while (attempt < MAX_ATTEMPTS) {
-                try {
-                    val jsonResp = api.submitJobJson(
-                        JobSubmitRequest(
-                            input_sha256 = sha,
-                            input_name = inputName,
-                            prompt_id = promptId,
-                            prompt_text = promptText,
-                            workflow = workflow,
-                        ),
-                    )
-                    if (jsonResp.isSuccessful) {
-                        val body = jsonResp.body() ?: throw IOException("Empty submit response")
-                        onUploadProgress?.invoke(1f)
-                        return body
-                    }
-                    if (jsonResp.code() != 409) {
-                        throw IOException("Submit failed: HTTP ${jsonResp.code()}")
-                    }
+        while (attempt < MAX_ATTEMPTS) {
+            try {
+                val jsonResp = api.submitJobJson(
+                    JobSubmitRequest(
+                        input_sha256 = sha,
+                        input_name = inputName,
+                        prompt_id = promptId,
+                        prompt_text = promptText,
+                        workflow = workflow,
+                    ),
+                )
+                if (jsonResp.isSuccessful) {
+                    val body = jsonResp.body() ?: throw IOException("Empty submit response")
+                    onUploadProgress?.invoke(1f)
+                    return body
+                }
+                if (jsonResp.code() != 409) {
+                    throw IOException("Submit failed: HTTP ${jsonResp.code()}")
+                }
 
-                    val errText = jsonResp.errorBody()?.string().orEmpty()
-                    val needUpload = runCatching {
-                        json.decodeFromString(NeedUploadResponse.serializer(), errText)
-                    }.getOrNull()
-                    if (needUpload?.need_upload != true && needUpload?.code != "need_upload") {
-                        throw IOException("Unexpected 409 body: $errText")
-                    }
+                val errText = jsonResp.errorBody()?.string().orEmpty()
+                val needUpload = runCatching {
+                    json.decodeFromString(NeedUploadResponse.serializer(), errText)
+                }.getOrNull()
+                if (needUpload?.need_upload != true && needUpload?.code != "need_upload") {
+                    throw IOException("Unexpected 409 body: $errText")
+                }
 
-                    val rawBody = file.asRequestBody("image/jpeg".toMediaType())
-                    val finalBody = if (onUploadProgress != null) {
-                        ProgressRequestBody(rawBody, onUploadProgress)
-                    } else {
-                        rawBody
-                    }
-                    val imagePart = MultipartBody.Part.createFormData("image", inputName, finalBody)
-                    return api.submitJobMultipart(
-                        image = imagePart,
-                        sha256 = sha.toRequestBody(TEXT_PLAIN),
-                        inputName = inputName.toRequestBody(TEXT_PLAIN),
-                        promptId = promptId?.toString()?.toRequestBody(TEXT_PLAIN),
-                        promptText = promptText?.toRequestBody(TEXT_PLAIN),
-                        workflow = workflow?.toRequestBody(TEXT_PLAIN),
-                    )
-                } catch (e: IOException) {
-                    attempt++
-                    lastError = e
-                    if (attempt < MAX_ATTEMPTS) {
-                        delay(1000L * (1 shl (attempt - 1)))
-                    }
+                val rawBody = file.asRequestBody("image/jpeg".toMediaType())
+                val finalBody = if (onUploadProgress != null) {
+                    ProgressRequestBody(rawBody, onUploadProgress)
+                } else {
+                    rawBody
+                }
+                val imagePart = MultipartBody.Part.createFormData("image", inputName, finalBody)
+                return api.submitJobMultipart(
+                    image = imagePart,
+                    sha256 = sha.toRequestBody(TEXT_PLAIN),
+                    inputName = inputName.toRequestBody(TEXT_PLAIN),
+                    promptId = promptId?.toString()?.toRequestBody(TEXT_PLAIN),
+                    promptText = promptText?.toRequestBody(TEXT_PLAIN),
+                    workflow = workflow?.toRequestBody(TEXT_PLAIN),
+                )
+            } catch (e: IOException) {
+                attempt++
+                lastError = e
+                if (attempt < MAX_ATTEMPTS) {
+                    delay(1000L * (1 shl (attempt - 1)))
                 }
             }
-            throw lastError ?: IOException("Failed to submit job after $MAX_ATTEMPTS attempts")
+        }
+        throw lastError ?: IOException("Failed to submit job after $MAX_ATTEMPTS attempts")
+    }
+
+    suspend fun submitJob(
+        inputUri: Uri,
+        promptId: Long?,
+        promptText: String?,
+        workflow: String?,
+        onUploadProgress: ((Float) -> Unit)?,
+    ): JobCreatedResponse {
+        val file = stageImage(inputUri)
+        try {
+            return submitStagedJob(file, promptId, promptText, workflow, onUploadProgress)
         } finally {
             file.delete()
         }

@@ -43,6 +43,14 @@ data class JobTagStats(
     val perPromptCounts: Map<Long, Int>,
 )
 
+/** Outcome stream for a background upload enqueued via WorkManager. */
+sealed interface JobUploadStatus {
+    data object Pending : JobUploadStatus
+    data class InProgress(val progress: Float) : JobUploadStatus
+    data class Succeeded(val jobId: String, val inputId: Int?) : JobUploadStatus
+    data class Failed(val message: String) : JobUploadStatus
+}
+
 /**
  * Single seam between the UI and the backend. UI layers depend on this
  * interface; implementations are swapped in [dev.zun.flux.FluxApp].
@@ -75,6 +83,35 @@ interface JobRepository {
      */
     suspend fun submitJob(
         inputUri: Uri,
+        promptId: Long? = null,
+        promptText: String? = null,
+        workflow: String? = null,
+        onUploadProgress: ((Float) -> Unit)? = null,
+    ): JobCreatedResponse
+
+    /**
+     * Stages the input image into private cache and enqueues a WorkManager
+     * upload. The image preprocessing (down-scale + EXIF rotate) happens
+     * synchronously before this returns so the file outlives the URI grant.
+     * Returns the work request UUID — pass it to [observeJobUpload] for
+     * progress and outcome.
+     */
+    suspend fun enqueueJobUpload(
+        inputUri: Uri,
+        promptId: Long? = null,
+        promptText: String? = null,
+        workflow: String? = null,
+    ): java.util.UUID
+
+    /** Observe progress and outcome of a prior [enqueueJobUpload]. */
+    fun observeJobUpload(uuid: java.util.UUID): Flow<JobUploadStatus>
+
+    /**
+     * Submit a previously-staged file. Used by [JobUploadWorker]; UI code
+     * should call [enqueueJobUpload] instead.
+     */
+    suspend fun submitStagedJob(
+        filePath: String,
         promptId: Long? = null,
         promptText: String? = null,
         workflow: String? = null,

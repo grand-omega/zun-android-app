@@ -7,6 +7,12 @@ import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.map
+import androidx.work.Constraints
+import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
+import androidx.work.workDataOf
 import dev.zun.flux.data.api.FluxApi
 import dev.zun.flux.data.api.HealthResponse
 import dev.zun.flux.data.api.JobCreatedResponse
@@ -20,6 +26,7 @@ import dev.zun.flux.data.local.toEntity
 import dev.zun.flux.data.local.toStatusDto
 import dev.zun.flux.data.local.toSummaryDto
 import dev.zun.flux.data.worker.DeleteSyncWorker
+import dev.zun.flux.data.worker.JobUploadWorker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -82,6 +89,71 @@ class RealJobRepository(
         onUploadProgress: ((Float) -> Unit)?,
     ): JobCreatedResponse = jobUploader.submitJob(
         inputUri = inputUri,
+        promptId = promptId,
+        promptText = promptText,
+        workflow = workflow,
+        onUploadProgress = onUploadProgress,
+    )
+
+    override suspend fun enqueueJobUpload(
+        inputUri: Uri,
+        promptId: Long?,
+        promptText: String?,
+        workflow: String?,
+    ): java.util.UUID {
+        require((promptId == null) xor (promptText == null)) {
+            "Exactly one of promptId / promptText must be set"
+        }
+        require(promptText == null || !workflow.isNullOrBlank()) {
+            "workflow is required when promptText is set"
+        }
+        val staged = jobUploader.stageImage(inputUri)
+        val data = workDataOf(
+            JobUploadWorker.KEY_FILE_PATH to staged.absolutePath,
+            JobUploadWorker.KEY_PROMPT_ID to (promptId ?: -1L),
+            JobUploadWorker.KEY_PROMPT_TEXT to promptText,
+            JobUploadWorker.KEY_WORKFLOW to workflow,
+        )
+        val request = OneTimeWorkRequestBuilder<JobUploadWorker>()
+            .setInputData(data)
+            .setConstraints(
+                Constraints.Builder()
+                    .setRequiredNetworkType(NetworkType.CONNECTED)
+                    .build(),
+            )
+            .build()
+        WorkManager.getInstance(context).enqueue(request)
+        return request.id
+    }
+
+    override fun observeJobUpload(uuid: java.util.UUID): Flow<JobUploadStatus> =
+        WorkManager.getInstance(context).getWorkInfoByIdFlow(uuid).map { info ->
+            when {
+                info == null -> JobUploadStatus.Pending
+                info.state == WorkInfo.State.SUCCEEDED -> JobUploadStatus.Succeeded(
+                    jobId = info.outputData.getString(JobUploadWorker.KEY_JOB_ID).orEmpty(),
+                    inputId = info.outputData.getInt(JobUploadWorker.KEY_INPUT_ID, -1).takeIf { it != -1 },
+                )
+                info.state == WorkInfo.State.FAILED -> JobUploadStatus.Failed(
+                    info.outputData.getString(JobUploadWorker.KEY_ERROR) ?: "Upload failed",
+                )
+                info.state == WorkInfo.State.CANCELLED -> JobUploadStatus.Failed("Cancelled")
+                info.state == WorkInfo.State.RUNNING ||
+                    info.state == WorkInfo.State.ENQUEUED -> JobUploadStatus.InProgress(
+                    info.progress.getFloat(JobUploadWorker.KEY_PROGRESS, 0f),
+                )
+                else -> JobUploadStatus.Pending
+            }
+        }
+
+    override suspend fun submitStagedJob(
+        filePath: String,
+        promptId: Long?,
+        promptText: String?,
+        workflow: String?,
+        onUploadProgress: ((Float) -> Unit)?,
+    ): JobCreatedResponse = jobUploader.submitStagedJob(
+        file = java.io.File(filePath),
         promptId = promptId,
         promptText = promptText,
         workflow = workflow,
