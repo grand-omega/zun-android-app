@@ -12,7 +12,9 @@ import java.io.IOException
  * Submits a previously-staged image to the server. The staged file is created
  * by [dev.zun.flux.data.repo.JobRepository.enqueueJobUpload] before the work
  * is enqueued and is deleted by this worker after submission (success or
- * failure). Transient network errors trigger a WorkManager retry.
+ * terminal failure). Transient network errors trigger a WorkManager retry up
+ * to [MAX_UPLOAD_RETRIES] times; after that the staged file is removed so
+ * persistent failures don't leak cache space.
  */
 class JobUploadWorker(
     context: Context,
@@ -50,8 +52,16 @@ class JobUploadWorker(
                 ),
             )
         } catch (_: IOException) {
-            // Retain the staged file so WorkManager can retry it.
-            Result.retry()
+            if (runAttemptCount < MAX_UPLOAD_RETRIES) {
+                Result.retry()
+            } else {
+                file.delete()
+                Result.failure(
+                    workDataOf(
+                        KEY_ERROR to "Upload failed after ${MAX_UPLOAD_RETRIES + 1} attempts",
+                    ),
+                )
+            }
         } catch (e: Exception) {
             file.delete()
             Result.failure(workDataOf(KEY_ERROR to (e.message ?: "Upload failed")))
@@ -67,5 +77,8 @@ class JobUploadWorker(
         const val KEY_JOB_ID = "job_id"
         const val KEY_INPUT_ID = "input_id"
         const val KEY_ERROR = "error"
+
+        /** Max IOException retries before we give up and delete the staged file. */
+        const val MAX_UPLOAD_RETRIES = 4
     }
 }

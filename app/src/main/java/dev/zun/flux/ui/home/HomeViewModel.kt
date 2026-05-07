@@ -8,6 +8,7 @@ import dev.zun.flux.data.api.PromptDto
 import dev.zun.flux.data.repo.ConnectionDiagnosis
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.data.repo.JobUploadStatus
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -23,6 +24,7 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 
 /** Sentinel for the synthetic "Write your own…" tile. Never sent to the server. */
 const val CUSTOM_PROMPT_ID: Long = -1L
@@ -30,6 +32,13 @@ const val CUSTOM_PROMPT_ID: Long = -1L
 /** Default workflow for free-text submissions when the user writes a custom prompt. */
 private const val DEFAULT_CUSTOM_WORKFLOW = "flux2_klein_edit"
 private const val TRY_HARDER_WORKFLOW = "flux2_klein_9b_kv_experimental"
+
+/**
+ * Cap on how long [HomeViewModel.submitOne] will wait for a WorkManager
+ * upload to reach a terminal state. Without this the wait is unbounded if the
+ * worker stays ENQUEUED (e.g. offline → unmet network constraint).
+ */
+private const val UPLOAD_WAIT_TIMEOUT_MS: Long = 60_000L
 
 sealed interface SubmitState {
     data object Idle : SubmitState
@@ -282,13 +291,20 @@ class HomeViewModel(
             promptText = promptText,
             workflow = workflow,
         )
-        val terminal = repository.observeJobUpload(workId)
-            .onEach { status ->
-                if (status is JobUploadStatus.InProgress) {
-                    _uploadProgress.value = status.progress
-                }
+        val terminal = try {
+            withTimeout(UPLOAD_WAIT_TIMEOUT_MS) {
+                repository.observeJobUpload(workId)
+                    .onEach { status ->
+                        if (status is JobUploadStatus.InProgress) {
+                            _uploadProgress.value = status.progress
+                        }
+                    }
+                    .first { it is JobUploadStatus.Succeeded || it is JobUploadStatus.Failed }
             }
-            .first { it is JobUploadStatus.Succeeded || it is JobUploadStatus.Failed }
+        } catch (_: TimeoutCancellationException) {
+            repository.cancelJobUpload(workId)
+            error("Upload timed out — check your connection")
+        }
         return when (terminal) {
             is JobUploadStatus.Succeeded -> JobCreatedResponse(
                 job_id = terminal.jobId,

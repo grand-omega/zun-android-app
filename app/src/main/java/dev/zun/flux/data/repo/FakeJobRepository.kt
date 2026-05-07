@@ -139,6 +139,10 @@ class FakeJobRepository(
         )
     }
 
+    override suspend fun cancelJobUpload(uuid: java.util.UUID) {
+        completedUploads.remove(uuid)
+    }
+
     override suspend fun submitStagedJob(
         filePath: String,
         promptId: Long?,
