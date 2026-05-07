@@ -1,8 +1,8 @@
 # Releasing FluxEdit
 
-This is the manual release flow. CI builds an unsigned APK on every push to a
-`v*` tag and attaches it to the GitHub Release; for an actually installable
-build you need a local signing key.
+This is the manual release flow. CI builds a signed APK on every push to a
+`v*` tag and attaches it to the GitHub Release when the release-signing
+secrets are configured.
 
 ## One-time keystore setup
 
@@ -40,7 +40,7 @@ git tag v1.2.0
 git push origin v1.2.0
 ```
 
-CI then builds + creates a GitHub Release with the unsigned APK attached.
+CI then builds + creates a GitHub Release with the signed APK attached.
 
 To pin exact values without a tag (e.g. for a hotfix), set environment vars:
 
@@ -111,9 +111,9 @@ gh secret set KEYSTORE_KEY_ALIAS --body 'flux'
 gh secret set KEYSTORE_KEY_PASSWORD --body 'your-key-password'
 ```
 
-If any of these are missing, the workflow falls back to an unsigned APK on
-tag builds — the release will still be created, but users won't be able to
-install it without side-loading a signed copy you upload manually.
+If any of these are missing, tag builds fail before creating a GitHub Release.
+That keeps production APKs from being published unsigned or debug-signed by
+accident.
 
 ### Tagging a release
 
