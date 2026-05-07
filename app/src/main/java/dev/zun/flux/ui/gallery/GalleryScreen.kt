@@ -571,10 +571,12 @@ private fun JobThumbnail(
             null
         },
     ) {
+        val promptLabel = resolvePromptLabel(prompts, job.effectivePromptId, job.prompt_text)
+        val tileDescription = stringResource(R.string.gallery_thumbnail_description, promptLabel)
         Box(modifier = Modifier.fillMaxSize()) {
             SubcomposeAsyncImage(
                 model = model,
-                contentDescription = null,
+                contentDescription = tileDescription,
                 contentScale = ContentScale.Crop,
                 modifier =
                 Modifier

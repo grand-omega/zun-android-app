@@ -59,6 +59,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import coil3.request.ImageRequest
@@ -246,10 +248,16 @@ fun PhotoViewerScreen(
                 val job = jobs.getOrNull(page) ?: return@HorizontalPager
                 val previewModel = repository.previewModel(job.id)
 
+                val pageDescription = stringResource(
+                    R.string.viewer_page_description,
+                    page + 1,
+                    jobs.size,
+                )
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .testTag("viewer_page_${job.id}"),
+                        .testTag("viewer_page_${job.id}")
+                        .semantics { contentDescription = pageDescription },
                 ) {
                     ZoomableImage(
                         model = previewModel,

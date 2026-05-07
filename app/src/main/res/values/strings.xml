@@ -2,6 +2,10 @@
 <resources>
     <string name="app_name">FluxEdit</string>
 
+    <!-- Accessibility content descriptions -->
+    <string name="gallery_thumbnail_description">Generation: %1$s</string>
+    <string name="viewer_page_description">Image %1$d of %2$d</string>
+
     <!-- Common -->
     <string name="common_back">Back</string>
     <string name="common_cancel">Cancel</string>
