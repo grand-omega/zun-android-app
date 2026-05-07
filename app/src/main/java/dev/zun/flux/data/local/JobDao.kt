@@ -1,10 +1,15 @@
 package dev.zun.flux.data.local
 
+import androidx.paging.PagingSource
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
+
+data class PromptIdCount(val promptId: Long, val jobCount: Int)
+
+data class JobTagTotals(val customCount: Int, val totalCount: Int)
 
 @Dao
 interface JobDao {
@@ -19,6 +24,63 @@ interface JobDao {
         """,
     )
     fun getVisibleJobs(): Flow<List<JobEntity>>
+
+    @Query(
+        """
+        SELECT * FROM jobs
+        WHERE status = 'done'
+        AND id NOT IN (SELECT jobId FROM pending_deletes)
+        ORDER BY createdAt DESC
+        """,
+    )
+    fun pagedDoneJobsAll(): PagingSource<Int, JobEntity>
+
+    @Query(
+        """
+        SELECT * FROM jobs
+        WHERE status = 'done'
+        AND promptId = :promptId
+        AND id NOT IN (SELECT jobId FROM pending_deletes)
+        ORDER BY createdAt DESC
+        """,
+    )
+    fun pagedDoneJobsByPromptId(promptId: Long): PagingSource<Int, JobEntity>
+
+    @Query(
+        """
+        SELECT * FROM jobs
+        WHERE status = 'done'
+        AND promptId IS NULL
+        AND promptText IS NOT NULL
+        AND id NOT IN (SELECT jobId FROM pending_deletes)
+        ORDER BY createdAt DESC
+        """,
+    )
+    fun pagedDoneJobsCustom(): PagingSource<Int, JobEntity>
+
+    @Query(
+        """
+        SELECT promptId AS promptId, COUNT(*) AS jobCount
+        FROM jobs
+        WHERE status = 'done'
+        AND promptId IS NOT NULL
+        AND id NOT IN (SELECT jobId FROM pending_deletes)
+        GROUP BY promptId
+        """,
+    )
+    fun jobCountsByPromptId(): Flow<List<PromptIdCount>>
+
+    @Query(
+        """
+        SELECT
+            COALESCE(SUM(CASE WHEN promptId IS NULL AND promptText IS NOT NULL THEN 1 ELSE 0 END), 0) AS customCount,
+            COUNT(*) AS totalCount
+        FROM jobs
+        WHERE status = 'done'
+        AND id NOT IN (SELECT jobId FROM pending_deletes)
+        """,
+    )
+    fun jobTagTotals(): Flow<JobTagTotals>
 
     @Query("SELECT * FROM jobs WHERE id = :jobId")
     suspend fun getJobById(jobId: String): JobEntity?

@@ -3,6 +3,10 @@ package dev.zun.flux.data.repo
 import android.content.Context
 import android.net.Uri
 import android.util.Log
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
+import androidx.paging.PagingData
+import androidx.paging.map
 import dev.zun.flux.data.api.FluxApi
 import dev.zun.flux.data.api.HealthResponse
 import dev.zun.flux.data.api.JobCreatedResponse
@@ -155,6 +159,33 @@ class RealJobRepository(
 
     override fun getJobsFlow(): Flow<List<JobSummaryDto>> = dao.getVisibleJobs().map { entities ->
         entities.filter { it.status == "done" }.map { it.toSummaryDto() }
+    }
+
+    override fun pagedJobs(promptId: Long?, customOnly: Boolean): Flow<PagingData<JobSummaryDto>> = Pager(
+        config = PagingConfig(
+            pageSize = 50,
+            enablePlaceholders = false,
+        ),
+        pagingSourceFactory = {
+            when {
+                customOnly -> dao.pagedDoneJobsCustom()
+                promptId != null -> dao.pagedDoneJobsByPromptId(promptId)
+                else -> dao.pagedDoneJobsAll()
+            }
+        },
+    ).flow.map { pagingData ->
+        pagingData.map { it.toSummaryDto() }
+    }
+
+    override fun jobTagStats(): Flow<JobTagStats> = combine(
+        dao.jobCountsByPromptId(),
+        dao.jobTagTotals(),
+    ) { perPrompt, totals ->
+        JobTagStats(
+            totalCount = totals.totalCount,
+            customCount = totals.customCount,
+            perPromptCounts = perPrompt.associate { it.promptId to it.jobCount },
+        )
     }
 
     override fun getJobFlow(jobId: String): Flow<JobStatusDto?> = dao.getVisibleJobByIdFlow(jobId).map { it?.toStatusDto() }

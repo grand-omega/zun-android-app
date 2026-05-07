@@ -1,6 +1,7 @@
 package dev.zun.flux.ui.home
 
 import android.net.Uri
+import androidx.paging.PagingData
 import dev.zun.flux.data.api.HealthResponse
 import dev.zun.flux.data.api.JobCreatedResponse
 import dev.zun.flux.data.api.JobListResponse
@@ -9,6 +10,7 @@ import dev.zun.flux.data.api.JobSummaryDto
 import dev.zun.flux.data.api.PromptDto
 import dev.zun.flux.data.repo.ConnectionDiagnosis
 import dev.zun.flux.data.repo.JobRepository
+import dev.zun.flux.data.repo.JobTagStats
 import dev.zun.flux.data.repo.OfflineCacheStats
 import dev.zun.flux.data.repo.OfflineImageAvailability
 import kotlinx.coroutines.CompletableDeferred
@@ -290,6 +292,15 @@ private class RecordingRepository : JobRepository {
     override suspend fun cancelJob(jobId: String) = Unit
 
     override fun getJobsFlow(): Flow<List<JobSummaryDto>> = MutableStateFlow(emptyList())
+
+    override fun pagedJobs(
+        promptId: Long?,
+        customOnly: Boolean,
+    ): Flow<PagingData<JobSummaryDto>> = MutableStateFlow(PagingData.empty())
+
+    override fun jobTagStats(): Flow<JobTagStats> = MutableStateFlow(
+        JobTagStats(totalCount = 0, customCount = 0, perPromptCounts = emptyMap()),
+    )
 
     override fun getJobFlow(jobId: String): Flow<JobStatusDto?> = MutableStateFlow(null)
 

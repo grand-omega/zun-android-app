@@ -1,12 +1,14 @@
 package dev.zun.flux.data.repo
 
 import android.net.Uri
+import androidx.paging.PagingData
 import dev.zun.flux.data.api.HealthResponse
 import dev.zun.flux.data.api.JobCreatedResponse
 import dev.zun.flux.data.api.JobListResponse
 import dev.zun.flux.data.api.JobStatusDto
 import dev.zun.flux.data.api.JobSummaryDto
 import dev.zun.flux.data.api.PromptDto
+import dev.zun.flux.data.api.effectivePromptId
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -209,6 +211,30 @@ class FakeJobRepository(
 
     override fun getJobsFlow(): Flow<List<JobSummaryDto>> = updates.map {
         listJobs(status = "done", limit = 100, cursor = null, inputId = null).items
+    }
+
+    override fun pagedJobs(promptId: Long?, customOnly: Boolean): Flow<PagingData<JobSummaryDto>> = updates.map {
+        val all = listJobs(status = "done", limit = 100, cursor = null, inputId = null).items
+        val filtered = when {
+            customOnly -> all.filter { it.effectivePromptId == null && it.prompt_text != null }
+            promptId != null -> all.filter { it.effectivePromptId == promptId }
+            else -> all
+        }
+        PagingData.from(filtered)
+    }
+
+    override fun jobTagStats(): Flow<JobTagStats> = updates.map {
+        val all = listJobs(status = "done", limit = 100, cursor = null, inputId = null).items
+        val perPrompt = all.asSequence()
+            .mapNotNull { it.effectivePromptId }
+            .groupingBy { it }
+            .eachCount()
+        val customCount = all.count { it.effectivePromptId == null && it.prompt_text != null }
+        JobTagStats(
+            totalCount = all.size,
+            customCount = customCount,
+            perPromptCounts = perPrompt,
+        )
     }
 
     override fun getJobFlow(jobId: String): Flow<JobStatusDto?> = updates.map {
