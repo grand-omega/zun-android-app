@@ -9,7 +9,59 @@ on:
     branches: [ "main" ]
 
 jobs:
-  build:
+  ci:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        # Full history so app/build.gradle.kts can derive versionCode/versionName
+        # from `git rev-list --count HEAD` and `git describe --tags`.
+        fetch-depth: 0
+
+    - name: set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: gradle
+
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+
+    - name: Create placeholder local.properties
+      run: |
+        echo "server.url=https://example.com" > local.properties
+        echo "api.token=placeholder" >> local.properties
+
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v4
+
+    - name: Lint GitHub Actions workflows
+      uses: rhysd/actionlint@v1
+
+    - name: Build Debug APK
+      run: ./gradlew assembleDebug --stacktrace -Porg.gradle.java.installations.auto-download=false -Porg.gradle.java.installations.auto-detect=true
+
+    - name: Run Unit Tests
+      run: ./gradlew testDebugUnitTest --stacktrace -Porg.gradle.java.installations.auto-download=false -Porg.gradle.java.installations.auto-detect=true
+
+    - name: Run Lint
+      run: ./gradlew lintDebug --stacktrace -Porg.gradle.java.installations.auto-download=false -Porg.gradle.java.installations.auto-detect=true
+
+    - name: Run Spotless Check
+      run: ./gradlew spotlessCheck --stacktrace -Porg.gradle.java.installations.auto-download=false -Porg.gradle.java.installations.auto-detect=true
+
+    - name: Upload Debug Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: flux-edit-debug
+        path: app/build/outputs/apk/debug/app-debug.apk
+
+  release:
+    needs: ci
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -42,7 +94,6 @@ jobs:
     # The repo signing block in app/build.gradle.kts will pick these up
     # automatically and produce a signed APK. Tag builds must be signed.
     - name: Require release signing secrets
-      if: startsWith(github.ref, 'refs/tags/v')
       env:
         ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         KEYSTORE_STORE_PASSWORD: ${{ secrets.KEYSTORE_STORE_PASSWORD }}
@@ -59,7 +110,6 @@ jobs:
         exit "$missing"
 
     - name: Decode release keystore
-      if: startsWith(github.ref, 'refs/tags/v')
       env:
         ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
       run: |
@@ -71,29 +121,10 @@ jobs:
         keyPassword=${{ secrets.KEYSTORE_KEY_PASSWORD }}
         EOF
 
-    - name: Build Debug APK
-      run: ./gradlew assembleDebug --stacktrace -Porg.gradle.java.installations.auto-download=false -Porg.gradle.java.installations.auto-detect=true
-
     - name: Build Release APK
       run: ./gradlew assembleRelease --stacktrace -Porg.gradle.java.installations.auto-download=false -Porg.gradle.java.installations.auto-detect=true
 
-    - name: Run Unit Tests
-      run: ./gradlew testDebugUnitTest --stacktrace -Porg.gradle.java.installations.auto-download=false -Porg.gradle.java.installations.auto-detect=true
-
-    - name: Run Lint
-      run: ./gradlew lintDebug --stacktrace -Porg.gradle.java.installations.auto-download=false -Porg.gradle.java.installations.auto-detect=true
-
-    - name: Run Spotless Check
-      run: ./gradlew spotlessCheck --stacktrace -Porg.gradle.java.installations.auto-download=false -Porg.gradle.java.installations.auto-detect=true
-
-    - name: Upload Debug Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: flux-edit-debug
-        path: app/build/outputs/apk/debug/app-debug.apk
-
     - name: Stage release APK for release upload
-      if: startsWith(github.ref, 'refs/tags/v')
       run: |
         signed="app/build/outputs/apk/release/app-release.apk"
         if [[ ! -f "$signed" ]]; then
@@ -103,7 +134,6 @@ jobs:
         cp "$signed" "flux-edit-${{ github.ref_name }}.apk"
 
     - name: Create Release
-      if: startsWith(github.ref, 'refs/tags/v')
       uses: softprops/action-gh-release@v2
       with:
         files: flux-edit-${{ github.ref_name }}.apk
