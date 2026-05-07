@@ -1,6 +1,7 @@
 package dev.zun.flux.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,11 +13,14 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -26,6 +30,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -124,34 +129,14 @@ fun SettingsScreen(
                 title = "Security",
                 detail = "Controls when FluxEdit asks for biometric or device unlock after backgrounding.",
             ) {
-                Column(modifier = Modifier.selectableGroup()) {
-                    lockoutOptions.forEach { (duration, label) ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .selectable(
-                                    selected = lockoutDuration == duration,
-                                    onClick = {
-                                        lockoutDuration = duration
-                                        settingsManager.lockoutDurationMs = duration
-                                    },
-                                    role = Role.RadioButton,
-                                )
-                                .padding(vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            RadioButton(
-                                selected = lockoutDuration == duration,
-                                onClick = null,
-                            )
-                            Text(
-                                text = label,
-                                style = MaterialTheme.typography.bodyLarge,
-                                modifier = Modifier.padding(start = 16.dp),
-                            )
-                        }
-                    }
-                }
+                LockoutDropdown(
+                    options = lockoutOptions,
+                    selected = lockoutDuration,
+                    onSelected = {
+                        lockoutDuration = it
+                        settingsManager.lockoutDurationMs = it
+                    },
+                )
             }
 
             SettingsGroup(
@@ -437,6 +422,54 @@ private fun activeRouteLabel(route: ActiveRoute): String = when (route) {
     ActiveRoute.NONE -> "(none)"
     ActiveRoute.LAN -> "LAN"
     ActiveRoute.TAILSCALE -> "Tailscale"
+}
+
+@Composable
+private fun LockoutDropdown(
+    options: List<Pair<Long, String>>,
+    selected: Long,
+    onSelected: (Long) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val currentLabel = options.firstOrNull { it.first == selected }?.second ?: "Custom"
+
+    Box(modifier = Modifier.fillMaxWidth()) {
+        TextButton(
+            onClick = { expanded = true },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = currentLabel,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f),
+                )
+                Icon(
+                    imageVector = Icons.Default.ArrowDropDown,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            options.forEach { (duration, label) ->
+                DropdownMenuItem(
+                    text = { Text(label) },
+                    onClick = {
+                        onSelected(duration)
+                        expanded = false
+                    },
+                )
+            }
+        }
+    }
 }
 
 private fun relativeTimeOrDash(timestampMs: Long?): String {
