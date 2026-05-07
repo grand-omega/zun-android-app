@@ -38,11 +38,17 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
+import androidx.compose.material3.adaptive.layout.AnimatedPane
+import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffold
+import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffoldRole
+import androidx.compose.material3.adaptive.navigation.rememberListDetailPaneScaffoldNavigator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -66,8 +72,9 @@ import dev.zun.flux.ui.common.PanelShape
 import dev.zun.flux.ui.common.StatusPill
 import dev.zun.flux.ui.common.StatusTone
 import dev.zun.flux.ui.theme.tabular
+import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3AdaptiveApi::class)
 @Composable
 fun BatchProgressScreen(
     jobIds: List<String>,
@@ -75,15 +82,18 @@ fun BatchProgressScreen(
     onViewResult: (String) -> Unit,
     onBack: () -> Unit,
 ) {
-    // null = grid overview, otherwise the index focused in the pager.
-    var focusedIndex by rememberSaveable { mutableStateOf<Int?>(null) }
     val deletedJobIds by repository.deletedJobIds().collectAsStateWithLifecycle(initialValue = emptySet())
     val activeJobIds = jobIds.filterNot { it in deletedJobIds }
 
-    LaunchedEffect(activeJobIds, focusedIndex) {
-        val index = focusedIndex
-        if (index != null && index !in activeJobIds.indices) {
-            focusedIndex = activeJobIds.indices.lastOrNull()
+    // ListDetailPaneScaffold gives us free phone↔tablet behavior: phones toggle
+    // between list (grid) and detail (focused pager); tablets show both panes.
+    val navigator = rememberListDetailPaneScaffoldNavigator<Int>()
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(activeJobIds) {
+        val focused = navigator.currentDestination?.contentKey
+        if (focused != null && focused !in activeJobIds.indices) {
+            scope.launch { navigator.navigateBack() }
         }
     }
 
@@ -91,28 +101,48 @@ fun BatchProgressScreen(
         if (activeJobIds.isEmpty()) onBack()
     }
 
-    BackHandler(focusedIndex != null) { focusedIndex = null }
-
-    if (activeJobIds.isEmpty()) {
-        return
-    } else if (focusedIndex == null) {
-        BatchGrid(
-            jobIds = activeJobIds,
-            repository = repository,
-            onTileClick = { index, isDone ->
-                if (isDone) onViewResult(activeJobIds[index]) else focusedIndex = index
-            },
-            onBack = onBack,
-        )
-    } else {
-        BatchFocused(
-            jobIds = activeJobIds,
-            initialIndex = focusedIndex!!,
-            repository = repository,
-            onViewResult = onViewResult,
-            onBack = { focusedIndex = null },
-        )
+    BackHandler(navigator.canNavigateBack()) {
+        scope.launch { navigator.navigateBack() }
     }
+
+    if (activeJobIds.isEmpty()) return
+
+    ListDetailPaneScaffold(
+        directive = navigator.scaffoldDirective,
+        value = navigator.scaffoldValue,
+        listPane = {
+            AnimatedPane {
+                BatchGrid(
+                    jobIds = activeJobIds,
+                    repository = repository,
+                    onTileClick = { index, isDone ->
+                        if (isDone) {
+                            onViewResult(activeJobIds[index])
+                        } else {
+                            scope.launch {
+                                navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, index)
+                            }
+                        }
+                    },
+                    onBack = onBack,
+                )
+            }
+        },
+        detailPane = {
+            AnimatedPane {
+                val focused = navigator.currentDestination?.contentKey
+                if (focused != null) {
+                    BatchFocused(
+                        jobIds = activeJobIds,
+                        initialIndex = focused,
+                        repository = repository,
+                        onViewResult = onViewResult,
+                        onBack = { scope.launch { navigator.navigateBack() } },
+                    )
+                }
+            }
+        },
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
