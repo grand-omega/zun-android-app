@@ -368,6 +368,7 @@ fun GalleryScreen(
                                             modifier = Modifier.padding(vertical = 8.dp),
                                         )
                                     }
+
                                     is GalleryGridItem.JobItem -> {
                                         val job = item.job
                                         val isSelected = selectedIds.contains(job.id)
@@ -422,6 +423,7 @@ fun GalleryScreen(
                                             },
                                         )
                                     }
+
                                     null -> { /* placeholder while loading */ }
                                 }
                             }
