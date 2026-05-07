@@ -294,7 +294,9 @@ class HomeViewModel(
                 job_id = terminal.jobId,
                 input_id = terminal.inputId,
             )
+
             is JobUploadStatus.Failed -> error(terminal.message)
+
             else -> error("Unexpected upload status: $terminal")
         }
     }

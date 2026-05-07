@@ -126,25 +126,29 @@ class RealJobRepository(
         return request.id
     }
 
-    override fun observeJobUpload(uuid: java.util.UUID): Flow<JobUploadStatus> =
-        WorkManager.getInstance(context).getWorkInfoByIdFlow(uuid).map { info ->
-            when {
-                info == null -> JobUploadStatus.Pending
-                info.state == WorkInfo.State.SUCCEEDED -> JobUploadStatus.Succeeded(
-                    jobId = info.outputData.getString(JobUploadWorker.KEY_JOB_ID).orEmpty(),
-                    inputId = info.outputData.getInt(JobUploadWorker.KEY_INPUT_ID, -1).takeIf { it != -1 },
-                )
-                info.state == WorkInfo.State.FAILED -> JobUploadStatus.Failed(
-                    info.outputData.getString(JobUploadWorker.KEY_ERROR) ?: "Upload failed",
-                )
-                info.state == WorkInfo.State.CANCELLED -> JobUploadStatus.Failed("Cancelled")
-                info.state == WorkInfo.State.RUNNING ||
-                    info.state == WorkInfo.State.ENQUEUED -> JobUploadStatus.InProgress(
-                    info.progress.getFloat(JobUploadWorker.KEY_PROGRESS, 0f),
-                )
-                else -> JobUploadStatus.Pending
-            }
+    override fun observeJobUpload(uuid: java.util.UUID): Flow<JobUploadStatus> = WorkManager.getInstance(context).getWorkInfoByIdFlow(uuid).map { info ->
+        when {
+            info == null -> JobUploadStatus.Pending
+
+            info.state == WorkInfo.State.SUCCEEDED -> JobUploadStatus.Succeeded(
+                jobId = info.outputData.getString(JobUploadWorker.KEY_JOB_ID).orEmpty(),
+                inputId = info.outputData.getInt(JobUploadWorker.KEY_INPUT_ID, -1).takeIf { it != -1 },
+            )
+
+            info.state == WorkInfo.State.FAILED -> JobUploadStatus.Failed(
+                info.outputData.getString(JobUploadWorker.KEY_ERROR) ?: "Upload failed",
+            )
+
+            info.state == WorkInfo.State.CANCELLED -> JobUploadStatus.Failed("Cancelled")
+
+            info.state == WorkInfo.State.RUNNING ||
+                info.state == WorkInfo.State.ENQUEUED -> JobUploadStatus.InProgress(
+                info.progress.getFloat(JobUploadWorker.KEY_PROGRESS, 0f),
+            )
+
+            else -> JobUploadStatus.Pending
         }
+    }
 
     override suspend fun submitStagedJob(
         filePath: String,
