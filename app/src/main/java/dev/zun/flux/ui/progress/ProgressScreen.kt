@@ -39,6 +39,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -47,6 +48,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import coil3.compose.AsyncImage
+import dev.zun.flux.R
 import dev.zun.flux.Tuning
 import dev.zun.flux.data.api.effectivePromptId
 import dev.zun.flux.data.repo.JobRepository
@@ -95,10 +97,10 @@ fun ProgressScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Generating") },
+                title = { Text(stringResource(R.string.progress_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 },
             )
@@ -129,7 +131,7 @@ fun ProgressScreen(
                 ) {
                     AsyncImage(
                         model = inputModel,
-                        contentDescription = "Source image being generated",
+                        contentDescription = stringResource(R.string.progress_source_image_being_generated),
                         modifier = Modifier.fillMaxSize().alpha(0.6f),
                     )
                     LoadingScrim(modifier = Modifier.fillMaxSize())
@@ -138,7 +140,7 @@ fun ProgressScreen(
                 // Status info
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     when (val s = state) {
-                        PollState.Starting -> Text("Starting…", style = MaterialTheme.typography.titleMedium)
+                        PollState.Starting -> Text(stringResource(R.string.progress_starting), style = MaterialTheme.typography.titleMedium)
 
                         is PollState.Running -> {
                             StatusPill(
@@ -148,30 +150,30 @@ fun ProgressScreen(
                             val pct = s.dto.progress?.let { (it * 100).toInt() }
                             if (pct != null) {
                                 Text(
-                                    text = "$pct%",
+                                    text = stringResource(R.string.progress_pct_format, pct),
                                     style = MaterialTheme.typography.displayMedium.tabular(),
                                     fontWeight = FontWeight.Bold,
                                 )
                             }
                         }
 
-                        is PollState.Done -> Text("Done", style = MaterialTheme.typography.titleMedium)
+                        is PollState.Done -> Text(stringResource(R.string.progress_done), style = MaterialTheme.typography.titleMedium)
 
                         is PollState.Failed -> {
                             Text(s.message, color = MaterialTheme.colorScheme.error)
                             Button(onClick = { viewModel.retry(jobId) }) {
-                                Text("Retry")
+                                Text(stringResource(R.string.common_retry))
                             }
                         }
 
                         PollState.Deleted -> Text(
-                            text = "Deleted",
+                            text = stringResource(R.string.progress_deleted),
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.secondary,
                         )
 
                         PollState.Cancelled -> Text(
-                            text = "Cancelled",
+                            text = stringResource(R.string.progress_cancelled),
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.secondary,
                         )
@@ -188,7 +190,7 @@ fun ProgressScreen(
                             modifier = Modifier.padding(16.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            MetadataRow("Prompt", resolvePromptLabel(prompts, dto.effectivePromptId, dto.prompt_text))
+                            MetadataRow(stringResource(R.string.progress_prompt_label), resolvePromptLabel(prompts, dto.effectivePromptId, dto.prompt_text))
                         }
                     }
                 }
@@ -196,7 +198,7 @@ fun ProgressScreen(
                 Spacer(Modifier.height(32.dp))
 
                 Text(
-                    text = "You can go back and pull-refresh Gallery later to pick up completed generations.",
+                    text = stringResource(R.string.progress_pull_refresh_hint),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.secondary,
                 )
@@ -208,7 +210,7 @@ fun ProgressScreen(
                     },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.common_cancel))
                 }
             }
         }

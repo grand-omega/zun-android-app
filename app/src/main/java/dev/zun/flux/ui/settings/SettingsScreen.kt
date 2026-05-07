@@ -37,6 +37,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -49,6 +50,7 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import dev.zun.flux.BuildConfig
 import dev.zun.flux.FluxApp
+import dev.zun.flux.R
 import dev.zun.flux.data.net.captureCertificatePin
 import dev.zun.flux.data.repo.ActiveRoute
 import dev.zun.flux.data.repo.ConnectionMode
@@ -93,21 +95,21 @@ fun SettingsScreen(
     var showClearCacheConfirm by remember { mutableStateOf(false) }
 
     val lockoutOptions = listOf(
-        0L to "Always lock",
-        30_000L to "30 seconds",
-        60_000L to "1 minute",
-        300_000L to "5 minutes",
-        600_000L to "10 minutes",
-        1_800_000L to "30 minutes",
+        0L to stringResource(R.string.settings_lockout_always),
+        30_000L to stringResource(R.string.settings_lockout_30s),
+        60_000L to stringResource(R.string.settings_lockout_1m),
+        300_000L to stringResource(R.string.settings_lockout_5m),
+        600_000L to stringResource(R.string.settings_lockout_10m),
+        1_800_000L to stringResource(R.string.settings_lockout_30m),
     )
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Settings") },
+                title = { Text(stringResource(R.string.settings_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 },
             )
@@ -122,8 +124,8 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             SettingsGroup(
-                title = "Security",
-                detail = "Controls when FluxEdit asks for biometric or device unlock after backgrounding.",
+                title = stringResource(R.string.settings_security_title),
+                detail = stringResource(R.string.settings_security_detail),
             ) {
                 OptionDropdown(
                     options = lockoutOptions,
@@ -136,12 +138,12 @@ fun SettingsScreen(
             }
 
             SettingsGroup(
-                title = "Connection",
-                detail = "Changes are tested before replacing the active server route.",
+                title = stringResource(R.string.settings_connection_title),
+                detail = stringResource(R.string.settings_connection_detail),
             ) {
-                Text("Mode", style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.settings_connection_mode_label), style = MaterialTheme.typography.bodyMedium)
                 OptionDropdown(
-                    options = connectionModeOptions,
+                    options = connectionModeOptions(),
                     selected = connectionDraft.connectionMode,
                     onSelected = viewModel::updateConnectionMode,
                 )
@@ -149,7 +151,7 @@ fun SettingsScreen(
                 OutlinedTextField(
                     value = connectionDraft.lanUrl,
                     onValueChange = viewModel::updateLanUrl,
-                    label = { Text("LAN URL (used at home)") },
+                    label = { Text(stringResource(R.string.settings_lan_url_label)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     isError = connectionDraft.error?.startsWith("LAN URL:") == true,
@@ -158,7 +160,7 @@ fun SettingsScreen(
                 OutlinedTextField(
                     value = connectionDraft.tailscaleUrl,
                     onValueChange = viewModel::updateTailscaleUrl,
-                    label = { Text("Tailscale URL (used away)") },
+                    label = { Text(stringResource(R.string.settings_tailscale_url_label)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     isError = connectionDraft.error?.startsWith("Tailscale URL:") == true,
@@ -172,7 +174,7 @@ fun SettingsScreen(
                 OutlinedTextField(
                     value = connectionDraft.token,
                     onValueChange = viewModel::updateToken,
-                    label = { Text("API Token") },
+                    label = { Text(stringResource(R.string.settings_token_label)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     visualTransformation = if (tokenVisible) {
@@ -188,7 +190,7 @@ fun SettingsScreen(
                                 } else {
                                     Icons.Default.Visibility
                                 },
-                                contentDescription = if (tokenVisible) "Hide token" else "Show token",
+                                contentDescription = stringResource(if (tokenVisible) R.string.settings_token_hide else R.string.settings_token_show),
                             )
                         }
                     },
@@ -204,9 +206,9 @@ fun SettingsScreen(
                             modifier = Modifier.padding(end = 8.dp),
                             color = MaterialTheme.colorScheme.onPrimary,
                         )
-                        Text("Testing connection...")
+                        Text(stringResource(R.string.settings_testing_connection))
                     } else {
-                        Text("Connect")
+                        Text(stringResource(R.string.common_connect))
                     }
                 }
 
@@ -214,11 +216,11 @@ fun SettingsScreen(
             }
 
             SettingsGroup(
-                title = "Offline Cache",
-                detail = "Keeps recently viewed images usable when the server is unavailable.",
+                title = stringResource(R.string.settings_offline_cache_title),
+                detail = stringResource(R.string.settings_offline_cache_detail),
             ) {
-                InfoRow("Cached Images", "${offlineCache.stats.fileCount} files")
-                InfoRow("Cache Size", formatBytes(offlineCache.stats.bytes))
+                InfoRow(stringResource(R.string.settings_cached_images), stringResource(R.string.settings_cached_files_format, offlineCache.stats.fileCount))
+                InfoRow(stringResource(R.string.settings_cache_size), formatBytes(offlineCache.stats.bytes))
                 StatusPill(label = offlineCache.status, tone = StatusTone.Neutral)
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                     Button(
@@ -231,26 +233,26 @@ fun SettingsScreen(
                                 modifier = Modifier.padding(end = 8.dp),
                                 color = MaterialTheme.colorScheme.onPrimary,
                             )
-                            Text("Caching...")
+                            Text(stringResource(R.string.settings_caching))
                         } else {
-                            Text("Refresh Cache")
+                            Text(stringResource(R.string.settings_refresh_cache))
                         }
                     }
                     OutlinedButton(
                         onClick = { showClearCacheConfirm = true },
                         modifier = Modifier.weight(1f),
                     ) {
-                        Text("Clear")
+                        Text(stringResource(R.string.common_clear))
                     }
                 }
             }
 
             SettingsGroup(
-                title = "Certificate Pinning",
-                detail = "Pin your servers' certificates so a compromised CA can't impersonate them. Re-pin after cert renewal.",
+                title = stringResource(R.string.settings_cert_pinning_title),
+                detail = stringResource(R.string.settings_cert_pinning_detail),
             ) {
                 if (certPins.isEmpty()) {
-                    StatusPill(label = "No pins active", tone = StatusTone.Warning)
+                    StatusPill(label = stringResource(R.string.settings_no_pins_active), tone = StatusTone.Warning)
                 } else {
                     certPins.forEach { (host, pin) ->
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -280,12 +282,16 @@ fun SettingsScreen(
                                     urls.mapNotNull { captureCertificatePin(app.okHttpClient, it) }
                                 }
                                 if (captured.isEmpty()) {
-                                    pinResult = "No HTTPS certificates captured. Pin only applies to https:// URLs."
+                                    pinResult = app.getString(R.string.settings_no_https_certificates)
                                 } else {
                                     captured.forEach { (host, pin) -> app.certPinStore.setPin(host, pin) }
                                     app.rebuildOkHttp()
                                     app.rebuildRepository()
-                                    pinResult = "Pinned ${captured.size} host${if (captured.size == 1) "" else "s"}."
+                                    pinResult = if (captured.size == 1) {
+                                        app.getString(R.string.settings_pinned_one_format)
+                                    } else {
+                                        app.getString(R.string.settings_pinned_many_format, captured.size)
+                                    }
                                 }
                                 pinningInProgress = false
                             }
@@ -298,9 +304,9 @@ fun SettingsScreen(
                                 modifier = Modifier.padding(end = 8.dp),
                                 color = MaterialTheme.colorScheme.onPrimary,
                             )
-                            Text("Pinning…")
+                            Text(stringResource(R.string.settings_pinning))
                         } else {
-                            Text("Pin Current")
+                            Text(stringResource(R.string.settings_pin_current))
                         }
                     }
                     OutlinedButton(
@@ -308,30 +314,30 @@ fun SettingsScreen(
                             app.certPinStore.clearAll()
                             app.rebuildOkHttp()
                             app.rebuildRepository()
-                            pinResult = "All pins cleared."
+                            pinResult = app.getString(R.string.settings_all_pins_cleared)
                         },
                         enabled = !pinningInProgress && certPins.isNotEmpty(),
                         modifier = Modifier.weight(1f),
                     ) {
-                        Text("Clear")
+                        Text(stringResource(R.string.common_clear))
                     }
                 }
                 pinResult?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
             }
 
             SettingsGroup(
-                title = "Diagnostics",
-                detail = "Snapshot of recent network activity. Useful when something feels off.",
+                title = stringResource(R.string.settings_diagnostics_title),
+                detail = stringResource(R.string.settings_diagnostics_detail),
             ) {
-                InfoRow("Active Route", activeRouteLabel(settingsManager.activeRoute))
-                InfoRow("Last Successful Request", relativeTimeOrDash(diagnostics.lastSuccessAtMs))
+                InfoRow(stringResource(R.string.settings_active_route), activeRouteLabel(settingsManager.activeRoute))
+                InfoRow(stringResource(R.string.settings_last_successful_request), relativeTimeOrDash(diagnostics.lastSuccessAtMs))
                 val pendingUploads = uploadQueue.count {
                     it.state == WorkInfo.State.ENQUEUED || it.state == WorkInfo.State.RUNNING
                 }
-                InfoRow("Upload Queue", "$pendingUploads pending")
+                InfoRow(stringResource(R.string.settings_upload_queue), stringResource(R.string.settings_pending_format, pendingUploads))
                 if (diagnostics.recentErrors.isNotEmpty()) {
                     Text(
-                        text = "Recent Errors",
+                        text = stringResource(R.string.settings_recent_errors),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.secondary,
                     )
@@ -345,18 +351,18 @@ fun SettingsScreen(
                         }
                     }
                 } else {
-                    StatusPill(label = "No errors recorded", tone = StatusTone.Success)
+                    StatusPill(label = stringResource(R.string.settings_no_errors_recorded), tone = StatusTone.Success)
                 }
             }
 
-            SettingsGroup(title = "App Info") {
-                InfoRow("Version", BuildConfig.VERSION_NAME)
-                InfoRow("Build", BuildConfig.VERSION_CODE.toString())
-                InfoRow("Package", BuildConfig.APPLICATION_ID)
-                InfoRow("Mode", connectionModeLabel(settingsManager.connectionMode))
-                InfoRow("Active URL", settingsManager.serverUrl ?: "(none)", isMonospace = true)
-                InfoRow("LAN URL", settingsManager.lanUrl ?: "(not set)", isMonospace = true)
-                InfoRow("Tailscale URL", settingsManager.tailscaleUrl ?: "(not set)", isMonospace = true)
+            SettingsGroup(title = stringResource(R.string.settings_app_info_title)) {
+                InfoRow(stringResource(R.string.settings_version), BuildConfig.VERSION_NAME)
+                InfoRow(stringResource(R.string.settings_build), BuildConfig.VERSION_CODE.toString())
+                InfoRow(stringResource(R.string.settings_package), BuildConfig.APPLICATION_ID)
+                InfoRow(stringResource(R.string.settings_mode), connectionModeLabel(settingsManager.connectionMode))
+                InfoRow(stringResource(R.string.settings_active_url), settingsManager.serverUrl ?: stringResource(R.string.settings_value_none), isMonospace = true)
+                InfoRow(stringResource(R.string.settings_lan_url), settingsManager.lanUrl ?: stringResource(R.string.settings_value_not_set), isMonospace = true)
+                InfoRow(stringResource(R.string.settings_tailscale_url), settingsManager.tailscaleUrl ?: stringResource(R.string.settings_value_not_set), isMonospace = true)
             }
         }
     }
@@ -364,8 +370,8 @@ fun SettingsScreen(
     if (showClearCacheConfirm) {
         AlertDialog(
             onDismissRequest = { showClearCacheConfirm = false },
-            title = { Text("Clear offline cache?") },
-            text = { Text("Cached image files will be removed from this device. Server history and settings stay unchanged.") },
+            title = { Text(stringResource(R.string.settings_clear_cache_title)) },
+            text = { Text(stringResource(R.string.settings_clear_cache_message)) },
             confirmButton = {
                 androidx.compose.material3.TextButton(
                     onClick = {
@@ -373,34 +379,37 @@ fun SettingsScreen(
                         viewModel.clearOfflineCache()
                     },
                 ) {
-                    Text("Clear", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.common_clear), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
                 androidx.compose.material3.TextButton(onClick = { showClearCacheConfirm = false }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.common_cancel))
                 }
             },
         )
     }
 }
 
-private val connectionModeOptions = listOf(
-    ConnectionMode.AUTO to "Auto (LAN first, Tailscale fallback)",
-    ConnectionMode.LAN_ONLY to "LAN only",
-    ConnectionMode.TAILSCALE_ONLY to "Tailscale only",
+@Composable
+private fun connectionModeOptions(): List<Pair<ConnectionMode, String>> = listOf(
+    ConnectionMode.AUTO to stringResource(R.string.settings_connection_mode_auto),
+    ConnectionMode.LAN_ONLY to stringResource(R.string.settings_connection_mode_lan_only),
+    ConnectionMode.TAILSCALE_ONLY to stringResource(R.string.settings_connection_mode_tailscale_only),
 )
 
+@Composable
 private fun connectionModeLabel(mode: ConnectionMode): String = when (mode) {
-    ConnectionMode.AUTO -> "Auto"
-    ConnectionMode.LAN_ONLY -> "LAN only"
-    ConnectionMode.TAILSCALE_ONLY -> "Tailscale only"
+    ConnectionMode.AUTO -> stringResource(R.string.settings_connection_mode_auto_short)
+    ConnectionMode.LAN_ONLY -> stringResource(R.string.settings_connection_mode_lan_only)
+    ConnectionMode.TAILSCALE_ONLY -> stringResource(R.string.settings_connection_mode_tailscale_only)
 }
 
+@Composable
 private fun activeRouteLabel(route: ActiveRoute): String = when (route) {
-    ActiveRoute.NONE -> "(none)"
-    ActiveRoute.LAN -> "LAN"
-    ActiveRoute.TAILSCALE -> "Tailscale"
+    ActiveRoute.NONE -> stringResource(R.string.settings_value_none)
+    ActiveRoute.LAN -> stringResource(R.string.settings_active_route_lan)
+    ActiveRoute.TAILSCALE -> stringResource(R.string.settings_active_route_tailscale)
 }
 
 @Composable

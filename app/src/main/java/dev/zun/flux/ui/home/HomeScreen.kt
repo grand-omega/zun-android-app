@@ -60,6 +60,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -70,6 +71,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import dev.zun.flux.FluxApp
+import dev.zun.flux.R
 import dev.zun.flux.data.api.PromptDto
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.ui.common.ControlShape
@@ -127,7 +129,7 @@ fun HomeScreen(
         coroutineScope.launch {
             val remaining = MAX_BATCH_IMAGES - composer.inputUris.size
             if (remaining <= 0) {
-                snackbarHostState.showOne("Limit is $MAX_BATCH_IMAGES images")
+                snackbarHostState.showOne(context.getString(R.string.home_limit_images_format, MAX_BATCH_IMAGES))
                 return@launch
             }
             val toAdd = newUris.filter { it !in composer.inputUris }.take(remaining)
@@ -136,7 +138,7 @@ fun HomeScreen(
             }
             val result = viewModel.addInputUris(cached, MAX_BATCH_IMAGES)
             if (newUris.size > toAdd.size || result.capped) {
-                snackbarHostState.showOne("Capped at $MAX_BATCH_IMAGES images")
+                snackbarHostState.showOne(context.getString(R.string.home_capped_images_format, MAX_BATCH_IMAGES))
             }
         }
     }
@@ -148,7 +150,7 @@ fun HomeScreen(
 
     LaunchedEffect(Unit) {
         viewModel.promptSavedEvents.collect {
-            snackbarHostState.showOne("Prompt saved")
+            snackbarHostState.showOne(context.getString(R.string.home_prompt_saved))
         }
     }
 
@@ -180,7 +182,7 @@ fun HomeScreen(
         val remaining = MAX_BATCH_IMAGES - composer.inputUris.size
         when {
             remaining <= 0 -> coroutineScope.launch {
-                snackbarHostState.showSnackbar("Limit is $MAX_BATCH_IMAGES images")
+                snackbarHostState.showSnackbar(context.getString(R.string.home_limit_images_format, MAX_BATCH_IMAGES))
             }
 
             remaining == 1 -> pickerSingle.launch(
@@ -204,7 +206,7 @@ fun HomeScreen(
                 viewModel.acknowledgeDone()
                 if (s.failed > 0) {
                     snackbarHostState.showOne(
-                        "${s.submittedIds.size} submitted, ${s.failed} failed",
+                        context.getString(R.string.home_submitted_failed_format, s.submittedIds.size, s.failed),
                     )
                 }
                 onBatchSubmitted(s.submittedIds)
@@ -222,12 +224,16 @@ fun HomeScreen(
             TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("FluxEdit")
+                        Text(stringResource(R.string.home_app_title))
                         Spacer(Modifier.width(10.dp))
                         HealthDot(health = health)
                         Spacer(Modifier.width(6.dp))
                         Text(
-                            text = "${activeRouteLabel(app.settingsManager.activeRoute)} · ${healthShortLabel(health)}",
+                            text = stringResource(
+                                R.string.home_status_format,
+                                activeRouteLabel(app.settingsManager.activeRoute),
+                                healthShortLabel(health),
+                            ),
                             style = MaterialTheme.typography.labelSmall,
                             color = healthColor(health),
                         )
@@ -235,10 +241,10 @@ fun HomeScreen(
                 },
                 actions = {
                     IconButton(onClick = onGalleryClick) {
-                        Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Gallery")
+                        Icon(Icons.AutoMirrored.Filled.List, contentDescription = stringResource(R.string.home_gallery))
                     }
                     IconButton(onClick = onSettingsClick) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+                        Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.home_settings))
                     }
                 },
             )
@@ -296,7 +302,7 @@ fun HomeScreen(
                             }
                             appendUris(listOf(uri))
                         } catch (_: Throwable) {
-                            snackbarHostState.showOne("Couldn't load that image")
+                            snackbarHostState.showOne(context.getString(R.string.home_couldnt_load_image))
                         } finally {
                             isFetchingRecent = false
                         }
@@ -359,7 +365,7 @@ fun HomeScreen(
     if (showSaveDialog) {
         AlertDialog(
             onDismissRequest = { showSaveDialog = false },
-            title = { Text("Save this prompt") },
+            title = { Text(stringResource(R.string.home_save_prompt_title)) },
             text = {
                 Column {
                     Text(
@@ -371,8 +377,8 @@ fun HomeScreen(
                     OutlinedTextField(
                         value = saveDialogLabel,
                         onValueChange = { saveDialogLabel = it },
-                        label = { Text("Label") },
-                        placeholder = { Text("e.g. Van Gogh style") },
+                        label = { Text(stringResource(R.string.home_save_prompt_label)) },
+                        placeholder = { Text(stringResource(R.string.home_save_prompt_placeholder)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -386,12 +392,12 @@ fun HomeScreen(
                         showSaveDialog = false
                     },
                 ) {
-                    Text("Save")
+                    Text(stringResource(R.string.common_save))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showSaveDialog = false }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.common_cancel))
                 }
             },
         )
@@ -588,15 +594,21 @@ private fun Composer(
             enabled = canSubmit,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text(submitButtonLabel(state, imageCount))
+            Text(
+                when {
+                    state is SubmitState.InFlight -> stringResource(R.string.home_submitting)
+                    imageCount > 1 -> stringResource(R.string.home_generate_count_format, imageCount)
+                    else -> stringResource(R.string.home_generate)
+                },
+            )
         }
 
         if (!canSubmit && state !is SubmitState.InFlight) {
             Text(
                 text = when {
-                    imageCount == 0 -> "Add a source image to generate."
-                    selectedLabel == null -> "Choose a prompt to generate."
-                    else -> "Finish the prompt before generating."
+                    imageCount == 0 -> stringResource(R.string.home_need_image)
+                    selectedLabel == null -> stringResource(R.string.home_need_prompt)
+                    else -> stringResource(R.string.home_finish_prompt)
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -629,12 +641,12 @@ private fun PromptStrip(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Prompt",
+                    text = stringResource(R.string.home_prompt),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.secondary,
                 )
                 Text(
-                    text = selectedLabel ?: "Choose a prompt",
+                    text = selectedLabel ?: stringResource(R.string.home_choose_a_prompt),
                     style = MaterialTheme.typography.bodyLarge,
                     color = if (selectedLabel != null) {
                         MaterialTheme.colorScheme.onSurface
@@ -652,7 +664,7 @@ private fun PromptStrip(
                     modifier = Modifier.padding(end = 8.dp),
                 ) {
                     Text(
-                        text = "HQ",
+                        text = stringResource(R.string.home_hq),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -661,7 +673,7 @@ private fun PromptStrip(
             }
             Icon(
                 imageVector = Icons.Default.KeyboardArrowDown,
-                contentDescription = "Open prompt picker",
+                contentDescription = stringResource(R.string.home_open_prompt_picker),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -677,12 +689,6 @@ private suspend fun SnackbarHostState.showOne(message: String) {
     showSnackbar(message = message, duration = SnackbarDuration.Short)
 }
 
-private fun submitButtonLabel(state: SubmitState, count: Int): String = when {
-    state is SubmitState.InFlight -> "Submitting…"
-    count > 1 -> "Generate $count"
-    else -> "Generate"
-}
-
 @Composable
 private fun UploadProgressSection(
     uploadProgress: Float?,
@@ -690,13 +696,26 @@ private fun UploadProgressSection(
 ) {
     if (uploadProgress == null && batchProgress == null) return
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        val label = buildString {
-            if (batchProgress != null) {
-                append("Uploading ${batchProgress.current} of ${batchProgress.total}")
-                if (uploadProgress != null) append(" · ${(uploadProgress * 100).toInt()}%")
-            } else if (uploadProgress != null) {
-                append("Uploading… ${(uploadProgress * 100).toInt()}%")
-            }
+        val label = when {
+            batchProgress != null && uploadProgress != null -> stringResource(
+                R.string.home_uploading_batch_with_pct_format,
+                batchProgress.current,
+                batchProgress.total,
+                (uploadProgress * 100).toInt(),
+            )
+
+            batchProgress != null -> stringResource(
+                R.string.home_uploading_batch_format,
+                batchProgress.current,
+                batchProgress.total,
+            )
+
+            uploadProgress != null -> stringResource(
+                R.string.home_uploading_pct_format,
+                (uploadProgress * 100).toInt(),
+            )
+
+            else -> ""
         }
         Text(
             text = label,

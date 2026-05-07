@@ -40,8 +40,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import dev.zun.flux.R
 import dev.zun.flux.ui.common.PanelShape
 
 const val MAX_BATCH_IMAGES = 20
@@ -74,7 +76,7 @@ fun ImageHero(
         ) {
             AsyncImage(
                 model = imageUris[0],
-                contentDescription = "Selected source image",
+                contentDescription = stringResource(R.string.home_selected_source_image),
                 contentScale = ContentScale.Fit,
                 modifier = Modifier.fillMaxSize(),
             )
@@ -85,7 +87,7 @@ fun ImageHero(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
-                text = "${imageUris.size} images · same prompt",
+                text = stringResource(R.string.home_n_images_same_prompt_format, imageUris.size),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.secondary,
             )
@@ -110,7 +112,7 @@ fun ImageHero(
             ) {
                 AsyncImage(
                     model = imageUris[0],
-                    contentDescription = "Primary selected source image",
+                    contentDescription = stringResource(R.string.home_primary_selected_source_image),
                     contentScale = ContentScale.Fit,
                     modifier = Modifier.fillMaxSize(),
                 )
@@ -150,7 +152,7 @@ private fun EmptyHero(
             )
             Spacer(Modifier.heightIn(min = 8.dp))
             Text(
-                text = "Add a source image",
+                text = stringResource(R.string.home_add_source_image),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface,
             )
@@ -162,12 +164,12 @@ private fun EmptyHero(
             ) {
                 IconLabel(
                     icon = Icons.Default.PhotoCamera,
-                    label = "Take photo",
+                    label = stringResource(R.string.home_take_photo),
                     onClick = onTakePhoto,
                 )
                 IconLabel(
                     icon = Icons.Default.Image,
-                    label = "From gallery",
+                    label = stringResource(R.string.home_from_gallery),
                     onClick = onPickGallery,
                 )
             }
@@ -190,7 +192,7 @@ private fun RecentInputRow(
 
     Spacer(Modifier.heightIn(min = 16.dp))
     Text(
-        text = "Recent",
+        text = stringResource(R.string.home_recent),
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.secondary,
     )
@@ -253,10 +255,10 @@ fun CompactSourceRow(
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         IconButton(onClick = onTakePhoto) {
-            Icon(Icons.Default.PhotoCamera, contentDescription = "Take photo")
+            Icon(Icons.Default.PhotoCamera, contentDescription = stringResource(R.string.home_take_photo))
         }
         IconButton(onClick = onPickGallery) {
-            Icon(Icons.Default.AddPhotoAlternate, contentDescription = "Add image")
+            Icon(Icons.Default.AddPhotoAlternate, contentDescription = stringResource(R.string.home_add_image))
         }
         Spacer(Modifier.width(4.dp))
         recents.take(3).forEach { (id, model, selected) ->
@@ -275,7 +277,7 @@ fun CompactSourceRow(
         Spacer(Modifier.weight(1f))
         if (imageCount > 1) {
             Text(
-                text = "$imageCount selected",
+                text = stringResource(R.string.home_n_selected_format, imageCount),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.secondary,
             )
@@ -295,7 +297,9 @@ private fun RecentInputThumbnail(
     val shape = RoundedCornerShape(cornerRadius.dp)
     AsyncImage(
         model = model,
-        contentDescription = if (selected) "Selected recent source image" else "Recent source image",
+        contentDescription = stringResource(
+            if (selected) R.string.home_selected_recent_source_image else R.string.home_recent_source_image,
+        ),
         contentScale = ContentScale.Crop,
         modifier = Modifier
             .size(size.dp)
@@ -318,7 +322,7 @@ private fun RecentInputThumbnail(
             if (size >= 48) {
                 Icon(
                     imageVector = Icons.Default.Check,
-                    contentDescription = "Already selected",
+                    contentDescription = stringResource(R.string.home_already_selected),
                     tint = Color.White,
                 )
             }
@@ -331,7 +335,7 @@ private fun ImageThumb(uri: Uri, onRemove: () -> Unit) {
     Box(modifier = Modifier.size(96.dp)) {
         AsyncImage(
             model = uri,
-            contentDescription = "Selected source image thumbnail",
+            contentDescription = stringResource(R.string.home_selected_source_image_thumbnail),
             contentScale = ContentScale.Crop,
             modifier = Modifier
                 .fillMaxSize()
@@ -349,7 +353,7 @@ private fun ImageThumb(uri: Uri, onRemove: () -> Unit) {
         ) {
             Icon(
                 imageVector = Icons.Default.Close,
-                contentDescription = "Remove image",
+                contentDescription = stringResource(R.string.home_remove_image),
                 tint = Color.White,
                 modifier = Modifier.size(14.dp),
             )
@@ -374,11 +378,11 @@ private fun AddMoreTile(onClick: () -> Unit) {
             ) {
                 Icon(
                     imageVector = Icons.Default.Add,
-                    contentDescription = "Add more images",
+                    contentDescription = stringResource(R.string.home_add_more_images),
                     tint = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    text = "Add",
+                    text = stringResource(R.string.home_add),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurface,
                 )

@@ -1,4 +1,277 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">FluxEdit</string>
+
+    <!-- Common -->
+    <string name="common_back">Back</string>
+    <string name="common_cancel">Cancel</string>
+    <string name="common_delete">Delete</string>
+    <string name="common_save">Save</string>
+    <string name="common_close">Close</string>
+    <string name="common_done">Done</string>
+    <string name="common_retry">Retry</string>
+    <string name="common_clear">Clear</string>
+    <string name="common_connect">Connect</string>
+    <string name="common_more">More</string>
+
+    <!-- Auth / Lock -->
+    <string name="auth_locked_title">FluxEdit is locked</string>
+    <string name="auth_locked_message">Unlock to view private images, prompts, and server settings.</string>
+    <string name="auth_unlock">Unlock</string>
+
+    <!-- Camera -->
+    <string name="camera_permission_title">Camera access needed</string>
+    <string name="camera_permission_message">Allow camera access to capture a new source image.</string>
+    <string name="camera_allow">Allow camera</string>
+    <string name="camera_take_photo">Take photo</string>
+    <string name="camera_close">Close</string>
+    <string name="camera_flip">Flip camera</string>
+
+    <!-- Gallery -->
+    <string name="gallery_title">Gallery</string>
+    <string name="gallery_n_selected">%1$d selected</string>
+    <string name="gallery_clear_selection">Clear selection</string>
+    <string name="gallery_save_selected">Save selected</string>
+    <string name="gallery_share_selected">Share selected</string>
+    <string name="gallery_delete_selected">Delete selected</string>
+    <string name="gallery_show_image_labels">Show image labels</string>
+    <string name="gallery_hide_image_labels">Hide image labels</string>
+    <string name="gallery_filter_by_tag">Filter by tag</string>
+    <string name="gallery_filter_option_format">%1$s · %2$d</string>
+    <string name="gallery_clear_filter">Clear filter</string>
+    <string name="gallery_showing_format">Showing: %1$s</string>
+    <string name="gallery_filtered">Filtered</string>
+    <string name="gallery_load_error_title">Couldn\'t load gallery</string>
+    <string name="gallery_load_error_default">Check your connection and try again.</string>
+    <string name="gallery_empty_filtered_title">No matching generations</string>
+    <string name="gallery_empty_filtered_message">Clear the active filter to return to the full gallery.</string>
+    <string name="gallery_empty_title">No generations yet</string>
+    <string name="gallery_empty_message">Create an edit from Home and completed results will appear here.</string>
+    <string name="gallery_create_an_edit">Create an edit</string>
+    <string name="gallery_undo_deleted_one">Deleted 1 generation</string>
+    <string name="gallery_undo_deleted_many">Deleted %1$d generations</string>
+    <string name="gallery_undo">Undo</string>
+    <string name="gallery_selected">Selected</string>
+    <string name="gallery_not_cached_needs_network">Not cached — needs network</string>
+    <string name="gallery_unavailable">Unavailable</string>
+    <string name="gallery_delete_confirm_title">Delete selected?</string>
+    <string name="gallery_delete_confirm_message">Removes %1$d generations. You can undo within 30 days.</string>
+    <string name="gallery_post_save_delete_title">Remove from app?</string>
+    <string name="gallery_post_save_delete_message_one">Saved 1 image to your gallery. Remove it from the app to free up space?</string>
+    <string name="gallery_post_save_delete_message_many">Saved %1$d images to your gallery. Remove them from the app to free up space?</string>
+    <string name="gallery_remove">Remove</string>
+    <string name="gallery_keep">Keep</string>
+
+    <!-- Photo viewer -->
+    <string name="viewer_delete_confirm_title">Delete generation?</string>
+    <string name="viewer_delete_confirm_message">This removes the generation from FluxEdit history. You can undo from the snackbar.</string>
+    <string name="viewer_image_unavailable_offline">Image unavailable offline</string>
+    <string name="viewer_save_failed">Save failed. Connect to the server for uncached originals.</string>
+    <string name="viewer_saved_to_gallery">Saved to Gallery</string>
+    <string name="viewer_compare">Compare</string>
+    <string name="viewer_loading">Loading</string>
+    <string name="viewer_use_input">Use input</string>
+    <string name="viewer_save">Save</string>
+    <string name="viewer_details">Details</string>
+    <string name="viewer_delete">Delete</string>
+    <string name="viewer_detail_created">Created</string>
+    <string name="viewer_detail_duration">Duration</string>
+    <string name="viewer_detail_duration_seconds_format">%1$ds</string>
+    <string name="viewer_detail_offline">Offline</string>
+    <string name="viewer_detail_prompt">Prompt</string>
+    <string name="viewer_detail_prompt_text">Prompt text</string>
+    <string name="viewer_offline_original_cached">Original cached</string>
+    <string name="viewer_offline_preview_cached">Preview cached</string>
+    <string name="viewer_offline_thumb_cached">Thumbnail cached</string>
+    <string name="viewer_offline_needs_server">Needs server</string>
+
+    <!-- Home -->
+    <string name="home_app_title">FluxEdit</string>
+    <string name="home_status_format">%1$s · %2$s</string>
+    <string name="home_gallery">Gallery</string>
+    <string name="home_settings">Settings</string>
+    <string name="home_save_prompt_title">Save this prompt</string>
+    <string name="home_save_prompt_label">Label</string>
+    <string name="home_save_prompt_placeholder">e.g. Van Gogh style</string>
+    <string name="home_prompt">Prompt</string>
+    <string name="home_choose_a_prompt">Choose a prompt</string>
+    <string name="home_hq">HQ</string>
+    <string name="home_open_prompt_picker">Open prompt picker</string>
+    <string name="home_limit_images_format">Limit is %1$d images</string>
+    <string name="home_capped_images_format">Capped at %1$d images</string>
+    <string name="home_prompt_saved">Prompt saved</string>
+    <string name="home_couldnt_load_image">Couldn\'t load that image</string>
+    <string name="home_submitted_failed_format">%1$d submitted, %2$d failed</string>
+    <string name="home_need_image">Add a source image to generate.</string>
+    <string name="home_need_prompt">Choose a prompt to generate.</string>
+    <string name="home_finish_prompt">Finish the prompt before generating.</string>
+    <string name="home_submitting">Submitting…</string>
+    <string name="home_generate_count_format">Generate %1$d</string>
+    <string name="home_generate">Generate</string>
+    <string name="home_uploading_batch_format">Uploading %1$d of %2$d</string>
+    <string name="home_uploading_batch_with_pct_format">Uploading %1$d of %2$d · %3$d%%</string>
+    <string name="home_uploading_pct_format">Uploading… %1$d%%</string>
+
+    <!-- Image picker -->
+    <string name="home_selected_source_image">Selected source image</string>
+    <string name="home_primary_selected_source_image">Primary selected source image</string>
+    <string name="home_selected_source_image_thumbnail">Selected source image thumbnail</string>
+    <string name="home_selected_recent_source_image">Selected recent source image</string>
+    <string name="home_recent_source_image">Recent source image</string>
+    <string name="home_n_images_same_prompt_format">%1$d images · same prompt</string>
+    <string name="home_add_source_image">Add a source image</string>
+    <string name="home_take_photo">Take photo</string>
+    <string name="home_from_gallery">From gallery</string>
+    <string name="home_recent">Recent</string>
+    <string name="home_already_selected">Already selected</string>
+    <string name="home_add_image">Add image</string>
+    <string name="home_n_selected_format">%1$d selected</string>
+    <string name="home_remove_image">Remove image</string>
+    <string name="home_add_more_images">Add more images</string>
+    <string name="home_add">Add</string>
+
+    <!-- Prompts -->
+    <string name="prompts_choose">Choose a prompt</string>
+    <string name="prompts_manage">Manage</string>
+    <string name="prompts_high_quality">High quality</string>
+    <string name="prompts_high_quality_detail">Slower, larger model</string>
+    <string name="prompts_search_placeholder">Search prompts</string>
+    <string name="prompts_no_match_format">No prompts match \"%1$s\"</string>
+    <string name="prompts_unpin">Unpin prompt</string>
+    <string name="prompts_pin">Pin prompt</string>
+    <string name="prompts_manage_title">Manage prompts</string>
+    <string name="prompts_no_saved">No saved prompts yet</string>
+    <string name="prompts_delete">Delete prompt</string>
+    <string name="prompts_write_your_own">Write your own...</string>
+    <string name="prompts_custom_placeholder">e.g. A cat wearing a spacesuit</string>
+    <string name="prompts_save_prompt">Save prompt</string>
+
+    <!-- Progress -->
+    <string name="progress_title">Generating</string>
+    <string name="progress_starting">Starting…</string>
+    <string name="progress_done">Done</string>
+    <string name="progress_deleted">Deleted</string>
+    <string name="progress_cancelled">Cancelled</string>
+    <string name="progress_pct_format">%1$d%%</string>
+    <string name="progress_prompt_label">Prompt</string>
+    <string name="progress_pull_refresh_hint">You can go back and pull-refresh Gallery later to pick up completed generations.</string>
+    <string name="progress_cancel">Cancel</string>
+    <string name="progress_retry">Retry</string>
+    <string name="progress_source_image_being_generated">Source image being generated</string>
+
+    <!-- Batch progress -->
+    <string name="progress_batch_n_generations_format">%1$d generations</string>
+    <string name="progress_batch_index_format">%1$d of %2$d</string>
+    <string name="progress_batch_back_to_overview">Back to overview</string>
+    <string name="progress_batch_completed_generation">Completed generation</string>
+    <string name="progress_batch_done">Done</string>
+    <string name="progress_batch_failed">Failed</string>
+    <string name="progress_batch_deleted">Deleted</string>
+    <string name="progress_batch_cancelled">Cancelled</string>
+    <string name="progress_batch_source_image_in_progress">Source image in progress</string>
+    <string name="progress_batch_view_result">View result</string>
+
+    <!-- Result -->
+    <string name="result_title">Result</string>
+    <string name="result_loading">Loading…</string>
+    <string name="result_write_your_own">Write your own...</string>
+    <string name="result_choose_prompt">Choose a prompt</string>
+    <string name="result_new_image">New image</string>
+    <string name="result_view_details">View details</string>
+    <string name="result_delete">Delete</string>
+    <string name="result_before">Before</string>
+    <string name="result_after">After</string>
+    <string name="result_regenerating">Regenerating…</string>
+    <string name="result_regenerate">Regenerate</string>
+    <string name="result_saving">Saving…</string>
+    <string name="result_save">Save</string>
+    <string name="result_share">Share</string>
+    <string name="result_saved_to_pictures">Saved to Pictures/FluxEdit</string>
+    <string name="result_delete_confirm_title">Delete generation?</string>
+    <string name="result_delete_confirm_message">This removes the generation from FluxEdit history and the server delete queue will sync in the background.</string>
+    <string name="result_save_prompt_title">Save this prompt</string>
+    <string name="result_save_prompt_label">Label</string>
+    <string name="result_prompt_saved">Prompt saved</string>
+    <string name="result_details_title">Details</string>
+    <string name="result_details_prompt_format">Prompt: %1$s</string>
+    <string name="result_details_created_format">Created: %1$s</string>
+    <string name="result_details_duration_format">Duration: %1$ds</string>
+    <string name="result_edit_prompt_and_regenerate">Edit prompt and regenerate</string>
+
+    <!-- Setup -->
+    <string name="setup_title">FluxEdit Setup</string>
+    <string name="setup_heading">Connect FluxEdit</string>
+    <string name="setup_description">Enter at least one private server URL and the API token used by Project ZUN.</string>
+    <string name="setup_server_title">Server</string>
+    <string name="setup_server_detail">Auto mode uses LAN first, then Tailscale when LAN is unavailable.</string>
+    <string name="setup_lan_url_label">LAN URL</string>
+    <string name="setup_lan_url_placeholder">http://192.168.1.15:8080</string>
+    <string name="setup_tailscale_url_label">Tailscale URL</string>
+    <string name="setup_tailscale_url_placeholder">https://zun.tailnet-name.ts.net</string>
+    <string name="setup_token_label">API Token</string>
+    <string name="setup_token_show">Show token</string>
+    <string name="setup_token_hide">Hide token</string>
+    <string name="setup_testing_connection">Testing connection...</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_security_title">Security</string>
+    <string name="settings_security_detail">Controls when FluxEdit asks for biometric or device unlock after backgrounding.</string>
+    <string name="settings_lockout_always">Always lock</string>
+    <string name="settings_lockout_30s">30 seconds</string>
+    <string name="settings_lockout_1m">1 minute</string>
+    <string name="settings_lockout_5m">5 minutes</string>
+    <string name="settings_lockout_10m">10 minutes</string>
+    <string name="settings_lockout_30m">30 minutes</string>
+    <string name="settings_connection_title">Connection</string>
+    <string name="settings_connection_detail">Changes are tested before replacing the active server route.</string>
+    <string name="settings_connection_mode_label">Mode</string>
+    <string name="settings_lan_url_label">LAN URL (used at home)</string>
+    <string name="settings_tailscale_url_label">Tailscale URL (used away)</string>
+    <string name="settings_token_label">API Token</string>
+    <string name="settings_token_show">Show token</string>
+    <string name="settings_token_hide">Hide token</string>
+    <string name="settings_testing_connection">Testing connection...</string>
+    <string name="settings_offline_cache_title">Offline Cache</string>
+    <string name="settings_offline_cache_detail">Keeps recently viewed images usable when the server is unavailable.</string>
+    <string name="settings_cached_images">Cached Images</string>
+    <string name="settings_cached_files_format">%1$d files</string>
+    <string name="settings_cache_size">Cache Size</string>
+    <string name="settings_caching">Caching...</string>
+    <string name="settings_refresh_cache">Refresh Cache</string>
+    <string name="settings_cert_pinning_title">Certificate Pinning</string>
+    <string name="settings_cert_pinning_detail">Pin your servers\' certificates so a compromised CA can\'t impersonate them. Re-pin after cert renewal.</string>
+    <string name="settings_no_pins_active">No pins active</string>
+    <string name="settings_no_https_certificates">No HTTPS certificates captured. Pin only applies to https:// URLs.</string>
+    <string name="settings_pinned_one_format">Pinned 1 host.</string>
+    <string name="settings_pinned_many_format">Pinned %1$d hosts.</string>
+    <string name="settings_pinning">Pinning…</string>
+    <string name="settings_pin_current">Pin Current</string>
+    <string name="settings_all_pins_cleared">All pins cleared.</string>
+    <string name="settings_diagnostics_title">Diagnostics</string>
+    <string name="settings_diagnostics_detail">Snapshot of recent network activity. Useful when something feels off.</string>
+    <string name="settings_active_route">Active Route</string>
+    <string name="settings_last_successful_request">Last Successful Request</string>
+    <string name="settings_upload_queue">Upload Queue</string>
+    <string name="settings_pending_format">%1$d pending</string>
+    <string name="settings_recent_errors">Recent Errors</string>
+    <string name="settings_no_errors_recorded">No errors recorded</string>
+    <string name="settings_app_info_title">App Info</string>
+    <string name="settings_version">Version</string>
+    <string name="settings_build">Build</string>
+    <string name="settings_package">Package</string>
+    <string name="settings_mode">Mode</string>
+    <string name="settings_active_url">Active URL</string>
+    <string name="settings_lan_url">LAN URL</string>
+    <string name="settings_tailscale_url">Tailscale URL</string>
+    <string name="settings_value_none">(none)</string>
+    <string name="settings_value_not_set">(not set)</string>
+    <string name="settings_clear_cache_title">Clear offline cache?</string>
+    <string name="settings_clear_cache_message">Cached image files will be removed from this device. Server history and settings stay unchanged.</string>
+    <string name="settings_connection_mode_auto">Auto (LAN first, Tailscale fallback)</string>
+    <string name="settings_connection_mode_auto_short">Auto</string>
+    <string name="settings_connection_mode_lan_only">LAN only</string>
+    <string name="settings_connection_mode_tailscale_only">Tailscale only</string>
+    <string name="settings_active_route_lan">LAN</string>
+    <string name="settings_active_route_tailscale">Tailscale</string>
 </resources>

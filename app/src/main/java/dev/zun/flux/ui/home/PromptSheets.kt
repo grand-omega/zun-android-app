@@ -40,7 +40,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import dev.zun.flux.R
 import dev.zun.flux.data.api.PromptDto
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -93,10 +95,10 @@ fun PromptLibrarySheet(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(
-                    text = "Choose a prompt",
+                    text = stringResource(R.string.prompts_choose),
                     style = MaterialTheme.typography.titleMedium,
                 )
-                TextButton(onClick = onManagePrompts) { Text("Manage") }
+                TextButton(onClick = onManagePrompts) { Text(stringResource(R.string.prompts_manage)) }
             }
 
             Surface(
@@ -112,11 +114,11 @@ fun PromptLibrarySheet(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "High quality",
+                            text = stringResource(R.string.prompts_high_quality),
                             style = MaterialTheme.typography.bodyLarge,
                         )
                         Text(
-                            text = "Slower, larger model",
+                            text = stringResource(R.string.prompts_high_quality_detail),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.secondary,
                         )
@@ -128,7 +130,7 @@ fun PromptLibrarySheet(
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
-                placeholder = { Text("Search prompts") },
+                placeholder = { Text(stringResource(R.string.prompts_search_placeholder)) },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
@@ -161,7 +163,7 @@ fun PromptLibrarySheet(
                 if (ordered.isEmpty()) {
                     item {
                         Text(
-                            text = "No prompts match \"$query\"",
+                            text = stringResource(R.string.prompts_no_match_format, query),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.secondary,
                             modifier = Modifier.padding(vertical = 12.dp),
@@ -228,7 +230,7 @@ private fun PromptRow(
             IconButton(onClick = onTogglePin) {
                 Icon(
                     imageVector = if (pinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
-                    contentDescription = if (pinned) "Unpin prompt" else "Pin prompt",
+                    contentDescription = stringResource(if (pinned) R.string.prompts_unpin else R.string.prompts_pin),
                     tint = if (pinned) {
                         MaterialTheme.colorScheme.primary
                     } else {
@@ -269,15 +271,15 @@ fun PromptManageSheet(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(
-                    text = "Manage prompts",
+                    text = stringResource(R.string.prompts_manage_title),
                     style = MaterialTheme.typography.titleMedium,
                 )
-                TextButton(onClick = onDismiss) { Text("Done") }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_done)) }
             }
 
             if (savedPrompts.isEmpty()) {
                 Text(
-                    text = "No saved prompts yet",
+                    text = stringResource(R.string.prompts_no_saved),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.secondary,
                     modifier = Modifier.padding(vertical = 12.dp),
@@ -355,7 +357,7 @@ private fun PromptManageRow(
             IconButton(onClick = onDelete) {
                 Icon(
                     Icons.Default.Close,
-                    contentDescription = "Delete prompt",
+                    contentDescription = stringResource(R.string.prompts_delete),
                     tint = MaterialTheme.colorScheme.error,
                 )
             }
@@ -395,7 +397,7 @@ private fun CustomPromptItem(
                     Spacer(Modifier.width(8.dp))
                 }
                 Text(
-                    text = "Write your own...",
+                    text = stringResource(R.string.prompts_write_your_own),
                     style = MaterialTheme.typography.bodyLarge,
                     color = if (expanded) {
                         MaterialTheme.colorScheme.onSecondaryContainer
@@ -408,7 +410,7 @@ private fun CustomPromptItem(
                 OutlinedTextField(
                     value = customText,
                     onValueChange = onTextChange,
-                    placeholder = { Text("e.g. A cat wearing a spacesuit") },
+                    placeholder = { Text(stringResource(R.string.prompts_custom_placeholder)) },
                     modifier = Modifier.fillMaxWidth(),
                 )
                 TextButton(
@@ -422,7 +424,7 @@ private fun CustomPromptItem(
                         modifier = Modifier.size(18.dp),
                     )
                     Spacer(Modifier.width(8.dp))
-                    Text("Save prompt")
+                    Text(stringResource(R.string.prompts_save_prompt))
                 }
             }
         }

@@ -58,6 +58,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -65,6 +66,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import coil3.compose.AsyncImage
+import dev.zun.flux.R
 import dev.zun.flux.Tuning
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.ui.common.LoadingScrim
@@ -156,10 +158,10 @@ private fun BatchGrid(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("${jobIds.size} generations") },
+                title = { Text(stringResource(R.string.progress_batch_n_generations_format, jobIds.size)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 },
             )
@@ -223,7 +225,7 @@ private fun BatchTile(
         if (isDone && resultModel != null) {
             AsyncImage(
                 model = resultModel,
-                contentDescription = "Completed generation",
+                contentDescription = stringResource(R.string.progress_batch_completed_generation),
                 modifier = Modifier.fillMaxSize(),
             )
             // Done check in corner.
@@ -237,7 +239,7 @@ private fun BatchTile(
             ) {
                 Icon(
                     Icons.Default.Check,
-                    contentDescription = "Done",
+                    contentDescription = stringResource(R.string.progress_batch_done),
                     tint = Color.White,
                     modifier = Modifier.size(14.dp),
                 )
@@ -246,7 +248,7 @@ private fun BatchTile(
             // Dimmed input + state overlay.
             AsyncImage(
                 model = inputModel,
-                contentDescription = "Source image in progress",
+                contentDescription = stringResource(R.string.progress_batch_source_image_in_progress),
                 modifier = Modifier.fillMaxSize().alpha(0.45f),
             )
             when (val s = state) {
@@ -260,7 +262,7 @@ private fun BatchTile(
                     val pct = s.dto.progress?.let { (it * 100).toInt() }
                     if (pct != null) {
                         Text(
-                            text = "$pct%",
+                            text = stringResource(R.string.progress_pct_format, pct),
                             color = Color.White,
                             fontWeight = FontWeight.Bold,
                             style = MaterialTheme.typography.headlineMedium.tabular(),
@@ -277,19 +279,19 @@ private fun BatchTile(
                 is PollState.Failed -> CornerBadge(
                     color = MaterialTheme.colorScheme.error,
                     icon = Icons.Default.Close,
-                    description = "Failed",
+                    description = stringResource(R.string.progress_batch_failed),
                 )
 
                 PollState.Deleted -> CornerBadge(
                     color = Color.DarkGray,
                     icon = Icons.Default.Close,
-                    description = "Deleted",
+                    description = stringResource(R.string.progress_batch_deleted),
                 )
 
                 PollState.Cancelled -> CornerBadge(
                     color = Color.DarkGray,
                     icon = Icons.Default.Close,
-                    description = "Cancelled",
+                    description = stringResource(R.string.progress_batch_cancelled),
                 )
 
                 is PollState.Done -> Unit // handled above
@@ -338,10 +340,10 @@ private fun BatchFocused(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("${pagerState.currentPage + 1} of ${jobIds.size}") },
+                title = { Text(stringResource(R.string.progress_batch_index_format, pagerState.currentPage + 1, jobIds.size)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to overview")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.progress_batch_back_to_overview))
                     }
                 },
             )
@@ -415,13 +417,13 @@ private fun BatchPage(
                 if (isDone && resultModel != null) {
                     AsyncImage(
                         model = resultModel,
-                        contentDescription = "Completed generation",
+                        contentDescription = stringResource(R.string.progress_batch_completed_generation),
                         modifier = Modifier.fillMaxSize(),
                     )
                 } else {
                     AsyncImage(
                         model = inputModel,
-                        contentDescription = "Source image in progress",
+                        contentDescription = stringResource(R.string.progress_batch_source_image_in_progress),
                         modifier = Modifier
                             .fillMaxSize()
                             .alpha(0.6f),
@@ -438,7 +440,7 @@ private fun BatchPage(
             ) {
                 when (val s = state) {
                     PollState.Starting -> Text(
-                        "Starting…",
+                        stringResource(R.string.progress_starting),
                         style = MaterialTheme.typography.titleMedium,
                     )
 
@@ -450,28 +452,28 @@ private fun BatchPage(
                         val pct = s.dto.progress?.let { (it * 100).toInt() }
                         if (pct != null) {
                             Text(
-                                text = "$pct%",
+                                text = stringResource(R.string.progress_pct_format, pct),
                                 style = MaterialTheme.typography.displayMedium.tabular(),
                                 fontWeight = FontWeight.Bold,
                             )
                         }
                     }
 
-                    is PollState.Done -> Text("Done", style = MaterialTheme.typography.titleMedium)
+                    is PollState.Done -> Text(stringResource(R.string.progress_done), style = MaterialTheme.typography.titleMedium)
 
                     is PollState.Failed -> {
                         Text(s.message, color = MaterialTheme.colorScheme.error)
-                        Button(onClick = { viewModel.retry(jobId) }) { Text("Retry") }
+                        Button(onClick = { viewModel.retry(jobId) }) { Text(stringResource(R.string.common_retry)) }
                     }
 
                     PollState.Deleted -> Text(
-                        text = "Deleted",
+                        text = stringResource(R.string.progress_deleted),
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.secondary,
                     )
 
                     PollState.Cancelled -> Text(
-                        text = "Cancelled",
+                        text = stringResource(R.string.progress_cancelled),
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.secondary,
                     )
@@ -485,14 +487,14 @@ private fun BatchPage(
                     onClick = onViewResult,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text("View result")
+                    Text(stringResource(R.string.progress_batch_view_result))
                 }
 
                 PollState.Starting, is PollState.Running -> OutlinedButton(
                     onClick = { viewModel.cancelJob(jobId) },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.common_cancel))
                 }
 
                 PollState.Deleted -> Unit
