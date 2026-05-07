@@ -546,9 +546,8 @@ private fun JobThumbnail(
                 },
             )
 
-            if (!isSelectionMode && availability.resultCached) {
-                CachedIcon(
-                    availability = availability,
+            if (!isSelectionMode && !availability.resultCached) {
+                NeedsNetworkIcon(
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .padding(4.dp),
@@ -597,14 +596,11 @@ private fun JobThumbnail(
 }
 
 @Composable
-private fun CachedIcon(
-    availability: OfflineImageAvailability,
-    modifier: Modifier = Modifier,
-) {
+private fun NeedsNetworkIcon(modifier: Modifier = Modifier) {
     Box(modifier = modifier) {
         Icon(
             imageVector = Icons.Default.CloudOff,
-            contentDescription = if (availability.resultCached) "Cached offline" else null,
+            contentDescription = "Not cached — needs network",
             tint = Color.White.copy(alpha = 0.82f),
             modifier = Modifier.size(16.dp),
         )
