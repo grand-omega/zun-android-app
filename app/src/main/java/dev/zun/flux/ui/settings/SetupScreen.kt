@@ -28,10 +28,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import dev.zun.flux.FluxApp
+import dev.zun.flux.R
 import dev.zun.flux.data.repo.ConnectionMode
 import dev.zun.flux.ui.common.ScreenPadding
 import dev.zun.flux.ui.common.SettingsGroup
@@ -58,7 +60,7 @@ fun SetupScreen(
     val scope = rememberCoroutineScope()
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("FluxEdit Setup") }) },
+        topBar = { TopAppBar(title = { Text(stringResource(R.string.setup_title)) }) },
     ) { inner ->
         Column(
             modifier = Modifier
@@ -70,19 +72,19 @@ fun SetupScreen(
             verticalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterVertically),
         ) {
             Text(
-                text = "Connect FluxEdit",
+                text = stringResource(R.string.setup_heading),
                 style = MaterialTheme.typography.headlineSmall,
             )
 
             Text(
-                text = "Enter at least one private server URL and the API token used by Project ZUN.",
+                text = stringResource(R.string.setup_description),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.secondary,
             )
 
             SettingsGroup(
-                title = "Server",
-                detail = "Auto mode uses LAN first, then Tailscale when LAN is unavailable.",
+                title = stringResource(R.string.setup_server_title),
+                detail = stringResource(R.string.setup_server_detail),
             ) {
                 OutlinedTextField(
                     value = lanUrl,
@@ -90,8 +92,8 @@ fun SetupScreen(
                         lanUrl = it
                         error = null
                     },
-                    label = { Text("LAN URL") },
-                    placeholder = { Text("http://192.168.1.15:8080") },
+                    label = { Text(stringResource(R.string.setup_lan_url_label)) },
+                    placeholder = { Text(stringResource(R.string.setup_lan_url_placeholder)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     isError = error != null,
@@ -103,8 +105,8 @@ fun SetupScreen(
                         tailscaleUrl = it
                         error = null
                     },
-                    label = { Text("Tailscale URL") },
-                    placeholder = { Text("https://zun.tailnet-name.ts.net") },
+                    label = { Text(stringResource(R.string.setup_tailscale_url_label)) },
+                    placeholder = { Text(stringResource(R.string.setup_tailscale_url_placeholder)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     isError = error != null,
@@ -116,7 +118,7 @@ fun SetupScreen(
                         token = it
                         error = null
                     },
-                    label = { Text("API Token") },
+                    label = { Text(stringResource(R.string.setup_token_label)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     isError = error != null,
@@ -133,7 +135,7 @@ fun SetupScreen(
                                 } else {
                                     Icons.Default.Visibility
                                 },
-                                contentDescription = if (tokenVisible) "Hide token" else "Show token",
+                                contentDescription = stringResource(if (tokenVisible) R.string.setup_token_hide else R.string.setup_token_show),
                             )
                         }
                     },
@@ -198,9 +200,9 @@ fun SetupScreen(
             ) {
                 if (isTesting) {
                     CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp), color = MaterialTheme.colorScheme.onPrimary)
-                    Text("Testing connection...")
+                    Text(stringResource(R.string.setup_testing_connection))
                 } else {
-                    Text("Connect")
+                    Text(stringResource(R.string.common_connect))
                 }
             }
         }

@@ -58,9 +58,11 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import coil3.request.ImageRequest
+import dev.zun.flux.R
 import dev.zun.flux.data.api.JobSummaryDto
 import dev.zun.flux.data.api.PromptDto
 import dev.zun.flux.data.api.effectivePromptId
@@ -130,9 +132,14 @@ fun PhotoViewerScreen(
 
     LaunchedEffect(pendingUndo) {
         val undo = pendingUndo ?: return@LaunchedEffect
+        val message = if (undo.size == 1) {
+            context.getString(R.string.gallery_undo_deleted_one)
+        } else {
+            context.getString(R.string.gallery_undo_deleted_many, undo.size)
+        }
         val result = snackbarHostState.showSnackbar(
-            message = "Deleted ${undo.size} generation${if (undo.size == 1) "" else "s"}",
-            actionLabel = "Undo",
+            message = message,
+            actionLabel = context.getString(R.string.gallery_undo),
             duration = androidx.compose.material3.SnackbarDuration.Short,
         )
         if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
@@ -161,7 +168,7 @@ fun PhotoViewerScreen(
                     title = { },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back), tint = Color.White)
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
@@ -204,9 +211,9 @@ fun PhotoViewerScreen(
                         scope.launch {
                             try {
                                 saveToPictures(context, src, "flux-${job.id}.jpg")
-                                Toast.makeText(context, "Saved to Gallery", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.viewer_saved_to_gallery), Toast.LENGTH_SHORT).show()
                             } catch (e: Exception) {
-                                viewerNotice = "Save failed. Connect to the server for uncached originals."
+                                viewerNotice = context.getString(R.string.viewer_save_failed)
                             }
                         }
                     },
@@ -301,8 +308,8 @@ fun PhotoViewerScreen(
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Delete generation?") },
-            text = { Text("This removes the generation from FluxEdit history. You can undo from the snackbar.") },
+            title = { Text(stringResource(R.string.viewer_delete_confirm_title)) },
+            text = { Text(stringResource(R.string.viewer_delete_confirm_message)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -314,12 +321,12 @@ fun PhotoViewerScreen(
                         }
                     },
                 ) {
-                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteConfirm = false }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.common_cancel))
                 }
             },
         )
@@ -384,7 +391,7 @@ private fun ZoomableImage(
 private fun MissingViewerImage() {
     MissingImageState(
         modifier = Modifier.fillMaxSize(),
-        label = "Image unavailable offline",
+        label = stringResource(R.string.viewer_image_unavailable_offline),
         dark = true,
     )
 }
@@ -430,16 +437,22 @@ private fun JobDetailsSheet(
             ) {
                 val locale = LocalLocale.current.platformLocale
                 DetailRow(
-                    "Created",
+                    stringResource(R.string.viewer_detail_created),
                     SimpleDateFormat("MMM d, yyyy · HH:mm", locale).format(Date(job.created_at * 1000)),
                 )
                 job.duration_seconds?.let {
-                    DetailRow("Duration", "${it}s")
+                    DetailRow(
+                        stringResource(R.string.viewer_detail_duration),
+                        stringResource(R.string.viewer_detail_duration_seconds_format, it),
+                    )
                 }
-                DetailRow("Offline", availability.toDetailText())
-                DetailRow("Prompt", promptLabel)
+                DetailRow(
+                    stringResource(R.string.viewer_detail_offline),
+                    stringResource(availability.toDetailTextRes()),
+                )
+                DetailRow(stringResource(R.string.viewer_detail_prompt), promptLabel)
                 job.prompt_text?.takeIf { it.isNotBlank() }?.let {
-                    DetailRow("Prompt text", it)
+                    DetailRow(stringResource(R.string.viewer_detail_prompt_text), it)
                 }
             }
         }
@@ -461,11 +474,11 @@ private fun DetailRow(
     }
 }
 
-private fun OfflineImageAvailability.toDetailText(): String = when {
-    resultCached -> "Original cached"
-    previewCached -> "Preview cached"
-    thumbCached -> "Thumbnail cached"
-    else -> "Needs server"
+private fun OfflineImageAvailability.toDetailTextRes(): Int = when {
+    resultCached -> R.string.viewer_offline_original_cached
+    previewCached -> R.string.viewer_offline_preview_cached
+    thumbCached -> R.string.viewer_offline_thumb_cached
+    else -> R.string.viewer_offline_needs_server
 }
 
 @Composable
@@ -482,29 +495,29 @@ private fun ViewerActionBar(
         if (hasInput) {
             ActionIcon(
                 icon = Icons.AutoMirrored.Filled.CompareArrows,
-                label = "Compare",
+                label = stringResource(R.string.viewer_compare),
                 onClick = onCompare,
             )
             ActionIcon(
                 icon = Icons.Default.Image,
-                label = if (selectingInput) "Loading" else "Use input",
+                label = stringResource(if (selectingInput) R.string.viewer_loading else R.string.viewer_use_input),
                 onClick = onUseInput,
                 enabled = !selectingInput,
             )
         }
         ActionIcon(
             icon = Icons.Default.Download,
-            label = "Save",
+            label = stringResource(R.string.viewer_save),
             onClick = onSave,
         )
         ActionIcon(
             icon = Icons.Default.Info,
-            label = "Details",
+            label = stringResource(R.string.viewer_details),
             onClick = onDetails,
         )
         ActionIcon(
             icon = Icons.Default.Delete,
-            label = "Delete",
+            label = stringResource(R.string.viewer_delete),
             onClick = onDelete,
         )
     }

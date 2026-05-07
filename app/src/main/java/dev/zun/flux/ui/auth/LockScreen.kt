@@ -11,7 +11,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import dev.zun.flux.R
 import dev.zun.flux.ui.common.EmptyState
 import dev.zun.flux.ui.common.StatusPill
 import dev.zun.flux.ui.common.StatusTone
@@ -28,14 +30,14 @@ fun LockScreen(
     ) {
         EmptyState(
             icon = Icons.Default.Lock,
-            title = "FluxEdit is locked",
-            message = "Unlock to view private images, prompts, and server settings.",
+            title = stringResource(R.string.auth_locked_title),
+            message = stringResource(R.string.auth_locked_message),
         )
         message?.let {
             StatusPill(label = it, tone = StatusTone.Error)
         }
         Button(onClick = onUnlockClick) {
-            Text("Unlock")
+            Text(stringResource(R.string.auth_unlock))
         }
     }
 }

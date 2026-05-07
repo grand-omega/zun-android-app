@@ -45,10 +45,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import dev.zun.flux.R
 import dev.zun.flux.ui.common.EmptyState
 import java.io.File
 
@@ -80,11 +82,11 @@ fun CameraScreen(
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             EmptyState(
                 icon = Icons.Default.PhotoCamera,
-                title = "Camera access needed",
-                message = "Allow camera access to capture a new source image.",
+                title = stringResource(R.string.camera_permission_title),
+                message = stringResource(R.string.camera_permission_message),
                 action = {
                     Button(onClick = { launcher.launch(Manifest.permission.CAMERA) }) {
-                        Text("Allow camera")
+                        Text(stringResource(R.string.camera_allow))
                     }
                 },
             )
@@ -140,10 +142,10 @@ private fun CameraContent(
                 onClick = onBack,
                 colors = IconButtonDefaults.iconButtonColors(containerColor = Color.Black.copy(alpha = 0.5f)),
             ) {
-                Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.camera_close), tint = Color.White)
             }
             Text(
-                "Take photo",
+                stringResource(R.string.camera_take_photo),
                 color = Color.White,
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(start = 16.dp),
@@ -208,7 +210,7 @@ private fun CameraContent(
                     .size(48.dp),
                 colors = IconButtonDefaults.iconButtonColors(containerColor = Color.Black.copy(alpha = 0.5f)),
             ) {
-                Icon(Icons.Default.Refresh, contentDescription = "Flip camera", tint = Color.White)
+                Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.camera_flip), tint = Color.White)
             }
         }
     }

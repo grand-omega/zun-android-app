@@ -73,12 +73,14 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
 import coil3.compose.SubcomposeAsyncImage
 import coil3.compose.SubcomposeAsyncImageContent
+import dev.zun.flux.R
 import dev.zun.flux.data.api.JobSummaryDto
 import dev.zun.flux.data.api.PromptDto
 import dev.zun.flux.data.api.effectivePromptId
@@ -136,9 +138,14 @@ fun GalleryScreen(
     LaunchedEffect(pendingUndo, showUndoSnackbars) {
         if (!showUndoSnackbars) return@LaunchedEffect
         val undo = pendingUndo ?: return@LaunchedEffect
+        val message = if (undo.size == 1) {
+            context.getString(R.string.gallery_undo_deleted_one)
+        } else {
+            context.getString(R.string.gallery_undo_deleted_many, undo.size)
+        }
         val result = snackbarHostState.showSnackbar(
-            message = "Deleted ${undo.size} generation${if (undo.size == 1) "" else "s"}",
-            actionLabel = "Undo",
+            message = message,
+            actionLabel = context.getString(R.string.gallery_undo),
             duration = androidx.compose.material3.SnackbarDuration.Short,
         )
         if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
@@ -153,10 +160,10 @@ fun GalleryScreen(
         topBar = {
             if (isSelectionMode) {
                 TopAppBar(
-                    title = { Text("${selectedIds.size} selected") },
+                    title = { Text(stringResource(R.string.gallery_n_selected, selectedIds.size)) },
                     navigationIcon = {
                         IconButton(onClick = { viewModel.clearSelection() }, enabled = !isSaving) {
-                            Icon(Icons.Default.Close, contentDescription = "Clear selection")
+                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.gallery_clear_selection))
                         }
                     },
                     actions = {
@@ -167,7 +174,7 @@ fun GalleryScreen(
                             if (isSaving) {
                                 CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                             } else {
-                                Icon(Icons.Default.Download, contentDescription = "Save selected")
+                                Icon(Icons.Default.Download, contentDescription = stringResource(R.string.gallery_save_selected))
                             }
                         }
                         IconButton(
@@ -177,31 +184,33 @@ fun GalleryScreen(
                             if (isSharing) {
                                 CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                             } else {
-                                Icon(Icons.Default.Share, contentDescription = "Share selected")
+                                Icon(Icons.Default.Share, contentDescription = stringResource(R.string.gallery_share_selected))
                             }
                         }
                         IconButton(onClick = { showDeleteConfirm = true }, enabled = !isSaving && !isSharing) {
-                            Icon(Icons.Default.Delete, contentDescription = "Delete selected")
+                            Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.gallery_delete_selected))
                         }
                     },
                 )
             } else {
                 TopAppBar(
-                    title = { Text("Gallery") },
+                    title = { Text(stringResource(R.string.gallery_title)) },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                         }
                     },
                     actions = {
                         IconButton(onClick = { showImageMetadata = !showImageMetadata }) {
                             Icon(
                                 Icons.AutoMirrored.Filled.Label,
-                                contentDescription = if (showImageMetadata) {
-                                    "Hide image labels"
-                                } else {
-                                    "Show image labels"
-                                },
+                                contentDescription = stringResource(
+                                    if (showImageMetadata) {
+                                        R.string.gallery_hide_image_labels
+                                    } else {
+                                        R.string.gallery_show_image_labels
+                                    },
+                                ),
                                 tint = if (showImageMetadata) {
                                     MaterialTheme.colorScheme.primary
                                 } else {
@@ -211,7 +220,7 @@ fun GalleryScreen(
                         }
                         Box {
                             IconButton(onClick = { showFilterMenu = true }) {
-                                Icon(Icons.Default.FilterList, contentDescription = "Filter by tag")
+                                Icon(Icons.Default.FilterList, contentDescription = stringResource(R.string.gallery_filter_by_tag))
                             }
                             DropdownMenu(
                                 expanded = showFilterMenu,
@@ -220,7 +229,15 @@ fun GalleryScreen(
                                 availableTags.forEach { option ->
                                     val isSelected = option.filter == tagFilter
                                     DropdownMenuItem(
-                                        text = { Text("${option.label} · ${option.count}") },
+                                        text = {
+                                            Text(
+                                                stringResource(
+                                                    R.string.gallery_filter_option_format,
+                                                    option.label,
+                                                    option.count,
+                                                ),
+                                            )
+                                        },
                                         leadingIcon = if (isSelected) {
                                             { Icon(Icons.Default.Check, contentDescription = null) }
                                         } else {
@@ -242,7 +259,7 @@ fun GalleryScreen(
         Column(modifier = Modifier.padding(inner)) {
             if (tagFilter != TagFilter.All && !isSelectionMode) {
                 val activeLabel = availableTags.firstOrNull { it.filter == tagFilter }?.label
-                    ?: "Filtered"
+                    ?: stringResource(R.string.gallery_filtered)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -250,11 +267,11 @@ fun GalleryScreen(
                 ) {
                     AssistChip(
                         onClick = { viewModel.setTagFilter(TagFilter.All) },
-                        label = { Text("Showing: $activeLabel") },
+                        label = { Text(stringResource(R.string.gallery_showing_format, activeLabel)) },
                         trailingIcon = {
                             Icon(
                                 Icons.Default.Close,
-                                contentDescription = "Clear filter",
+                                contentDescription = stringResource(R.string.gallery_clear_filter),
                                 modifier = Modifier.size(AssistChipDefaults.IconSize),
                             )
                         },
@@ -274,12 +291,12 @@ fun GalleryScreen(
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         EmptyState(
                             icon = Icons.Default.CloudOff,
-                            title = "Couldn't load gallery",
+                            title = stringResource(R.string.gallery_load_error_title),
                             message = refreshError.error.message
-                                ?: "Check your connection and try again.",
+                                ?: stringResource(R.string.gallery_load_error_default),
                             action = {
                                 TextButton(onClick = { pagedItems.retry() }) {
-                                    Text("Retry")
+                                    Text(stringResource(R.string.common_retry))
                                 }
                             },
                         )
@@ -291,12 +308,20 @@ fun GalleryScreen(
                         } else {
                             EmptyState(
                                 icon = Icons.Default.ImageNotSupported,
-                                title = if (tagFilter != TagFilter.All) "No matching generations" else "No generations yet",
-                                message = if (tagFilter != TagFilter.All) {
-                                    "Clear the active filter to return to the full gallery."
-                                } else {
-                                    "Create an edit from Home and completed results will appear here."
-                                },
+                                title = stringResource(
+                                    if (tagFilter != TagFilter.All) {
+                                        R.string.gallery_empty_filtered_title
+                                    } else {
+                                        R.string.gallery_empty_title
+                                    },
+                                ),
+                                message = stringResource(
+                                    if (tagFilter != TagFilter.All) {
+                                        R.string.gallery_empty_filtered_message
+                                    } else {
+                                        R.string.gallery_empty_message
+                                    },
+                                ),
                                 action = {
                                     TextButton(
                                         onClick = {
@@ -307,7 +332,15 @@ fun GalleryScreen(
                                             }
                                         },
                                     ) {
-                                        Text(if (tagFilter != TagFilter.All) "Clear filter" else "Create an edit")
+                                        Text(
+                                            stringResource(
+                                                if (tagFilter != TagFilter.All) {
+                                                    R.string.gallery_clear_filter
+                                                } else {
+                                                    R.string.gallery_create_an_edit
+                                                },
+                                            ),
+                                        )
                                     }
                                 },
                             )
@@ -452,8 +485,8 @@ fun GalleryScreen(
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Delete selected?") },
-            text = { Text("Removes ${selectedIds.size} generations. You can undo within 30 days.") },
+            title = { Text(stringResource(R.string.gallery_delete_confirm_title)) },
+            text = { Text(stringResource(R.string.gallery_delete_confirm_message, selectedIds.size)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -461,12 +494,12 @@ fun GalleryScreen(
                         showDeleteConfirm = false
                     },
                 ) {
-                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteConfirm = false }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.common_cancel))
                 }
             },
         )
@@ -476,21 +509,24 @@ fun GalleryScreen(
         val n = savedIds.size
         AlertDialog(
             onDismissRequest = { viewModel.dismissPostSaveDelete() },
-            title = { Text("Remove from app?") },
+            title = { Text(stringResource(R.string.gallery_post_save_delete_title)) },
             text = {
                 Text(
-                    "Saved $n image${if (n == 1) "" else "s"} to your gallery. " +
-                        "Remove ${if (n == 1) "it" else "them"} from the app to free up space?",
+                    if (n == 1) {
+                        stringResource(R.string.gallery_post_save_delete_message_one)
+                    } else {
+                        stringResource(R.string.gallery_post_save_delete_message_many, n)
+                    },
                 )
             },
             confirmButton = {
                 TextButton(onClick = { viewModel.confirmPostSaveDelete() }) {
-                    Text("Remove", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.gallery_remove), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { viewModel.dismissPostSaveDelete() }) {
-                    Text("Keep")
+                    Text(stringResource(R.string.gallery_keep))
                 }
             },
         )
@@ -600,7 +636,7 @@ private fun JobThumbnail(
                 ) {
                     Icon(
                         imageVector = Icons.Default.CheckCircle,
-                        contentDescription = "Selected",
+                        contentDescription = stringResource(R.string.gallery_selected),
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.fillMaxSize(),
                     )
@@ -615,7 +651,7 @@ private fun NeedsNetworkIcon(modifier: Modifier = Modifier) {
     Box(modifier = modifier) {
         Icon(
             imageVector = Icons.Default.CloudOff,
-            contentDescription = "Not cached — needs network",
+            contentDescription = stringResource(R.string.gallery_not_cached_needs_network),
             tint = Color.White.copy(alpha = 0.82f),
             modifier = Modifier.size(16.dp),
         )
@@ -630,6 +666,6 @@ private fun MissingThumbnail() {
             .background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center,
     ) {
-        MissingImageState(label = "Unavailable", modifier = Modifier.fillMaxSize())
+        MissingImageState(label = stringResource(R.string.gallery_unavailable), modifier = Modifier.fillMaxSize())
     }
 }

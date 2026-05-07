@@ -51,9 +51,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLocale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import dev.zun.flux.R
 import dev.zun.flux.data.api.JobStatusDto
 import dev.zun.flux.data.api.effectivePromptId
 import dev.zun.flux.data.repo.JobRepository
@@ -122,15 +124,15 @@ fun ResultScreen(
     }
 
     val promptLabel = when (val id = selectedPromptId) {
-        null -> jobDto?.let { resolvePromptLabel(prompts, it.effectivePromptId, it.prompt_text) } ?: "Loading…"
+        null -> jobDto?.let { resolvePromptLabel(prompts, it.effectivePromptId, it.prompt_text) } ?: stringResource(R.string.result_loading)
 
         CUSTOM_PROMPT_ID -> customPromptText.trim().takeIf { it.isNotBlank() }?.let {
             if (it.length <= 64) it else it.take(61) + "…"
-        } ?: "Write your own..."
+        } ?: stringResource(R.string.result_write_your_own)
 
         else -> prompts.firstOrNull { it.id == id }?.label
             ?: jobDto?.let { resolvePromptLabel(prompts, it.effectivePromptId, it.prompt_text) }
-            ?: "Choose a prompt"
+            ?: stringResource(R.string.result_choose_prompt)
     }
 
     val canRegenerate = jobDto?.input_id != null && !regenerating
@@ -191,33 +193,33 @@ fun ResultScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Result") },
+                title = { Text(stringResource(R.string.result_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 },
                 actions = {
                     IconButton(onClick = { showMenu = true }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "More")
+                        Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.common_more))
                     }
                     DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
                         DropdownMenuItem(
-                            text = { Text("New image") },
+                            text = { Text(stringResource(R.string.result_new_image)) },
                             onClick = {
                                 showMenu = false
                                 onNewImage()
                             },
                         )
                         DropdownMenuItem(
-                            text = { Text("View details") },
+                            text = { Text(stringResource(R.string.result_view_details)) },
                             onClick = {
                                 showMenu = false
                                 showDetails = true
                             },
                         )
                         DropdownMenuItem(
-                            text = { Text("Delete") },
+                            text = { Text(stringResource(R.string.result_delete)) },
                             onClick = {
                                 showMenu = false
                                 showDeleteConfirm = true
@@ -243,12 +245,12 @@ fun ResultScreen(
                 ) {
                     CompareImage(
                         model = inputModel,
-                        label = "Before",
+                        label = stringResource(R.string.result_before),
                         modifier = Modifier.weight(1f).fillMaxSize(),
                     )
                     CompareImage(
                         model = previewModel,
-                        label = "After",
+                        label = stringResource(R.string.result_after),
                         modifier = Modifier.weight(1f).fillMaxSize(),
                     )
                 }
@@ -264,7 +266,7 @@ fun ResultScreen(
                         )
                     } else {
                         // No input image (e.g. text-only generation) — just show the result.
-                        CompareImage(model = previewModel, label = "After", modifier = Modifier.fillMaxSize())
+                        CompareImage(model = previewModel, label = stringResource(R.string.result_after), modifier = Modifier.fillMaxSize())
                     }
                 }
             }
@@ -291,7 +293,7 @@ fun ResultScreen(
                         color = MaterialTheme.colorScheme.onPrimary,
                     )
                     Text(
-                        text = "Regenerating…",
+                        text = stringResource(R.string.result_regenerating),
                         modifier = Modifier.padding(start = 8.dp),
                     )
                 } else {
@@ -300,7 +302,7 @@ fun ResultScreen(
                         contentDescription = null,
                         modifier = Modifier.padding(end = 8.dp),
                     )
-                    Text("Regenerate")
+                    Text(stringResource(R.string.result_regenerate))
                 }
             }
 
@@ -317,7 +319,7 @@ fun ResultScreen(
                             val msg =
                                 try {
                                     saveToPictures(context, src, "flux-$jobId.jpg")
-                                    "Saved to Pictures/FluxEdit"
+                                    context.getString(R.string.result_saved_to_pictures)
                                 } catch (t: Throwable) {
                                     t.toUserMessage("save")
                                 }
@@ -328,7 +330,7 @@ fun ResultScreen(
                     enabled = resultModel != null && !saving,
                     modifier = Modifier.weight(1f),
                 ) {
-                    Text(if (saving) "Saving…" else "Save")
+                    Text(stringResource(if (saving) R.string.result_saving else R.string.result_save))
                 }
 
                 OutlinedButton(
@@ -354,7 +356,7 @@ fun ResultScreen(
                         contentDescription = null,
                         modifier = Modifier.padding(end = 8.dp),
                     )
-                    Text("Share")
+                    Text(stringResource(R.string.result_share))
                 }
             }
         }
@@ -392,8 +394,8 @@ fun ResultScreen(
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Delete generation?") },
-            text = { Text("This removes the generation from FluxEdit history and the server delete queue will sync in the background.") },
+            title = { Text(stringResource(R.string.result_delete_confirm_title)) },
+            text = { Text(stringResource(R.string.result_delete_confirm_message)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -401,11 +403,11 @@ fun ResultScreen(
                         deleteResult()
                     },
                 ) {
-                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") }
+                TextButton(onClick = { showDeleteConfirm = false }) { Text(stringResource(R.string.common_cancel)) }
             },
         )
     }
@@ -435,7 +437,7 @@ fun ResultScreen(
     if (showSavePromptDialog) {
         AlertDialog(
             onDismissRequest = { showSavePromptDialog = false },
-            title = { Text("Save this prompt") },
+            title = { Text(stringResource(R.string.result_save_prompt_title)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
@@ -445,7 +447,7 @@ fun ResultScreen(
                     androidx.compose.material3.OutlinedTextField(
                         value = savePromptLabel,
                         onValueChange = { savePromptLabel = it },
-                        label = { Text("Label") },
+                        label = { Text(stringResource(R.string.result_save_prompt_label)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -468,7 +470,7 @@ fun ResultScreen(
                                 customPromptText = ""
                                 showSavePromptDialog = false
                                 showPromptSheet = false
-                                Toast.makeText(context, "Prompt saved", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.result_prompt_saved), Toast.LENGTH_SHORT).show()
                             } catch (t: Throwable) {
                                 Toast.makeText(
                                     context,
@@ -478,10 +480,10 @@ fun ResultScreen(
                             }
                         }
                     },
-                ) { Text("Save") }
+                ) { Text(stringResource(R.string.common_save)) }
             },
             dismissButton = {
-                TextButton(onClick = { showSavePromptDialog = false }) { Text("Cancel") }
+                TextButton(onClick = { showSavePromptDialog = false }) { Text(stringResource(R.string.common_cancel)) }
             },
         )
     }
@@ -491,22 +493,22 @@ fun ResultScreen(
         val locale = LocalLocale.current.platformLocale
         AlertDialog(
             onDismissRequest = { showDetails = false },
-            title = { Text("Details") },
+            title = { Text(stringResource(R.string.result_details_title)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (dto != null) {
-                        Text("Prompt: ${resolvePromptLabel(prompts, dto.effectivePromptId, dto.prompt_text)}")
-                        Text("Created: ${SimpleDateFormat("MMM d, yyyy · HH:mm", locale).format(Date(dto.created_at * 1000))}")
+                        Text(stringResource(R.string.result_details_prompt_format, resolvePromptLabel(prompts, dto.effectivePromptId, dto.prompt_text)))
+                        Text(stringResource(R.string.result_details_created_format, SimpleDateFormat("MMM d, yyyy · HH:mm", locale).format(Date(dto.created_at * 1000))))
                         val started = dto.started_at
                         val completed = dto.completed_at
                         if (started != null && completed != null) {
-                            Text("Duration: ${completed - started}s")
+                            Text(stringResource(R.string.result_details_duration_format, completed - started))
                         }
                     }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showDetails = false }) { Text("Close") }
+                TextButton(onClick = { showDetails = false }) { Text(stringResource(R.string.common_close)) }
             },
         )
     }
@@ -539,7 +541,7 @@ private fun PromptStrip(
                 onClick = onEdit,
                 enabled = editEnabled,
             ) {
-                Icon(Icons.Default.Edit, contentDescription = "Edit prompt and regenerate")
+                Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.result_edit_prompt_and_regenerate))
             }
         }
     }
