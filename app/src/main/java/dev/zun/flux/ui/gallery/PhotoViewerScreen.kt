@@ -3,6 +3,7 @@ package dev.zun.flux.ui.gallery
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -314,7 +315,7 @@ private fun ZoomableImage(
 
     LaunchedEffect(shouldReset) {
         if (shouldReset) {
-            zoomableState.resetZoom(withAnimation = false)
+            zoomableState.resetZoom(snap())
         }
     }
 
