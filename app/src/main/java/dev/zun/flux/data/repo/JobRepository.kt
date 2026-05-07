@@ -1,6 +1,7 @@
 package dev.zun.flux.data.repo
 
 import android.net.Uri
+import androidx.paging.PagingData
 import dev.zun.flux.data.api.HealthResponse
 import dev.zun.flux.data.api.JobCreatedResponse
 import dev.zun.flux.data.api.JobListResponse
@@ -33,6 +34,13 @@ data class OfflineImageAvailability(
 data class OfflineCacheStats(
     val bytes: Long,
     val fileCount: Int,
+)
+
+/** Aggregate counts for the gallery tag-filter dropdown. */
+data class JobTagStats(
+    val totalCount: Int,
+    val customCount: Int,
+    val perPromptCounts: Map<Long, Int>,
 )
 
 /**
@@ -96,6 +104,15 @@ interface JobRepository {
 
     /** Local database flows */
     fun getJobsFlow(): Flow<List<JobSummaryDto>>
+
+    /**
+     * Paged stream of done jobs, optionally narrowed by [promptId] or
+     * [customOnly]. Pass `(null, false)` for no filter.
+     */
+    fun pagedJobs(promptId: Long?, customOnly: Boolean): Flow<PagingData<JobSummaryDto>>
+
+    /** Aggregate counts used by the gallery tag-filter dropdown. */
+    fun jobTagStats(): Flow<JobTagStats>
 
     fun getJobFlow(jobId: String): Flow<JobStatusDto?>
 

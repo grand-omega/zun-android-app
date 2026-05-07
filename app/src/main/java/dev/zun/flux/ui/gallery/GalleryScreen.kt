@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -76,6 +75,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.paging.LoadState
+import androidx.paging.compose.collectAsLazyPagingItems
 import coil3.compose.SubcomposeAsyncImage
 import coil3.compose.SubcomposeAsyncImageContent
 import dev.zun.flux.data.api.JobSummaryDto
@@ -85,7 +86,6 @@ import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.data.repo.OfflineImageAvailability
 import dev.zun.flux.ui.common.EmptyState
 import dev.zun.flux.ui.common.MissingImageState
-import dev.zun.flux.util.formatTimestamp
 import dev.zun.flux.util.resolvePromptLabel
 
 /** Whether a drag-select session is adding tiles to or removing them from the
@@ -101,7 +101,7 @@ fun GalleryScreen(
     onBack: () -> Unit,
     showUndoSnackbars: Boolean = true,
 ) {
-    val jobs by viewModel.jobs.collectAsStateWithLifecycle()
+    val pagedItems = viewModel.pagedGridItems.collectAsLazyPagingItems()
     val prompts by viewModel.prompts.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val isSaving by viewModel.isSaving.collectAsStateWithLifecycle()
@@ -266,9 +266,12 @@ fun GalleryScreen(
                 onRefresh = { viewModel.refresh() },
                 modifier = Modifier.fillMaxSize(),
             ) {
-                if (jobs.isEmpty()) {
+                val isInitialLoading = pagedItems.loadState.refresh is LoadState.Loading
+                val isEmpty = pagedItems.itemCount == 0 &&
+                    pagedItems.loadState.refresh is LoadState.NotLoading
+                if (isEmpty) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        if (isLoading) {
+                        if (isLoading || isInitialLoading) {
                             CircularProgressIndicator()
                         } else {
                             EmptyState(
@@ -296,10 +299,6 @@ fun GalleryScreen(
                         }
                     }
                 } else {
-                    val groupedJobs =
-                        remember(jobs) {
-                            jobs.groupBy { formatTimestamp(it.created_at) }
-                        }
                     val gridState = rememberLazyGridState()
                     // Tile bounds keyed by jobId, in root coords. Updated on
                     // every layout pass (so scroll keeps them fresh).
@@ -312,8 +311,9 @@ fun GalleryScreen(
                         val anchor = anchorIndex ?: return
                         val lo = minOf(anchor, cursorIdx)
                         val hi = maxOf(anchor, cursorIdx)
-                        val rangeIds = jobs.subList(lo, hi + 1).asSequence()
-                            .map { it.id }
+                        val snapshot = pagedItems.itemSnapshotList.items
+                        val rangeIds = (lo..hi).asSequence()
+                            .mapNotNull { (snapshot.getOrNull(it) as? GalleryGridItem.JobItem)?.job?.id }
                             .toSet()
                         viewModel.setSelection(
                             if (dragMode == DragMode.Add) {
@@ -328,7 +328,9 @@ fun GalleryScreen(
                         val id = tileBounds.entries
                             .firstOrNull { it.value.contains(rootPos) }?.key
                             ?: return -1
-                        return jobs.indexOfFirst { it.id == id }
+                        return pagedItems.itemSnapshotList.items.indexOfFirst {
+                            it is GalleryGridItem.JobItem && it.job.id == id
+                        }
                     }
 
                     Box(
@@ -342,66 +344,85 @@ fun GalleryScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            groupedJobs.forEach { (date, items) ->
-                                item(span = { GridItemSpan(maxLineSpan) }) {
-                                    Text(
-                                        text = date,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        modifier = Modifier.padding(vertical = 8.dp),
-                                    )
-                                }
-                                items(items, key = { it.id }) { job ->
-                                    val isSelected = selectedIds.contains(job.id)
-                                    val jobIndex = jobs.indexOfFirst { it.id == job.id }
-                                    JobThumbnail(
-                                        modifier = Modifier
-                                            .onGloballyPositioned { coords ->
-                                                tileBounds[job.id] = coords.boundsInRoot()
-                                            }
-                                            .pointerInput(job.id, jobIndex) {
-                                                detectDragGesturesAfterLongPress(
-                                                    onDragStart = { local ->
-                                                        if (jobIndex < 0) return@detectDragGesturesAfterLongPress
-                                                        val tileBoundsForJob = tileBounds[job.id]
-                                                            ?: return@detectDragGesturesAfterLongPress
-                                                        baseSelection = latestSelectedIds
-                                                        dragMode = if (job.id in baseSelection) {
-                                                            DragMode.Remove
-                                                        } else {
-                                                            DragMode.Add
-                                                        }
-                                                        anchorIndex = jobIndex
-                                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                        applyRange(jobIndex)
-                                                    },
-                                                    onDrag = { change, _ ->
-                                                        if (anchorIndex == null) return@detectDragGesturesAfterLongPress
-                                                        val tileBoundsForJob = tileBounds[job.id]
-                                                            ?: return@detectDragGesturesAfterLongPress
-                                                        val root = tileBoundsForJob.topLeft + change.position
-                                                        val idx = hitTest(root)
-                                                        if (idx >= 0) applyRange(idx)
-                                                        change.consume()
-                                                    },
-                                                    onDragEnd = { anchorIndex = null },
-                                                    onDragCancel = { anchorIndex = null },
-                                                )
+                            items(
+                                count = pagedItems.itemCount,
+                                key = { idx ->
+                                    when (val item = pagedItems.peek(idx)) {
+                                        is GalleryGridItem.JobItem -> "job_${item.job.id}"
+                                        is GalleryGridItem.DateSeparator -> "sep_${item.date}"
+                                        null -> "ph_$idx"
+                                    }
+                                },
+                                span = { idx ->
+                                    when (pagedItems.peek(idx)) {
+                                        is GalleryGridItem.DateSeparator -> GridItemSpan(maxLineSpan)
+                                        else -> GridItemSpan(1)
+                                    }
+                                },
+                            ) { idx ->
+                                when (val item = pagedItems[idx]) {
+                                    is GalleryGridItem.DateSeparator -> {
+                                        Text(
+                                            text = item.date,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            modifier = Modifier.padding(vertical = 8.dp),
+                                        )
+                                    }
+                                    is GalleryGridItem.JobItem -> {
+                                        val job = item.job
+                                        val isSelected = selectedIds.contains(job.id)
+                                        val jobIndex = idx
+                                        JobThumbnail(
+                                            modifier = Modifier
+                                                .onGloballyPositioned { coords ->
+                                                    tileBounds[job.id] = coords.boundsInRoot()
+                                                }
+                                                .pointerInput(job.id, jobIndex) {
+                                                    detectDragGesturesAfterLongPress(
+                                                        onDragStart = {
+                                                            if (jobIndex < 0) return@detectDragGesturesAfterLongPress
+                                                            tileBounds[job.id]
+                                                                ?: return@detectDragGesturesAfterLongPress
+                                                            baseSelection = latestSelectedIds
+                                                            dragMode = if (job.id in baseSelection) {
+                                                                DragMode.Remove
+                                                            } else {
+                                                                DragMode.Add
+                                                            }
+                                                            anchorIndex = jobIndex
+                                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                            applyRange(jobIndex)
+                                                        },
+                                                        onDrag = { change, _ ->
+                                                            if (anchorIndex == null) return@detectDragGesturesAfterLongPress
+                                                            val tileBoundsForJob = tileBounds[job.id]
+                                                                ?: return@detectDragGesturesAfterLongPress
+                                                            val root = tileBoundsForJob.topLeft + change.position
+                                                            val hit = hitTest(root)
+                                                            if (hit >= 0) applyRange(hit)
+                                                            change.consume()
+                                                        },
+                                                        onDragEnd = { anchorIndex = null },
+                                                        onDragCancel = { anchorIndex = null },
+                                                    )
+                                                },
+                                            job = job,
+                                            prompts = prompts,
+                                            model = repository.thumbModel(job.id),
+                                            availability = repository.offlineAvailability(job.id),
+                                            showMetadata = showImageMetadata,
+                                            isSelected = isSelected,
+                                            isSelectionMode = isSelectionMode,
+                                            onClick = {
+                                                if (isSelectionMode) {
+                                                    viewModel.toggleSelection(job.id)
+                                                } else {
+                                                    onJobClick(job.id)
+                                                }
                                             },
-                                        job = job,
-                                        prompts = prompts,
-                                        model = repository.thumbModel(job.id),
-                                        availability = repository.offlineAvailability(job.id),
-                                        showMetadata = showImageMetadata,
-                                        isSelected = isSelected,
-                                        isSelectionMode = isSelectionMode,
-                                        onClick = {
-                                            if (isSelectionMode) {
-                                                viewModel.toggleSelection(job.id)
-                                            } else {
-                                                onJobClick(job.id)
-                                            }
-                                        },
-                                    )
+                                        )
+                                    }
+                                    null -> { /* placeholder while loading */ }
                                 }
                             }
                         }

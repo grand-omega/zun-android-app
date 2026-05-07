@@ -3,17 +3,25 @@ package dev.zun.flux.ui.gallery
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.paging.PagingData
+import androidx.paging.cachedIn
+import androidx.paging.insertSeparators
+import androidx.paging.map
 import dev.zun.flux.data.api.JobSummaryDto
 import dev.zun.flux.data.api.PromptDto
 import dev.zun.flux.data.api.effectivePromptId
 import dev.zun.flux.data.repo.JobRepository
+import dev.zun.flux.util.formatTimestamp
 import dev.zun.flux.util.saveToPictures
 import dev.zun.flux.util.shareImages
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -32,6 +40,12 @@ data class TagOption(
     val count: Int,
 )
 
+/** A row in the paged gallery grid: either a job tile or a date header. */
+sealed interface GalleryGridItem {
+    data class JobItem(val job: JobSummaryDto) : GalleryGridItem
+    data class DateSeparator(val date: String) : GalleryGridItem
+}
+
 class GalleryViewModel(
     private val repository: JobRepository,
 ) : ViewModel() {
@@ -49,7 +63,10 @@ class GalleryViewModel(
     private val _tagFilter = MutableStateFlow<TagFilter>(TagFilter.All)
     val tagFilter: StateFlow<TagFilter> = _tagFilter.asStateFlow()
 
-    /** Jobs visible to the user — already filtered by [tagFilter]. */
+    /**
+     * Filtered list view of all done jobs. Used by PhotoViewerScreen
+     * (HorizontalPager). Grid uses [pagedGridItems] instead.
+     */
     val jobs: StateFlow<List<JobSummaryDto>> =
         combine(allJobs, _tagFilter) { all, filter ->
             when (filter) {
@@ -59,24 +76,47 @@ class GalleryViewModel(
             }
         }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
-    /** Tag choices to show in the filter dropdown. */
+    /**
+     * Paged stream for the gallery grid, with date-separator rows inserted
+     * between groups. Reacts to [tagFilter] changes.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val pagedGridItems: Flow<PagingData<GalleryGridItem>> =
+        _tagFilter.flatMapLatest { filter ->
+            val (promptId, customOnly) = when (filter) {
+                TagFilter.All -> null to false
+                is TagFilter.ByPromptId -> filter.promptId to false
+                TagFilter.Custom -> null to true
+            }
+            repository.pagedJobs(promptId, customOnly)
+        }.map { pagingData ->
+            pagingData
+                .map<JobSummaryDto, GalleryGridItem> { GalleryGridItem.JobItem(it) }
+                .insertSeparators { before, after ->
+                    val afterJob = (after as? GalleryGridItem.JobItem)?.job ?: return@insertSeparators null
+                    val afterDate = formatTimestamp(afterJob.created_at)
+                    val beforeJob = (before as? GalleryGridItem.JobItem)?.job
+                    if (beforeJob == null || formatTimestamp(beforeJob.created_at) != afterDate) {
+                        GalleryGridItem.DateSeparator(afterDate)
+                    } else {
+                        null
+                    }
+                }
+        }.cachedIn(viewModelScope)
+
+    /** Tag choices to show in the filter dropdown. Counts come from SQL aggregates. */
     val availableTags: StateFlow<List<TagOption>> =
-        combine(allJobs, prompts) { all, ps ->
+        combine(repository.jobTagStats(), prompts) { stats, ps ->
             buildList {
-                add(TagOption(TagFilter.All, "All", all.size))
-                all.asSequence()
-                    .mapNotNull { it.effectivePromptId }
-                    .groupingBy { it }
-                    .eachCount()
-                    .entries
+                add(TagOption(TagFilter.All, "All", stats.totalCount))
+                stats.perPromptCounts.entries
                     .sortedByDescending { it.value }
                     .forEach { (id, count) ->
                         val label = ps.firstOrNull { it.id == id }?.label ?: "Unknown prompt"
                         add(TagOption(TagFilter.ByPromptId(id), label, count))
                     }
-                val customCount = all.count { it.effectivePromptId == null && it.prompt_text != null }
-                if (customCount > 0) {
-                    add(TagOption(TagFilter.Custom, "Custom prompts", customCount))
+                if (stats.customCount > 0) {
+                    add(TagOption(TagFilter.Custom, "Custom prompts", stats.customCount))
                 }
             }
         }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
