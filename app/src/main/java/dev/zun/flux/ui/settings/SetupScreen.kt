@@ -169,6 +169,7 @@ fun SetupScreen(
                                 settings.apiToken = token.trim()
 
                                 // Resolve the active route once after the user taps Connect.
+                                app.networkResolver.invalidateCache()
                                 app.networkResolver.refreshNow()
 
                                 // Validate token & connectivity (listPrompts requires auth).

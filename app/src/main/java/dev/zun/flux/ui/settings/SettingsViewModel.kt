@@ -83,6 +83,7 @@ class SettingsViewModel(
                     settings.tailscaleUrl = tailscale
                     settings.connectionMode = draft.connectionMode
                     settings.apiToken = draft.token.trim()
+                    app.networkResolver.invalidateCache()
                     app.networkResolver.refreshNow()
                     app.repository.listPrompts()
                     updateDraft { copy(status = "Connection settings active.", isConnecting = false) }

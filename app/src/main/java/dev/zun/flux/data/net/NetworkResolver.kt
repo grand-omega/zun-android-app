@@ -1,5 +1,6 @@
 package dev.zun.flux.data.net
 
+import dev.zun.flux.Tuning
 import dev.zun.flux.data.repo.ActiveRoute
 import dev.zun.flux.data.repo.ConnectionMode
 import dev.zun.flux.data.repo.SettingsManager
@@ -21,17 +22,33 @@ import java.net.URI
  * is asked to rebuild the Retrofit/OkHttp stack via [onActiveUrlChanged].
  *
  * Re-runs on every network change so cellular ↔ Wi-Fi switching is automatic.
+ *
+ * Probe results are cached briefly (see [Tuning.NETWORK_RESOLVE_CACHE_MS]) so a
+ * burst of ConnectivityManager callbacks (common when WiFi flaps) doesn't storm
+ * the server.
  */
 class NetworkResolver(
     private val settings: SettingsManager,
+    private val nowMs: () -> Long = { System.currentTimeMillis() },
     private val onActiveUrlChanged: () -> Unit,
 ) {
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val mutex = Mutex()
 
+    @Volatile
+    private var lastResolvedAtMs: Long = 0L
+
     fun refresh(): Job = scope.launch { refreshNow() }
 
+    /** Forces a re-probe even if the cached result is still fresh. */
+    fun invalidateCache() {
+        lastResolvedAtMs = 0L
+    }
+
     suspend fun refreshNow() = mutex.withLock {
+        if (nowMs() - lastResolvedAtMs < Tuning.NETWORK_RESOLVE_CACHE_MS) {
+            return@withLock
+        }
         val lan = settings.lanUrl?.takeUnless { it.isBlank() }
         val ts = settings.tailscaleUrl?.takeUnless { it.isBlank() }
 
@@ -41,6 +58,8 @@ class NetworkResolver(
             tailscaleUrl = ts,
             isLanReachable = lan?.let { probe(it) } ?: false,
         )
+
+        lastResolvedAtMs = nowMs()
 
         if (chosen == null) {
             if (settings.serverUrl != null || settings.activeRoute != ActiveRoute.NONE) {
@@ -72,16 +91,12 @@ class NetworkResolver(
         }
         return try {
             Socket().use { s ->
-                s.connect(InetSocketAddress(host, port), PROBE_TIMEOUT_MS)
+                s.connect(InetSocketAddress(host, port), Tuning.NETWORK_PROBE_TIMEOUT_MS)
                 true
             }
         } catch (_: Exception) {
             false
         }
-    }
-
-    private companion object {
-        const val PROBE_TIMEOUT_MS = 400
     }
 }
 
