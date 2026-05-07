@@ -89,18 +89,54 @@ Things to verify on first launch of a fresh install:
 4. Generate one image end-to-end (Camera or Gallery → prompt → Submit → Result).
 5. Reopen the app — token persisted, no re-prompt for setup.
 
-## Distribution
+## Distribution: tag a release
 
-- **Personal sideload**: copy the signed APK to a private location (e.g. an
-  SMB share, Tailscale Drive, or a self-hosted file host).
-- **GitHub Release**: tag-triggered CI uploads an unsigned APK. Users would
-  need to side-load and bypass "package not signed" warnings, so prefer the
-  signed-APK route for anything you actually expect people to install.
-- **Play Store**: not currently set up. To enable, you'd need to:
-  1. Generate an upload key (separate from the release signing key).
-  2. Add Play Console account.
-  3. Add a CI workflow with secrets for upload-key + Play API credentials.
-  Out of scope until there's user demand.
+CI is configured to produce a **signed APK** when a `v*` tag is pushed,
+provided four GitHub Secrets are set on the repo:
+
+| Secret | Value |
+|---|---|
+| `ANDROID_KEYSTORE_BASE64` | `base64 -w0 flux-release.jks` of the keystore file |
+| `KEYSTORE_STORE_PASSWORD` | `storePassword` from your `keystore.properties` |
+| `KEYSTORE_KEY_ALIAS` | `keyAlias` from your `keystore.properties` |
+| `KEYSTORE_KEY_PASSWORD` | `keyPassword` from your `keystore.properties` |
+
+### One-time GitHub Secrets setup
+
+```bash
+# From the repo root, where flux-release.jks lives
+gh secret set ANDROID_KEYSTORE_BASE64 < <(base64 -w0 flux-release.jks)
+gh secret set KEYSTORE_STORE_PASSWORD --body 'your-store-password'
+gh secret set KEYSTORE_KEY_ALIAS --body 'flux'
+gh secret set KEYSTORE_KEY_PASSWORD --body 'your-key-password'
+```
+
+If any of these are missing, the workflow falls back to an unsigned APK on
+tag builds — the release will still be created, but users won't be able to
+install it without side-loading a signed copy you upload manually.
+
+### Tagging a release
+
+```bash
+# 1. Sanity check the working tree
+git status                # clean
+./gradlew testDebugUnitTest spotlessCheck lintDebug   # green
+
+# 2. Tag and push
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+CI runs the workflow, builds a signed `flux-edit-v1.0.0.apk`, and creates a
+GitHub Release with the APK attached and auto-generated release notes from
+the commit history.
+
+### Other channels
+
+- **Personal sideload**: skip GitHub entirely, just copy the local
+  `app-release.apk` somewhere private (Tailscale Drive, SMB, etc.).
+- **Play Store**: not currently wired. Would need a separate upload key,
+  Play Console account, and `bundleRelease` (AAB) in the workflow.
 
 ## Pre-release checklist
 
