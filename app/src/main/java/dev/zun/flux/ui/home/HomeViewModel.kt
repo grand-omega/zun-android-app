@@ -7,6 +7,7 @@ import dev.zun.flux.data.api.JobCreatedResponse
 import dev.zun.flux.data.api.PromptDto
 import dev.zun.flux.data.repo.ConnectionDiagnosis
 import dev.zun.flux.data.repo.JobRepository
+import dev.zun.flux.data.repo.JobUploadStatus
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -15,7 +16,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
@@ -273,13 +276,27 @@ class HomeViewModel(
         val workflow = if (tryHarder) TRY_HARDER_WORKFLOW else DEFAULT_CUSTOM_WORKFLOW
         val promptId = selectedPromptId.takeUnless { it == CUSTOM_PROMPT_ID }
         val promptText = customPromptText.takeIf { selectedPromptId == CUSTOM_PROMPT_ID }
-        return repository.submitJob(
+        val workId = repository.enqueueJobUpload(
             inputUri = inputUri,
             promptId = promptId,
             promptText = promptText,
             workflow = workflow,
-            onUploadProgress = { progress -> _uploadProgress.value = progress },
         )
+        val terminal = repository.observeJobUpload(workId)
+            .onEach { status ->
+                if (status is JobUploadStatus.InProgress) {
+                    _uploadProgress.value = status.progress
+                }
+            }
+            .first { it is JobUploadStatus.Succeeded || it is JobUploadStatus.Failed }
+        return when (terminal) {
+            is JobUploadStatus.Succeeded -> JobCreatedResponse(
+                job_id = terminal.jobId,
+                input_id = terminal.inputId,
+            )
+            is JobUploadStatus.Failed -> error(terminal.message)
+            else -> error("Unexpected upload status: $terminal")
+        }
     }
 
     fun acknowledgeDone() {
