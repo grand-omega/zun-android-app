@@ -89,35 +89,31 @@ class RealJobRepository(
 
     override suspend fun submitJob(
         inputUri: Uri,
-        promptId: Long?,
-        promptText: String?,
+        selection: PromptSelection,
         workflow: String?,
         onUploadProgress: ((Float) -> Unit)?,
     ): JobCreatedResponse = jobUploader.submitJob(
         inputUri = inputUri,
-        promptId = promptId,
-        promptText = promptText,
+        selection = selection,
         workflow = workflow,
         onUploadProgress = onUploadProgress,
     )
 
     override suspend fun enqueueJobUpload(
         inputUri: Uri,
-        promptId: Long?,
-        promptText: String?,
+        selection: PromptSelection,
         workflow: String?,
     ): java.util.UUID {
-        require((promptId == null) xor (promptText == null)) {
-            "Exactly one of promptId / promptText must be set"
-        }
-        require(promptText == null || !workflow.isNullOrBlank()) {
-            "workflow is required when promptText is set"
+        if (selection is PromptSelection.Custom) {
+            require(!workflow.isNullOrBlank()) {
+                "workflow is required for custom prompts"
+            }
         }
         val staged = jobUploader.stageImage(inputUri)
         val data = workDataOf(
             JobUploadWorker.KEY_FILE_PATH to staged.absolutePath,
-            JobUploadWorker.KEY_PROMPT_ID to (promptId ?: -1L),
-            JobUploadWorker.KEY_PROMPT_TEXT to promptText,
+            JobUploadWorker.KEY_PROMPT_ID to ((selection as? PromptSelection.Saved)?.promptId ?: -1L),
+            JobUploadWorker.KEY_PROMPT_TEXT to (selection as? PromptSelection.Custom)?.text,
             JobUploadWorker.KEY_WORKFLOW to workflow,
         )
         val request = OneTimeWorkRequestBuilder<JobUploadWorker>()
@@ -170,14 +166,12 @@ class RealJobRepository(
 
     override suspend fun submitStagedJob(
         filePath: String,
-        promptId: Long?,
-        promptText: String?,
+        selection: PromptSelection,
         workflow: String?,
         onUploadProgress: ((Float) -> Unit)?,
     ): JobCreatedResponse = jobUploader.submitStagedJob(
         file = java.io.File(filePath),
-        promptId = promptId,
-        promptText = promptText,
+        selection = selection,
         workflow = workflow,
         onUploadProgress = onUploadProgress,
     )

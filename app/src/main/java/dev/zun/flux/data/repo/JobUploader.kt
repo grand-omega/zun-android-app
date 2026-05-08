@@ -37,16 +37,14 @@ class JobUploader(
      */
     suspend fun submitStagedJob(
         file: File,
-        promptId: Long?,
-        promptText: String?,
+        selection: PromptSelection,
         workflow: String?,
         onUploadProgress: ((Float) -> Unit)?,
     ): JobCreatedResponse {
-        require((promptId == null) xor (promptText == null)) {
-            "Exactly one of promptId / promptText must be set"
-        }
+        val promptId = (selection as? PromptSelection.Saved)?.promptId
+        val promptText = (selection as? PromptSelection.Custom)?.text
         require(promptText == null || !workflow.isNullOrBlank()) {
-            "workflow is required when promptText is set"
+            "workflow is required for custom prompts"
         }
 
         val sha = sha256Hex(file)
@@ -110,14 +108,13 @@ class JobUploader(
 
     suspend fun submitJob(
         inputUri: Uri,
-        promptId: Long?,
-        promptText: String?,
+        selection: PromptSelection,
         workflow: String?,
         onUploadProgress: ((Float) -> Unit)?,
     ): JobCreatedResponse {
         val file = stageImage(inputUri)
         try {
-            return submitStagedJob(file, promptId, promptText, workflow, onUploadProgress)
+            return submitStagedJob(file, selection, workflow, onUploadProgress)
         } finally {
             file.delete()
         }
