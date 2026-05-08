@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlin.random.Random
 
 sealed interface PollState {
     data object Starting : PollState
@@ -64,6 +65,7 @@ class ProgressViewModel(
         // Poll only while this ViewModel is alive. No background worker is kept
         // running after the progress UI leaves composition.
         pollJob = viewModelScope.launch {
+            var iteration = 0
             while (true) {
                 try {
                     val job = repository.getJob(jobId)
@@ -78,9 +80,23 @@ class ProgressViewModel(
                     }
                     return@launch
                 }
-                delay(5000)
+                delay(nextPollDelayMs(iteration++))
             }
         }
+    }
+
+    /**
+     * Backoff schedule: 5s for the first 3 polls, 10s for the next 2, then 20s,
+     * with ±25% jitter to spread server load when many clients poll the same job.
+     */
+    private fun nextPollDelayMs(iteration: Int): Long {
+        val base = when {
+            iteration < 3 -> 5_000L
+            iteration < 5 -> 10_000L
+            else -> 20_000L
+        }
+        val jitter = (base * 0.25 * (Random.nextDouble() * 2.0 - 1.0)).toLong()
+        return base + jitter
     }
 
     fun retry(jobId: String) {
