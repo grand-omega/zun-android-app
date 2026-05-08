@@ -47,13 +47,13 @@ class RealJobRepository(
     private val context: Context,
     private val api: FluxApi,
     private val settingsManager: SettingsManager,
-    okHttpClient: OkHttpClient,
+    @Suppress("UNUSED_PARAMETER") okHttpClient: OkHttpClient,
+    private val offlineImageCache: OfflineImageCache,
 ) : JobRepository {
     private val dao = AppDatabase.getDatabase(context).jobDao()
     private val connectionDiagnoser = ConnectionDiagnoser(settingsManager)
     private val jobUploader = JobUploader(context, api)
     private val recentInputCache = RecentInputCache(context, api)
-    private val offlineImageCache = OfflineImageCache(context, okHttpClient)
     private val cacheScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val _promptsState = MutableStateFlow<List<PromptDto>>(emptyList())
