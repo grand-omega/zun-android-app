@@ -17,6 +17,7 @@ import dev.zun.flux.data.repo.JobUploadStatus
 import dev.zun.flux.data.repo.OfflineCacheStats
 import dev.zun.flux.data.repo.OfflineImageAvailability
 import dev.zun.flux.data.repo.PromptRepository
+import dev.zun.flux.data.repo.PromptSelection
 import dev.zun.flux.data.repo.UploadRepository
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -270,14 +271,13 @@ private class RecordingRepository :
 
     override suspend fun submitJob(
         inputUri: Uri,
-        promptId: Long?,
-        promptText: String?,
+        selection: PromptSelection,
         workflow: String?,
         onUploadProgress: ((Float) -> Unit)?,
     ): JobCreatedResponse {
         submitCalls++
-        lastPromptId = promptId
-        lastPromptText = promptText
+        lastPromptId = (selection as? PromptSelection.Saved)?.promptId
+        lastPromptText = (selection as? PromptSelection.Custom)?.text
         lastWorkflow = workflow
         holdSubmit?.await()
         if (inputUri in failingUris) {
@@ -291,11 +291,10 @@ private class RecordingRepository :
 
     override suspend fun enqueueJobUpload(
         inputUri: Uri,
-        promptId: Long?,
-        promptText: String?,
+        selection: PromptSelection,
         workflow: String?,
     ): java.util.UUID {
-        val resp = submitJob(inputUri, promptId, promptText, workflow, onUploadProgress = null)
+        val resp = submitJob(inputUri, selection, workflow, onUploadProgress = null)
         val workId = java.util.UUID.randomUUID()
         pendingUploads[workId] = JobUploadStatus.Succeeded(jobId = resp.job_id, inputId = resp.input_id)
         return workId
@@ -311,14 +310,12 @@ private class RecordingRepository :
 
     override suspend fun submitStagedJob(
         filePath: String,
-        promptId: Long?,
-        promptText: String?,
+        selection: PromptSelection,
         workflow: String?,
         onUploadProgress: ((Float) -> Unit)?,
     ): JobCreatedResponse = submitJob(
         inputUri = Uri.parse("file://$filePath"),
-        promptId = promptId,
-        promptText = promptText,
+        selection = selection,
         workflow = workflow,
         onUploadProgress = onUploadProgress,
     )

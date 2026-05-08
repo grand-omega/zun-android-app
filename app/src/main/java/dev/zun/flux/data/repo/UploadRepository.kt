@@ -15,8 +15,9 @@ sealed interface JobUploadStatus {
 
 interface UploadRepository {
     /**
-     * Submit a job. Exactly one of [promptId] / [promptText] must be non-null.
-     * [workflow] is required when [promptText] is set.
+     * Submit a job. [workflow] is required when [selection] is
+     * [PromptSelection.Custom] (the server has no default workflow for
+     * free-text prompts).
      *
      * Uses the v2 JSON-probe-then-multipart flow: we try a cheap JSON submit first
      * with only the sha256 hash; the server returns 409 `need_upload` if it doesn't
@@ -24,8 +25,7 @@ interface UploadRepository {
      */
     suspend fun submitJob(
         inputUri: Uri,
-        promptId: Long? = null,
-        promptText: String? = null,
+        selection: PromptSelection,
         workflow: String? = null,
         onUploadProgress: ((Float) -> Unit)? = null,
     ): JobCreatedResponse
@@ -39,8 +39,7 @@ interface UploadRepository {
      */
     suspend fun enqueueJobUpload(
         inputUri: Uri,
-        promptId: Long? = null,
-        promptText: String? = null,
+        selection: PromptSelection,
         workflow: String? = null,
     ): UUID
 
@@ -59,8 +58,7 @@ interface UploadRepository {
      */
     suspend fun submitStagedJob(
         filePath: String,
-        promptId: Long? = null,
-        promptText: String? = null,
+        selection: PromptSelection,
         workflow: String? = null,
         onUploadProgress: ((Float) -> Unit)? = null,
     ): JobCreatedResponse
