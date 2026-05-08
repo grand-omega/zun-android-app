@@ -10,15 +10,25 @@ import okhttp3.Request
 import java.io.File
 
 class OfflineImageCache internal constructor(
-    private val rootDir: File,
+    val rootDir: File,
     private val okHttpClient: OkHttpClient,
     private val maxBytes: Long = Tuning.OFFLINE_IMAGE_CACHE_MAX_BYTES,
+    internal val vault: EncryptedFileVault? = null,
 ) {
     constructor(
         context: Context,
         okHttpClient: OkHttpClient,
         maxBytes: Long = Tuning.OFFLINE_IMAGE_CACHE_MAX_BYTES,
-    ) : this(File(context.filesDir, "offline_images"), okHttpClient, maxBytes)
+    ) : this(
+        rootDir = File(context.filesDir, "offline_images"),
+        okHttpClient = okHttpClient,
+        maxBytes = maxBytes,
+        vault = EncryptedFileVault.from(context),
+    )
+
+    init {
+        if (vault != null) ensureEncryptedLayout()
+    }
 
     enum class Kind(val fileName: String) {
         Thumb("thumb.jpg"),
@@ -29,14 +39,14 @@ class OfflineImageCache internal constructor(
     private val semaphore = Semaphore(Tuning.OFFLINE_PREFETCH_CONCURRENCY)
 
     fun availability(jobId: String): OfflineImageAvailability = OfflineImageAvailability(
-        thumbCached = localUri(jobId, Kind.Thumb) != null,
-        previewCached = localUri(jobId, Kind.Preview) != null,
-        resultCached = localUri(jobId, Kind.Result) != null,
+        thumbCached = isCached(jobId, Kind.Thumb),
+        previewCached = isCached(jobId, Kind.Preview),
+        resultCached = isCached(jobId, Kind.Result),
     )
 
     fun stats(): OfflineCacheStats {
         val files = rootDir.walkTopDown()
-            .filter { it.isFile }
+            .filter { it.isFile && it.name != ENCRYPTED_SENTINEL }
             .toList()
         return OfflineCacheStats(
             bytes = files.sumOf { it.length() },
@@ -45,31 +55,46 @@ class OfflineImageCache internal constructor(
     }
 
     fun localUri(jobId: String, kind: Kind): Uri? {
-        val file = cacheFile(jobId, kind)
-        return if (file.exists() && file.length() > 0L) Uri.fromFile(file) else null
+        if (!isCached(jobId, kind)) return null
+        return if (vault != null) {
+            // Custom scheme handled by EncryptedCacheFetcher in the Coil graph.
+            Uri.Builder()
+                .scheme(SCHEME)
+                .authority(jobId.sanitizeFileName())
+                .path("/${kind.fileName}")
+                .build()
+        } else {
+            Uri.fromFile(cacheFile(jobId, kind))
+        }
+    }
+
+    /** Returns decrypted bytes for the cached file, or null if absent. */
+    fun readDecrypted(safeJobId: String, kind: Kind): ByteArray? {
+        val file = File(File(rootDir, safeJobId), kind.fileName)
+        if (!file.exists() || file.length() == 0L) return null
+        val raw = file.readBytes()
+        return vault?.decrypt(raw) ?: raw
     }
 
     suspend fun prefetch(jobId: String, kind: Kind, url: String) {
         val outFile = cacheFile(jobId, kind)
-        if (outFile.exists() && outFile.length() > 0L) {
+        if (isCached(jobId, kind)) {
             outFile.setLastModified(System.currentTimeMillis())
             return
         }
 
         semaphore.withPermit {
-            if (outFile.exists() && outFile.length() > 0L) return@withPermit
+            if (isCached(jobId, kind)) return@withPermit
             outFile.parentFile?.mkdirs()
             val tempFile = File(outFile.parentFile, "${outFile.name}.tmp")
             runCatching {
                 val request = Request.Builder().url(url).build()
-                okHttpClient.newCall(request).execute().use { response ->
+                val bytes = okHttpClient.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) error("Failed to cache image: ${response.code}")
-                    response.body.byteStream().use { input ->
-                        tempFile.outputStream().use { output ->
-                            input.copyTo(output)
-                        }
-                    }
+                    response.body.bytes()
                 }
+                val payload = vault?.encrypt(bytes) ?: bytes
+                tempFile.writeBytes(payload)
                 if (tempFile.length() > 0L) {
                     if (!tempFile.renameTo(outFile)) {
                         tempFile.copyTo(outFile, overwrite = true)
@@ -92,11 +117,17 @@ class OfflineImageCache internal constructor(
 
     fun clear() {
         rootDir.deleteRecursively()
+        if (vault != null) ensureEncryptedLayout()
+    }
+
+    private fun isCached(jobId: String, kind: Kind): Boolean {
+        val file = cacheFile(jobId, kind)
+        return file.exists() && file.length() > 0L
     }
 
     private fun prune() {
         val files = rootDir.walkTopDown()
-            .filter { it.isFile }
+            .filter { it.isFile && it.name != ENCRYPTED_SENTINEL }
             .sortedBy { it.lastModified() }
             .toList()
         var total = files.sumOf { it.length() }
@@ -107,9 +138,28 @@ class OfflineImageCache internal constructor(
         }
     }
 
+    /**
+     * One-shot wipe of any pre-existing plaintext cache files. Idempotent —
+     * subsequent runs see the sentinel and exit cheaply. Drops cached images
+     * (rather than re-encrypting them) because the data is replenishable from
+     * the server and a wipe avoids partial-migration edge cases.
+     */
+    private fun ensureEncryptedLayout() {
+        val sentinel = File(rootDir, ENCRYPTED_SENTINEL)
+        if (sentinel.exists()) return
+        rootDir.deleteRecursively()
+        rootDir.mkdirs()
+        sentinel.createNewFile()
+    }
+
     private fun cacheFile(jobId: String, kind: Kind): File = File(jobDir(jobId), kind.fileName)
 
     private fun jobDir(jobId: String): File = File(rootDir, jobId.sanitizeFileName())
 
     private fun String.sanitizeFileName(): String = replace(Regex("[^A-Za-z0-9._-]"), "_")
+
+    companion object {
+        const val SCHEME = "flux-cache"
+        private const val ENCRYPTED_SENTINEL = ".encrypted"
+    }
 }

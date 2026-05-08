@@ -44,11 +44,6 @@ object Tuning {
      *  don't re-decode and re-downsample. */
     const val COIL_MEMORY_CACHE_BYTES = 256L * 1024L * 1024L
 
-    /** Coil's URL-keyed disk cache. Separate from [OFFLINE_IMAGE_CACHE_MAX_BYTES] (which is
-     *  job-keyed and long-lived); Coil's cache is short-lived but lets sub-pixel zoom in the
-     *  photo viewer re-decode at higher resolution without re-downloading. */
-    const val COIL_DISK_CACHE_BYTES = 256L * 1024L * 1024L
-
     // --- Paging ---------------------------------------------------------------
 
     /** Page size for the gallery grid. Larger = fewer round trips, smaller = faster initial

@@ -5,14 +5,15 @@ import android.net.ConnectivityManager
 import android.net.Network
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
-import coil3.disk.DiskCache
 import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import dev.zun.flux.data.api.FluxApi
 import dev.zun.flux.data.diag.Diagnostics
 import dev.zun.flux.data.net.CertPinStore
 import dev.zun.flux.data.net.NetworkResolver
+import dev.zun.flux.data.repo.EncryptedCacheFetcherFactory
 import dev.zun.flux.data.repo.JobRepository
+import dev.zun.flux.data.repo.OfflineImageCache
 import dev.zun.flux.data.repo.PinnedPromptsStore
 import dev.zun.flux.data.repo.RealJobRepository
 import dev.zun.flux.data.repo.SettingsManager
@@ -23,7 +24,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
-import okio.Path.Companion.toOkioPath
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import java.util.concurrent.TimeUnit
@@ -60,6 +60,9 @@ class FluxApp : Application() {
     lateinit var certPinStore: CertPinStore
         private set
 
+    lateinit var offlineImageCache: OfflineImageCache
+        private set
+
     val diagnostics = Diagnostics()
 
     override fun onCreate() {
@@ -72,10 +75,14 @@ class FluxApp : Application() {
         networkResolver = NetworkResolver(settingsManager) { rebuildRepository() }
 
         rebuildOkHttp()
+        offlineImageCache = OfflineImageCache(this, okHttpClient)
 
         SingletonImageLoader.setSafe { ctx ->
             ImageLoader.Builder(ctx)
                 .components {
+                    // Custom fetcher decrypts flux-cache:// URIs produced by
+                    // OfflineImageCache when its Keystore-backed vault is active.
+                    add(EncryptedCacheFetcherFactory(offlineImageCache))
                     add(OkHttpNetworkFetcherFactory(callFactory = { okHttpClient }))
                 }
                 // Memory cache holds a few full-res bitmaps so scroll-back and Telephoto
@@ -85,15 +92,9 @@ class FluxApp : Application() {
                         .maxSizeBytes(Tuning.COIL_MEMORY_CACHE_BYTES)
                         .build()
                 }
-                // URL-keyed disk cache is separate from OfflineImageCache (job-keyed). Both
-                // exist on purpose: Coil's cache lets the zoomable viewer re-decode at
-                // higher resolution from local bytes without re-downloading.
-                .diskCache {
-                    DiskCache.Builder()
-                        .directory(cacheDir.resolve("coil_image_cache").toOkioPath())
-                        .maxSizeBytes(Tuning.COIL_DISK_CACHE_BYTES)
-                        .build()
-                }
+                // No URL-keyed disk cache: OfflineImageCache is the canonical
+                // disk store and persists encrypted bytes. A second plaintext
+                // cache would defeat the encryption.
                 .build()
         }
 
@@ -154,7 +155,7 @@ class FluxApp : Application() {
 
         val api = retrofit.create(FluxApi::class.java)
         _repositoryState.value = RepositoryState(
-            repository = RealJobRepository(this, api, settingsManager, okHttpClient),
+            repository = RealJobRepository(this, api, settingsManager, okHttpClient, offlineImageCache),
             version = ++repositoryVersion,
         )
     }
