@@ -185,7 +185,7 @@ fun SetupScreen(
                                 app.networkResolver.refreshNow()
 
                                 // Validate token & connectivity (listPrompts requires auth).
-                                app.repository.listPrompts()
+                                app.repositories.prompts.listPrompts()
 
                                 onSuccess()
                             } catch (t: Throwable) {

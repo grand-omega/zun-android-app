@@ -12,11 +12,15 @@ import dev.zun.flux.data.diag.Diagnostics
 import dev.zun.flux.data.net.CertPinStore
 import dev.zun.flux.data.net.NetworkResolver
 import dev.zun.flux.data.repo.EncryptedCacheFetcherFactory
+import dev.zun.flux.data.repo.HealthRepository
+import dev.zun.flux.data.repo.ImageSourceRepository
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.data.repo.OfflineImageCache
 import dev.zun.flux.data.repo.PinnedPromptsStore
+import dev.zun.flux.data.repo.PromptRepository
 import dev.zun.flux.data.repo.RealJobRepository
 import dev.zun.flux.data.repo.SettingsManager
+import dev.zun.flux.data.repo.UploadRepository
 import dev.zun.flux.ui.auth.AuthStateHolder
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,8 +32,21 @@ import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import java.util.concurrent.TimeUnit
 
+/**
+ * Bundle of narrow repository interfaces that share a single backing
+ * implementation. Wiring layers (e.g. [dev.zun.flux.ui.nav.AppNavHost])
+ * receive this and hand each screen only the interface it actually uses.
+ */
+data class Repositories(
+    val health: HealthRepository,
+    val prompts: PromptRepository,
+    val jobs: JobRepository,
+    val uploads: UploadRepository,
+    val images: ImageSourceRepository,
+)
+
 data class RepositoryState(
-    val repository: JobRepository,
+    val repositories: Repositories,
     val version: Long,
 )
 
@@ -39,8 +56,8 @@ class FluxApp : Application() {
 
     private var repositoryVersion = 0L
 
-    val repository: JobRepository
-        get() = _repositoryState.value?.repository ?: error("Repository has not been initialized")
+    val repositories: Repositories
+        get() = _repositoryState.value?.repositories ?: error("Repository has not been initialized")
 
     var okHttpClient: OkHttpClient = OkHttpClient()
         private set
@@ -154,8 +171,15 @@ class FluxApp : Application() {
                 .build()
 
         val api = retrofit.create(FluxApi::class.java)
+        val real = RealJobRepository(this, api, settingsManager, okHttpClient, offlineImageCache)
         _repositoryState.value = RepositoryState(
-            repository = RealJobRepository(this, api, settingsManager, okHttpClient, offlineImageCache),
+            repositories = Repositories(
+                health = real,
+                prompts = real,
+                jobs = real,
+                uploads = real,
+                images = real,
+            ),
             version = ++repositoryVersion,
         )
     }

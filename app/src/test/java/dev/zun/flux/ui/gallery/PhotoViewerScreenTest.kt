@@ -31,13 +31,13 @@ class PhotoViewerScreenTest {
         val repo = FakeJobRepository().apply {
             seedDoneJobs(listOf("j1", "j2", "j3", "j4", "j5"))
         }
-        val viewModel = GalleryViewModel(repo)
+        val viewModel = GalleryViewModel(repo, repo, repo)
 
         rule.setContent {
             PhotoViewerScreen(
                 initialJobId = "j3",
                 viewModel = viewModel,
-                repository = repo,
+                images = repo,
                 onUseInput = {},
                 onBack = {},
             )
@@ -52,13 +52,13 @@ class PhotoViewerScreenTest {
     @Test
     fun `viewer renders loading state when jobs flow is initially empty`() {
         val repo = FakeJobRepository()
-        val viewModel = GalleryViewModel(repo)
+        val viewModel = GalleryViewModel(repo, repo, repo)
 
         rule.setContent {
             PhotoViewerScreen(
                 initialJobId = "anything",
                 viewModel = viewModel,
-                repository = repo,
+                images = repo,
                 onUseInput = {},
                 onBack = {},
             )
@@ -74,13 +74,13 @@ class PhotoViewerScreenTest {
     @Test
     fun `tapping the delete action opens the confirmation dialog`() {
         val repo = FakeJobRepository().apply { seedDoneJobs(listOf("a", "b")) }
-        val viewModel = GalleryViewModel(repo)
+        val viewModel = GalleryViewModel(repo, repo, repo)
 
         rule.setContent {
             PhotoViewerScreen(
                 initialJobId = "a",
                 viewModel = viewModel,
-                repository = repo,
+                images = repo,
                 onUseInput = {},
                 onBack = {},
             )
@@ -96,13 +96,13 @@ class PhotoViewerScreenTest {
     @Test
     fun `dismiss button closes the delete confirmation without deleting`() {
         val repo = FakeJobRepository().apply { seedDoneJobs(listOf("a", "b")) }
-        val viewModel = GalleryViewModel(repo)
+        val viewModel = GalleryViewModel(repo, repo, repo)
 
         rule.setContent {
             PhotoViewerScreen(
                 initialJobId = "a",
                 viewModel = viewModel,
-                repository = repo,
+                images = repo,
                 onUseInput = {},
                 onBack = {},
             )

@@ -73,7 +73,11 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import dev.zun.flux.FluxApp
 import dev.zun.flux.R
 import dev.zun.flux.data.api.PromptDto
+import dev.zun.flux.data.repo.HealthRepository
+import dev.zun.flux.data.repo.ImageSourceRepository
 import dev.zun.flux.data.repo.JobRepository
+import dev.zun.flux.data.repo.PromptRepository
+import dev.zun.flux.data.repo.UploadRepository
 import dev.zun.flux.ui.common.ControlShape
 import dev.zun.flux.util.cacheInputLocally
 import kotlinx.coroutines.Dispatchers
@@ -83,7 +87,11 @@ import kotlinx.coroutines.withContext
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
-    repository: JobRepository,
+    healthRepo: HealthRepository,
+    promptRepo: PromptRepository,
+    jobRepo: JobRepository,
+    uploadRepo: UploadRepository,
+    images: ImageSourceRepository,
     repositoryVersion: Long,
     windowSizeClass: WindowSizeClass,
     capturedUri: Uri? = null,
@@ -98,7 +106,7 @@ fun HomeScreen(
             key = "home-$repositoryVersion",
             factory =
             viewModelFactory {
-                initializer { HomeViewModel(repository) }
+                initializer { HomeViewModel(healthRepo, promptRepo, jobRepo, uploadRepo) }
             },
         )
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -108,7 +116,7 @@ fun HomeScreen(
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val uploadProgress by viewModel.uploadProgress.collectAsStateWithLifecycle()
     val batchProgress by viewModel.batchProgress.collectAsStateWithLifecycle()
-    val recentInputIds by remember { repository.recentInputIds(3) }
+    val recentInputIds by remember { images.recentInputIds(3) }
         .collectAsStateWithLifecycle(initialValue = emptyList())
     val haptic = LocalHapticFeedback.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -289,7 +297,7 @@ fun HomeScreen(
             }
             var isFetchingRecent by remember { mutableStateOf(false) }
             val onPickRecent: (Int) -> Unit = { inputId ->
-                val expectedUri = repository.recentInputUri(inputId)
+                val expectedUri = images.recentInputUri(inputId)
                 if (expectedUri in composer.inputUris) {
                     // Tap a selected recent to toggle it off.
                     viewModel.removeInputUri(expectedUri)
@@ -298,7 +306,7 @@ fun HomeScreen(
                         isFetchingRecent = true
                         try {
                             val uri = withContext(Dispatchers.IO) {
-                                repository.downloadInputToCache(inputId)
+                                images.downloadInputToCache(inputId)
                             }
                             appendUris(listOf(uri))
                         } catch (_: Throwable) {
@@ -310,7 +318,7 @@ fun HomeScreen(
                 }
             }
             val recents = recentInputIds.map { id ->
-                Triple(id, repository.inputModel(id), repository.recentInputUri(id) in composer.inputUris)
+                Triple(id, images.inputModel(id), images.recentInputUri(id) in composer.inputUris)
             }
 
             HomeContent(

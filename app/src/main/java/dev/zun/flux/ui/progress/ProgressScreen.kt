@@ -51,7 +51,9 @@ import coil3.compose.AsyncImage
 import dev.zun.flux.R
 import dev.zun.flux.Tuning
 import dev.zun.flux.data.api.effectivePromptId
+import dev.zun.flux.data.repo.ImageSourceRepository
 import dev.zun.flux.data.repo.JobRepository
+import dev.zun.flux.data.repo.PromptRepository
 import dev.zun.flux.ui.common.LoadingScrim
 import dev.zun.flux.ui.common.PanelShape
 import dev.zun.flux.ui.common.StatusPill
@@ -63,7 +65,9 @@ import dev.zun.flux.util.resolvePromptLabel
 @Composable
 fun ProgressScreen(
     jobId: String,
-    repository: JobRepository,
+    jobs: JobRepository,
+    prompts: PromptRepository,
+    images: ImageSourceRepository,
     onDone: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -74,15 +78,15 @@ fun ProgressScreen(
             viewModelFactory {
                 initializer {
                     ProgressViewModel(
-                        repository = repository,
+                        repository = jobs,
                     )
                 }
             },
         )
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val prompts by repository.promptsState.collectAsStateWithLifecycle()
+    val promptList by prompts.promptsState.collectAsStateWithLifecycle()
     val currentDto = (state as? PollState.Running)?.dto ?: (state as? PollState.Done)?.dto
-    val inputModel = remember(currentDto?.input_id) { repository.inputModel(currentDto?.input_id) }
+    val inputModel = remember(currentDto?.input_id) { images.inputModel(currentDto?.input_id) }
     val haptic = LocalHapticFeedback.current
 
     LaunchedEffect(jobId) { viewModel.start(jobId) }
@@ -190,7 +194,7 @@ fun ProgressScreen(
                             modifier = Modifier.padding(16.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            MetadataRow(stringResource(R.string.progress_prompt_label), resolvePromptLabel(prompts, dto.effectivePromptId, dto.prompt_text))
+                            MetadataRow(stringResource(R.string.progress_prompt_label), resolvePromptLabel(promptList, dto.effectivePromptId, dto.prompt_text))
                         }
                     }
                 }

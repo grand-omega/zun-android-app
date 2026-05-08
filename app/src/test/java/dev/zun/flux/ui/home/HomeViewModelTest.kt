@@ -9,11 +9,15 @@ import dev.zun.flux.data.api.JobStatusDto
 import dev.zun.flux.data.api.JobSummaryDto
 import dev.zun.flux.data.api.PromptDto
 import dev.zun.flux.data.repo.ConnectionDiagnosis
+import dev.zun.flux.data.repo.HealthRepository
+import dev.zun.flux.data.repo.ImageSourceRepository
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.data.repo.JobTagStats
 import dev.zun.flux.data.repo.JobUploadStatus
 import dev.zun.flux.data.repo.OfflineCacheStats
 import dev.zun.flux.data.repo.OfflineImageAvailability
+import dev.zun.flux.data.repo.PromptRepository
+import dev.zun.flux.data.repo.UploadRepository
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -48,7 +52,12 @@ class HomeViewModelTest {
     @Before
     fun setUp() {
         repository = RecordingRepository()
-        viewModel = HomeViewModel(repository)
+        viewModel = HomeViewModel(
+            healthRepo = repository,
+            promptRepo = repository,
+            jobRepo = repository,
+            uploadRepo = repository,
+        )
     }
 
     @Test
@@ -217,7 +226,12 @@ class MainDispatcherRule(
     }
 }
 
-private class RecordingRepository : JobRepository {
+private class RecordingRepository :
+    JobRepository,
+    HealthRepository,
+    PromptRepository,
+    UploadRepository,
+    ImageSourceRepository {
     private val _promptsState = MutableStateFlow(
         listOf(
             PromptDto(id = 1L, label = "One"),

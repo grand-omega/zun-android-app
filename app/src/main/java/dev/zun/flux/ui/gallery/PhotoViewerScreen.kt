@@ -68,7 +68,7 @@ import dev.zun.flux.R
 import dev.zun.flux.data.api.JobSummaryDto
 import dev.zun.flux.data.api.PromptDto
 import dev.zun.flux.data.api.effectivePromptId
-import dev.zun.flux.data.repo.JobRepository
+import dev.zun.flux.data.repo.ImageSourceRepository
 import dev.zun.flux.data.repo.OfflineImageAvailability
 import dev.zun.flux.ui.common.ActionBarSurface
 import dev.zun.flux.ui.common.MissingImageState
@@ -90,7 +90,7 @@ import java.util.Date
 fun PhotoViewerScreen(
     initialJobId: String,
     viewModel: GalleryViewModel,
-    repository: JobRepository,
+    images: ImageSourceRepository,
     onUseInput: (Uri) -> Unit,
     onBack: () -> Unit,
 ) {
@@ -193,7 +193,7 @@ fun PhotoViewerScreen(
                         scope.launch {
                             try {
                                 val uri = withContext(Dispatchers.IO) {
-                                    repository.downloadInputToCache(inputId)
+                                    images.downloadInputToCache(inputId)
                                 }
                                 onUseInput(uri)
                             } catch (t: Throwable) {
@@ -209,7 +209,7 @@ fun PhotoViewerScreen(
                     },
                     onSave = {
                         val job = currentJob ?: return@ViewerActionBar
-                        val src = repository.resultModel(job.id) ?: return@ViewerActionBar
+                        val src = images.resultModel(job.id) ?: return@ViewerActionBar
                         scope.launch {
                             try {
                                 saveToPictures(context, src, "flux-${job.id}.jpg")
@@ -246,7 +246,7 @@ fun PhotoViewerScreen(
                 userScrollEnabled = zoomedPage == null,
             ) { page ->
                 val job = jobs.getOrNull(page) ?: return@HorizontalPager
-                val previewModel = repository.previewModel(job.id)
+                val previewModel = images.previewModel(job.id)
 
                 val pageDescription = stringResource(
                     R.string.viewer_page_description,
@@ -289,7 +289,7 @@ fun PhotoViewerScreen(
                         JobDetailsSheet(
                             job = currentJob,
                             prompts = prompts,
-                            availability = repository.offlineAvailability(currentJob.id),
+                            availability = images.offlineAvailability(currentJob.id),
                             onClose = { showDetails = false },
                         )
                     }
@@ -302,8 +302,8 @@ fun PhotoViewerScreen(
                 val inputId = currentJob?.input_id
                 if (currentJob != null && inputId != null) {
                     CompareOverlay(
-                        beforeModel = repository.inputModel(inputId),
-                        afterModel = repository.previewModel(currentJob.id),
+                        beforeModel = images.inputModel(inputId),
+                        afterModel = images.previewModel(currentJob.id),
                         onDismiss = { showCompare = false },
                     )
                 } else {

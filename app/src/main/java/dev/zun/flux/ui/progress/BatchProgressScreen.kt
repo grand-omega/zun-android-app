@@ -68,6 +68,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import coil3.compose.AsyncImage
 import dev.zun.flux.R
 import dev.zun.flux.Tuning
+import dev.zun.flux.data.repo.ImageSourceRepository
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.ui.common.LoadingScrim
 import dev.zun.flux.ui.common.PanelShape
@@ -80,11 +81,12 @@ import kotlinx.coroutines.launch
 @Composable
 fun BatchProgressScreen(
     jobIds: List<String>,
-    repository: JobRepository,
+    jobs: JobRepository,
+    images: ImageSourceRepository,
     onViewResult: (String) -> Unit,
     onBack: () -> Unit,
 ) {
-    val deletedJobIds by repository.deletedJobIds().collectAsStateWithLifecycle(initialValue = emptySet())
+    val deletedJobIds by jobs.deletedJobIds().collectAsStateWithLifecycle(initialValue = emptySet())
     val activeJobIds = jobIds.filterNot { it in deletedJobIds }
 
     // ListDetailPaneScaffold gives us free phone↔tablet behavior: phones toggle
@@ -116,7 +118,8 @@ fun BatchProgressScreen(
             AnimatedPane {
                 BatchGrid(
                     jobIds = activeJobIds,
-                    repository = repository,
+                    jobs = jobs,
+                    images = images,
                     onTileClick = { index, isDone ->
                         if (isDone) {
                             onViewResult(activeJobIds[index])
@@ -137,7 +140,8 @@ fun BatchProgressScreen(
                     BatchFocused(
                         jobIds = activeJobIds,
                         initialIndex = focused,
-                        repository = repository,
+                        jobs = jobs,
+                        images = images,
                         onViewResult = onViewResult,
                         onBack = { scope.launch { navigator.navigateBack() } },
                     )
@@ -151,7 +155,8 @@ fun BatchProgressScreen(
 @Composable
 private fun BatchGrid(
     jobIds: List<String>,
-    repository: JobRepository,
+    jobs: JobRepository,
+    images: ImageSourceRepository,
     onTileClick: (index: Int, isDone: Boolean) -> Unit,
     onBack: () -> Unit,
 ) {
@@ -179,7 +184,8 @@ private fun BatchGrid(
             itemsIndexed(jobIds, key = { _, id -> id }) { index, jobId ->
                 BatchTile(
                     jobId = jobId,
-                    repository = repository,
+                    jobs = jobs,
+                    images = images,
                     onClick = { isDone -> onTileClick(index, isDone) },
                 )
             }
@@ -190,7 +196,8 @@ private fun BatchGrid(
 @Composable
 private fun BatchTile(
     jobId: String,
-    repository: JobRepository,
+    jobs: JobRepository,
+    images: ImageSourceRepository,
     onClick: (isDone: Boolean) -> Unit,
 ) {
     val viewModel: ProgressViewModel = viewModel(
@@ -198,7 +205,7 @@ private fun BatchTile(
         factory = viewModelFactory {
             initializer {
                 ProgressViewModel(
-                    repository = repository,
+                    repository = jobs,
                 )
             }
         },
@@ -207,10 +214,10 @@ private fun BatchTile(
     LaunchedEffect(jobId) { viewModel.start(jobId) }
 
     val currentDto = (state as? PollState.Running)?.dto ?: (state as? PollState.Done)?.dto
-    val inputModel = remember(currentDto?.input_id) { repository.inputModel(currentDto?.input_id) }
+    val inputModel = remember(currentDto?.input_id) { images.inputModel(currentDto?.input_id) }
     val isDone = state is PollState.Done
     val resultModel = remember(jobId, isDone) {
-        if (isDone) repository.previewModel(jobId) else null
+        if (isDone) images.previewModel(jobId) else null
     }
 
     Box(
@@ -328,7 +335,8 @@ private fun BoxScope.CornerBadge(
 private fun BatchFocused(
     jobIds: List<String>,
     initialIndex: Int,
-    repository: JobRepository,
+    jobs: JobRepository,
+    images: ImageSourceRepository,
     onViewResult: (String) -> Unit,
     onBack: () -> Unit,
 ) {
@@ -357,7 +365,8 @@ private fun BatchFocused(
         ) { page ->
             BatchPage(
                 jobId = jobIds[page],
-                repository = repository,
+                jobs = jobs,
+                images = images,
                 onViewResult = { onViewResult(jobIds[page]) },
             )
         }
@@ -367,7 +376,8 @@ private fun BatchFocused(
 @Composable
 private fun BatchPage(
     jobId: String,
-    repository: JobRepository,
+    jobs: JobRepository,
+    images: ImageSourceRepository,
     onViewResult: () -> Unit,
 ) {
     val viewModel: ProgressViewModel = viewModel(
@@ -375,17 +385,17 @@ private fun BatchPage(
         factory = viewModelFactory {
             initializer {
                 ProgressViewModel(
-                    repository = repository,
+                    repository = jobs,
                 )
             }
         },
     )
     val state by viewModel.state.collectAsStateWithLifecycle()
     val currentDto = (state as? PollState.Running)?.dto ?: (state as? PollState.Done)?.dto
-    val inputModel = remember(currentDto?.input_id) { repository.inputModel(currentDto?.input_id) }
+    val inputModel = remember(currentDto?.input_id) { images.inputModel(currentDto?.input_id) }
     val isDone = state is PollState.Done
     val resultModel = remember(jobId, isDone) {
-        if (isDone) repository.resultModel(jobId) else null
+        if (isDone) images.resultModel(jobId) else null
     }
     val haptic = LocalHapticFeedback.current
 
