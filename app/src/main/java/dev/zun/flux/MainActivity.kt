@@ -51,7 +51,7 @@ class MainActivity : FragmentActivity() {
                 val current = repoState
                 if (auth.isAuthed && current != null) {
                     AppNavHost(
-                        repository = current.repository,
+                        repositories = current.repositories,
                         repositoryVersion = current.version,
                         windowSizeClass = windowSizeClass,
                     )

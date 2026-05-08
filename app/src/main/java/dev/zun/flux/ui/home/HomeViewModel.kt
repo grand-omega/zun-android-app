@@ -7,8 +7,11 @@ import androidx.lifecycle.viewModelScope
 import dev.zun.flux.data.api.JobCreatedResponse
 import dev.zun.flux.data.api.PromptDto
 import dev.zun.flux.data.repo.ConnectionDiagnosis
+import dev.zun.flux.data.repo.HealthRepository
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.data.repo.JobUploadStatus
+import dev.zun.flux.data.repo.PromptRepository
+import dev.zun.flux.data.repo.UploadRepository
 import dev.zun.flux.util.toUserMessage
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.channels.Channel
@@ -83,7 +86,10 @@ sealed interface HealthState {
 }
 
 class HomeViewModel(
-    private val repository: JobRepository,
+    private val healthRepo: HealthRepository,
+    private val promptRepo: PromptRepository,
+    private val jobRepo: JobRepository,
+    private val uploadRepo: UploadRepository,
 ) : ViewModel() {
     private val _state = MutableStateFlow<SubmitState>(SubmitState.Idle)
     val state: StateFlow<SubmitState> = _state.asStateFlow()
@@ -91,7 +97,7 @@ class HomeViewModel(
     private val _composer = MutableStateFlow(HomeComposerState())
     val composer: StateFlow<HomeComposerState> = _composer.asStateFlow()
 
-    val prompts: StateFlow<List<PromptDto>> = repository.promptsState
+    val prompts: StateFlow<List<PromptDto>> = promptRepo.promptsState
         .map { fetched ->
             clearDeletedPromptSelection(fetched)
             fetched + CUSTOM_PROMPT
@@ -124,7 +130,7 @@ class HomeViewModel(
     }
 
     private suspend fun fetchPrompts() {
-        runCatching { repository.listPrompts() }
+        runCatching { promptRepo.listPrompts() }
     }
 
     suspend fun runHealthChecks() {
@@ -137,7 +143,7 @@ class HomeViewModel(
     private suspend fun performHealthCheck() {
         _health.value =
             try {
-                repository.health()
+                healthRepo.health()
                 HealthState.Connected
             } catch (e: retrofit2.HttpException) {
                 if (e.code() == 401) {
@@ -146,7 +152,7 @@ class HomeViewModel(
                     HealthState.ServerError(e.code(), e.message())
                 }
             } catch (_: java.io.IOException) {
-                repository.diagnoseConnection().toHealthState()
+                healthRepo.diagnoseConnection().toHealthState()
             } catch (e: Throwable) {
                 HealthState.NetworkError(e.message ?: "Unknown error")
             }
@@ -172,7 +178,7 @@ class HomeViewModel(
         viewModelScope.launch {
             _isRefreshing.value = true
             try {
-                repository.syncHistory()
+                jobRepo.syncHistory()
                 fetchPrompts()
                 performHealthCheck()
             } finally {
@@ -288,7 +294,7 @@ class HomeViewModel(
         val workflow = if (tryHarder) TRY_HARDER_WORKFLOW else DEFAULT_CUSTOM_WORKFLOW
         val promptId = selectedPromptId.takeUnless { it == CUSTOM_PROMPT_ID }
         val promptText = customPromptText.takeIf { selectedPromptId == CUSTOM_PROMPT_ID }
-        val workId = repository.enqueueJobUpload(
+        val workId = uploadRepo.enqueueJobUpload(
             inputUri = inputUri,
             promptId = promptId,
             promptText = promptText,
@@ -296,7 +302,7 @@ class HomeViewModel(
         )
         val terminal = try {
             withTimeout(UPLOAD_WAIT_TIMEOUT_MS) {
-                repository.observeJobUpload(workId)
+                uploadRepo.observeJobUpload(workId)
                     .onEach { status ->
                         if (status is JobUploadStatus.InProgress) {
                             _uploadProgress.value = status.progress
@@ -305,7 +311,7 @@ class HomeViewModel(
                     .first { it is JobUploadStatus.Succeeded || it is JobUploadStatus.Failed }
             }
         } catch (_: TimeoutCancellationException) {
-            repository.cancelJobUpload(workId)
+            uploadRepo.cancelJobUpload(workId)
             error("Upload timed out — check your connection")
         }
         return when (terminal) {
@@ -330,7 +336,7 @@ class HomeViewModel(
     fun savePrompt(label: String, text: String) {
         viewModelScope.launch {
             try {
-                val created = repository.createPrompt(
+                val created = promptRepo.createPrompt(
                     label = label.trim(),
                     text = text.trim(),
                     workflow = DEFAULT_CUSTOM_WORKFLOW,
@@ -349,7 +355,7 @@ class HomeViewModel(
     fun deletePrompt(promptId: Long) {
         viewModelScope.launch {
             try {
-                repository.deletePrompt(promptId)
+                promptRepo.deletePrompt(promptId)
                 if (_composer.value.selectedPromptId == promptId) {
                     _composer.value = _composer.value.copy(selectedPromptId = null)
                 }

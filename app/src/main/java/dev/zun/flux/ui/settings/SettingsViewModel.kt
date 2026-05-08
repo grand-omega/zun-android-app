@@ -46,7 +46,7 @@ class SettingsViewModel(
     val connectionDraft: StateFlow<ConnectionDraftState> = _connectionDraft.asStateFlow()
 
     private val _offlineCache = MutableStateFlow(
-        OfflineCacheState(stats = app.repository.offlineCacheStats()),
+        OfflineCacheState(stats = app.repositories.images.offlineCacheStats()),
     )
     val offlineCache: StateFlow<OfflineCacheState> = _offlineCache.asStateFlow()
 
@@ -95,7 +95,7 @@ class SettingsViewModel(
                     settings.apiToken = draft.token.trim()
                     app.networkResolver.invalidateCache()
                     app.networkResolver.refreshNow()
-                    app.repository.listPrompts()
+                    app.repositories.prompts.listPrompts()
                     updateDraft { copy(status = "Connection settings active.", isConnecting = false) }
                 } catch (t: Throwable) {
                     settings.lanUrl = oldLan
@@ -129,9 +129,9 @@ class SettingsViewModel(
         _offlineCache.value = _offlineCache.value.copy(isRefreshing = true, status = "Refreshing offline cache...")
         viewModelScope.launch {
             try {
-                app.repository.syncHistory()
+                app.repositories.jobs.syncHistory()
                 _offlineCache.value = OfflineCacheState(
-                    stats = app.repository.offlineCacheStats(),
+                    stats = app.repositories.images.offlineCacheStats(),
                     status = "Offline cache refresh started. Images continue caching in the background.",
                 )
             } catch (t: Throwable) {
@@ -144,9 +144,9 @@ class SettingsViewModel(
     }
 
     fun clearOfflineCache() {
-        app.repository.clearOfflineImageCache()
+        app.repositories.images.clearOfflineImageCache()
         _offlineCache.value = OfflineCacheState(
-            stats = app.repository.offlineCacheStats(),
+            stats = app.repositories.images.offlineCacheStats(),
             status = "Offline image cache cleared.",
         )
     }

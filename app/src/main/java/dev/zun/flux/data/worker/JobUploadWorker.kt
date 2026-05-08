@@ -34,9 +34,9 @@ class JobUploadWorker(
             return Result.failure(workDataOf(KEY_ERROR to "Staged file missing"))
         }
 
-        val repository = (applicationContext as FluxApp).repository
+        val uploads = (applicationContext as FluxApp).repositories.uploads
         return try {
-            val resp = repository.submitStagedJob(
+            val resp = uploads.submitStagedJob(
                 filePath = filePath,
                 promptId = promptId,
                 promptText = promptText,

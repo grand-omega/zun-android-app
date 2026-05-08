@@ -17,9 +17,9 @@ class DeleteSyncWorker(
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
-        val repository = (applicationContext as FluxApp).repository
+        val jobs = (applicationContext as FluxApp).repositories.jobs
         return try {
-            repository.syncPendingDeletes()
+            jobs.syncPendingDeletes()
             Result.success()
         } catch (_: IOException) {
             Result.retry()

@@ -15,7 +15,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import dev.zun.flux.FluxApp
-import dev.zun.flux.data.repo.JobRepository
+import dev.zun.flux.Repositories
 import dev.zun.flux.ui.capture.CameraScreen
 import dev.zun.flux.ui.gallery.GalleryScaffold
 import dev.zun.flux.ui.home.HomeScreen
@@ -34,7 +34,7 @@ private const val KEY_DELETED_JOB_ID = "deletedJobId"
 
 @Composable
 fun AppNavHost(
-    repository: JobRepository,
+    repositories: Repositories,
     repositoryVersion: Long,
     windowSizeClass: WindowSizeClass,
 ) {
@@ -58,7 +58,11 @@ fun AppNavHost(
             }
 
             HomeScreen(
-                repository = repository,
+                healthRepo = repositories.health,
+                promptRepo = repositories.prompts,
+                jobRepo = repositories.jobs,
+                uploadRepo = repositories.uploads,
+                images = repositories.images,
                 repositoryVersion = repositoryVersion,
                 windowSizeClass = windowSizeClass,
                 capturedUri = capturedUri,
@@ -94,7 +98,9 @@ fun AppNavHost(
         }
         composable(Routes.GALLERY) {
             GalleryScaffold(
-                repository = repository,
+                jobs = repositories.jobs,
+                prompts = repositories.prompts,
+                images = repositories.images,
                 repositoryVersion = repositoryVersion,
                 onUseInput = { uri ->
                     nav.getBackStackEntry(Routes.HOME).savedStateHandle["capturedUri"] = uri
@@ -113,7 +119,9 @@ fun AppNavHost(
             val jobId = entry.arguments?.getString("jobId").orEmpty()
             ProgressScreen(
                 jobId = jobId,
-                repository = repository,
+                jobs = repositories.jobs,
+                prompts = repositories.prompts,
+                images = repositories.images,
                 onDone = {
                     nav.navigate(Routes.result(jobId)) {
                         popUpTo(Routes.HOME)
@@ -126,7 +134,10 @@ fun AppNavHost(
             val jobId = entry.arguments?.getString("jobId").orEmpty()
             ResultScreen(
                 jobId = jobId,
-                repository = repository,
+                jobs = repositories.jobs,
+                promptRepo = repositories.prompts,
+                uploads = repositories.uploads,
+                images = repositories.images,
                 windowSizeClass = windowSizeClass,
                 onRegenerated = { newJobId ->
                     nav.navigate(Routes.progress(newJobId)) {
@@ -153,7 +164,7 @@ fun AppNavHost(
             val deletedJobId by savedState
                 .getStateFlow<String?>(KEY_DELETED_JOB_ID, null)
                 .collectAsStateWithLifecycle()
-            val pendingDeletedIds by repository.deletedJobIds()
+            val pendingDeletedIds by repositories.jobs.deletedJobIds()
                 .collectAsStateWithLifecycle(initialValue = emptySet())
             // Track removals so deleted tiles disappear from the grid.
             val removedIds: SnapshotStateList<String> = remember { mutableStateListOf<String>() }
@@ -182,7 +193,8 @@ fun AppNavHost(
             if (visibleJobIds.isNotEmpty()) {
                 BatchProgressScreen(
                     jobIds = visibleJobIds,
-                    repository = repository,
+                    jobs = repositories.jobs,
+                    images = repositories.images,
                     onViewResult = { id -> nav.navigate(Routes.result(id)) },
                     onBack = { nav.popBackStack(Routes.HOME, inclusive = false) },
                 )

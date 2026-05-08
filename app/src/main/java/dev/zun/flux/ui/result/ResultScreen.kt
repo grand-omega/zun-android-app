@@ -58,7 +58,10 @@ import coil3.compose.AsyncImage
 import dev.zun.flux.R
 import dev.zun.flux.data.api.JobStatusDto
 import dev.zun.flux.data.api.effectivePromptId
+import dev.zun.flux.data.repo.ImageSourceRepository
 import dev.zun.flux.data.repo.JobRepository
+import dev.zun.flux.data.repo.PromptRepository
+import dev.zun.flux.data.repo.UploadRepository
 import dev.zun.flux.ui.common.ControlShape
 import dev.zun.flux.ui.gallery.BeforeAfterSlider
 import dev.zun.flux.ui.home.CUSTOM_PROMPT_ID
@@ -81,7 +84,10 @@ private const val TRY_HARDER_WORKFLOW = "flux2_klein_9b_kv_experimental"
 @Composable
 fun ResultScreen(
     jobId: String,
-    repository: JobRepository,
+    jobs: JobRepository,
+    promptRepo: PromptRepository,
+    uploads: UploadRepository,
+    images: ImageSourceRepository,
     windowSizeClass: WindowSizeClass,
     onRegenerated: (String) -> Unit,
     onNewImage: () -> Unit,
@@ -91,11 +97,11 @@ fun ResultScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val jobDto by produceState<JobStatusDto?>(null, jobId) {
-        repository.getJobFlow(jobId).collect { value = it }
+        jobs.getJobFlow(jobId).collect { value = it }
     }
-    val inputModel = remember(jobDto?.input_id) { repository.inputModel(jobDto?.input_id) }
-    val previewModel = remember(jobId) { repository.previewModel(jobId) }
-    val resultModel = remember(jobId) { repository.resultModel(jobId) }
+    val inputModel = remember(jobDto?.input_id) { images.inputModel(jobDto?.input_id) }
+    val previewModel = remember(jobId) { images.previewModel(jobId) }
+    val resultModel = remember(jobId) { images.resultModel(jobId) }
 
     var saving by remember { mutableStateOf(false) }
     var regenerating by remember { mutableStateOf(false) }
@@ -109,7 +115,7 @@ fun ResultScreen(
     var selectedPromptId by remember(jobId) { mutableStateOf<Long?>(null) }
     var customPromptText by remember(jobId) { mutableStateOf("") }
     var tryHarder by remember(jobId) { mutableStateOf(false) }
-    val prompts by repository.promptsState.collectAsState()
+    val prompts by promptRepo.promptsState.collectAsState()
     val app = context.applicationContext as dev.zun.flux.FluxApp
     val pinnedIds by app.pinnedPrompts.ids.collectAsState()
     val isWide = windowSizeClass.widthSizeClass >= WindowWidthSizeClass.Medium
@@ -153,9 +159,9 @@ fun ResultScreen(
             scope.launch {
                 try {
                     val inputUri = withContext(Dispatchers.IO) {
-                        repository.downloadInputToCache(inputId)
+                        images.downloadInputToCache(inputId)
                     }
-                    val resp = repository.submitJob(
+                    val resp = uploads.submitJob(
                         inputUri = inputUri,
                         promptId = promptId.takeUnless { it == CUSTOM_PROMPT_ID },
                         promptText = customText.takeIf { promptId == CUSTOM_PROMPT_ID },
@@ -178,7 +184,7 @@ fun ResultScreen(
     fun deleteResult() {
         scope.launch {
             try {
-                repository.deleteJob(jobId)
+                jobs.deleteJob(jobId)
                 onDeleted()
             } catch (t: Throwable) {
                 Toast.makeText(
@@ -419,7 +425,7 @@ fun ResultScreen(
             onDeletePrompt = { promptId ->
                 scope.launch {
                     try {
-                        repository.deletePrompt(promptId)
+                        promptRepo.deletePrompt(promptId)
                         if (selectedPromptId == promptId) selectedPromptId = null
                     } catch (t: Throwable) {
                         Toast.makeText(
@@ -461,7 +467,7 @@ fun ResultScreen(
                         val text = customPromptText.trim()
                         scope.launch {
                             try {
-                                val created = repository.createPrompt(
+                                val created = promptRepo.createPrompt(
                                     label = label,
                                     text = text,
                                     workflow = DEFAULT_CUSTOM_WORKFLOW,
