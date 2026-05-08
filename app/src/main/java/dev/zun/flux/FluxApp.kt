@@ -92,7 +92,9 @@ class FluxApp : Application() {
         networkResolver = NetworkResolver(settingsManager) { rebuildRepository() }
 
         rebuildOkHttp()
-        offlineImageCache = OfflineImageCache(this, okHttpClient)
+        // Resolves the client at call time so cert-pin / interceptor changes
+        // via rebuildOkHttp() take effect on subsequent prefetches.
+        offlineImageCache = OfflineImageCache(this, okHttpClientProvider = { okHttpClient })
 
         SingletonImageLoader.setSafe { ctx ->
             ImageLoader.Builder(ctx)
