@@ -11,17 +11,22 @@ import java.io.File
 
 class OfflineImageCache internal constructor(
     val rootDir: File,
-    private val okHttpClient: OkHttpClient,
+    private val okHttpClientProvider: () -> OkHttpClient,
     private val maxBytes: Long = Tuning.OFFLINE_IMAGE_CACHE_MAX_BYTES,
     internal val vault: EncryptedFileVault? = null,
 ) {
+    /**
+     * Resolves the OkHttpClient at call time so that cert-pin / interceptor
+     * changes via FluxApp.rebuildOkHttp() take effect on subsequent prefetches
+     * without rebuilding this cache (and dropping its in-flight state).
+     */
     constructor(
         context: Context,
-        okHttpClient: OkHttpClient,
+        okHttpClientProvider: () -> OkHttpClient,
         maxBytes: Long = Tuning.OFFLINE_IMAGE_CACHE_MAX_BYTES,
     ) : this(
         rootDir = File(context.filesDir, "offline_images"),
-        okHttpClient = okHttpClient,
+        okHttpClientProvider = okHttpClientProvider,
         maxBytes = maxBytes,
         vault = EncryptedFileVault.from(context),
     )
@@ -89,12 +94,13 @@ class OfflineImageCache internal constructor(
             val tempFile = File(outFile.parentFile, "${outFile.name}.tmp")
             runCatching {
                 val request = Request.Builder().url(url).build()
-                val bytes = okHttpClient.newCall(request).execute().use { response ->
+                okHttpClientProvider().newCall(request).execute().use { response ->
                     if (!response.isSuccessful) error("Failed to cache image: ${response.code}")
-                    response.body.bytes()
+                    val source = response.body.byteStream()
+                    val rawSink = tempFile.outputStream()
+                    val sink = vault?.encryptingStream(rawSink) ?: rawSink
+                    sink.use { source.use { it.copyTo(sink) } }
                 }
-                val payload = vault?.encrypt(bytes) ?: bytes
-                tempFile.writeBytes(payload)
                 if (tempFile.length() > 0L) {
                     if (!tempFile.renameTo(outFile)) {
                         tempFile.copyTo(outFile, overwrite = true)

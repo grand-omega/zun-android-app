@@ -23,7 +23,7 @@ class OfflineImageCacheTest {
     fun prefetch_writesDeterministicPrivateFile() = runTest {
         val cache = OfflineImageCache(
             rootDir = temp.newFolder("offline_images"),
-            okHttpClient = imageClient { "thumb-bytes".encodeToByteArray() },
+            okHttpClientProvider = { imageClient { "thumb-bytes".encodeToByteArray() } },
             maxBytes = 1_000,
         )
 
@@ -38,7 +38,7 @@ class OfflineImageCacheTest {
     fun delete_removesCachedJobFiles() = runTest {
         val cache = OfflineImageCache(
             rootDir = temp.newFolder("offline_images"),
-            okHttpClient = imageClient { "preview".encodeToByteArray() },
+            okHttpClientProvider = { imageClient { "preview".encodeToByteArray() } },
             maxBytes = 1_000,
         )
         cache.prefetch("job-1", OfflineImageCache.Kind.Preview, "https://example.test/preview")
@@ -52,7 +52,7 @@ class OfflineImageCacheTest {
     fun resultKind_usesStableResultFileName() = runTest {
         val cache = OfflineImageCache(
             rootDir = temp.newFolder("offline_images"),
-            okHttpClient = imageClient { "result".encodeToByteArray() },
+            okHttpClientProvider = { imageClient { "result".encodeToByteArray() } },
             maxBytes = 1_000,
         )
 
@@ -65,7 +65,7 @@ class OfflineImageCacheTest {
     fun statsAndClear_reportAndRemoveCachedFiles() = runTest {
         val cache = OfflineImageCache(
             rootDir = temp.newFolder("offline_images"),
-            okHttpClient = imageClient { "cached".encodeToByteArray() },
+            okHttpClientProvider = { imageClient { "cached".encodeToByteArray() } },
             maxBytes = 1_000,
         )
         cache.prefetch("job-1", OfflineImageCache.Kind.Result, "https://example.test/result")
@@ -83,12 +83,13 @@ class OfflineImageCacheTest {
     @Test
     fun prefetch_prunesOldestFilesWhenCacheExceedsLimit() = runTest {
         var counter = 0
+        val client = imageClient {
+            counter += 1
+            ByteArray(8) { counter.toByte() }
+        }
         val cache = OfflineImageCache(
             rootDir = temp.newFolder("offline_images"),
-            okHttpClient = imageClient {
-                counter += 1
-                ByteArray(8) { counter.toByte() }
-            },
+            okHttpClientProvider = { client },
             maxBytes = 12,
         )
 
