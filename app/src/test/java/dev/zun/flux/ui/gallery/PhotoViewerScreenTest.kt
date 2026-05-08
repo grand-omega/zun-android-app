@@ -1,8 +1,11 @@
 package dev.zun.flux.ui.gallery
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import dev.zun.flux.data.repo.FakeJobRepository
 import org.junit.Rule
 import org.junit.Test
@@ -68,5 +71,57 @@ class PhotoViewerScreenTest {
         }
     }
 
+    @Test
+    fun `tapping the delete action opens the confirmation dialog`() {
+        val repo = FakeJobRepository().apply { seedDoneJobs(listOf("a", "b")) }
+        val viewModel = GalleryViewModel(repo)
+
+        rule.setContent {
+            PhotoViewerScreen(
+                initialJobId = "a",
+                viewModel = viewModel,
+                repository = repo,
+                onUseInput = {},
+                onBack = {},
+            )
+        }
+
+        rule.waitUntil(timeoutMillis = 3_000) {
+            rule.onAllNodesWithTagSafe("viewer_page_a").isNotEmpty()
+        }
+        rule.onNode(hasContentDescription("Delete")).performClick()
+        rule.onNodeWithText("Delete generation?").assertIsDisplayed()
+    }
+
+    @Test
+    fun `dismiss button closes the delete confirmation without deleting`() {
+        val repo = FakeJobRepository().apply { seedDoneJobs(listOf("a", "b")) }
+        val viewModel = GalleryViewModel(repo)
+
+        rule.setContent {
+            PhotoViewerScreen(
+                initialJobId = "a",
+                viewModel = viewModel,
+                repository = repo,
+                onUseInput = {},
+                onBack = {},
+            )
+        }
+
+        rule.waitUntil(timeoutMillis = 3_000) {
+            rule.onAllNodesWithTagSafe("viewer_page_a").isNotEmpty()
+        }
+        rule.onNode(hasContentDescription("Delete")).performClick()
+        rule.onNodeWithText("Cancel").performClick()
+
+        // Dialog gone, page still visible.
+        rule.onNodeWithTag("viewer_page_a").assertIsDisplayed()
+        rule.onAllNodesWithTextSafe("Delete generation?").let { nodes ->
+            assert(nodes.isEmpty()) { "expected delete dialog to be dismissed" }
+        }
+    }
+
     private fun androidx.compose.ui.test.junit4.ComposeContentTestRule.onAllNodesWithTagSafe(tag: String) = onAllNodes(androidx.compose.ui.test.hasTestTag(tag)).fetchSemanticsNodes(atLeastOneRootRequired = false)
+
+    private fun androidx.compose.ui.test.junit4.ComposeContentTestRule.onAllNodesWithTextSafe(text: String) = onAllNodes(androidx.compose.ui.test.hasText(text)).fetchSemanticsNodes(atLeastOneRootRequired = false)
 }
