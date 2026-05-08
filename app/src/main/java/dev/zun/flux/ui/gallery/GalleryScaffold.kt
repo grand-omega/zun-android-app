@@ -12,13 +12,17 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import dev.zun.flux.data.repo.ImageSourceRepository
 import dev.zun.flux.data.repo.JobRepository
+import dev.zun.flux.data.repo.PromptRepository
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3AdaptiveApi::class)
 @Composable
 fun GalleryScaffold(
-    repository: JobRepository,
+    jobs: JobRepository,
+    prompts: PromptRepository,
+    images: ImageSourceRepository,
     repositoryVersion: Long,
     onUseInput: (Uri) -> Unit,
     onBack: () -> Unit,
@@ -28,7 +32,7 @@ fun GalleryScaffold(
             key = "gallery-$repositoryVersion",
             factory =
             viewModelFactory {
-                initializer { GalleryViewModel(repository) }
+                initializer { GalleryViewModel(jobs, prompts, images) }
             },
         )
     val navigator = rememberListDetailPaneScaffoldNavigator<String>()
@@ -42,7 +46,7 @@ fun GalleryScaffold(
         listPane = {
             AnimatedPane {
                 GalleryScreen(
-                    repository = repository,
+                    images = images,
                     viewModel = viewModel,
                     onJobClick = { jobId ->
                         scope.launch { navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, jobId) }
@@ -59,7 +63,7 @@ fun GalleryScaffold(
                     PhotoViewerScreen(
                         initialJobId = jobId,
                         viewModel = viewModel,
-                        repository = repository,
+                        images = images,
                         onUseInput = onUseInput,
                         onBack = { scope.launch { navigator.navigateBack() } },
                     )

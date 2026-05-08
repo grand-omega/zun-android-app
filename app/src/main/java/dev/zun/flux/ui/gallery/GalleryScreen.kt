@@ -84,7 +84,7 @@ import dev.zun.flux.R
 import dev.zun.flux.data.api.JobSummaryDto
 import dev.zun.flux.data.api.PromptDto
 import dev.zun.flux.data.api.effectivePromptId
-import dev.zun.flux.data.repo.JobRepository
+import dev.zun.flux.data.repo.ImageSourceRepository
 import dev.zun.flux.data.repo.OfflineImageAvailability
 import dev.zun.flux.ui.common.EmptyState
 import dev.zun.flux.ui.common.MissingImageState
@@ -97,7 +97,7 @@ private enum class DragMode { Add, Remove }
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GalleryScreen(
-    repository: JobRepository,
+    images: ImageSourceRepository,
     viewModel: GalleryViewModel,
     onJobClick: (String) -> Unit,
     onBack: () -> Unit,
@@ -457,8 +457,8 @@ fun GalleryScreen(
                                                 },
                                             job = job,
                                             prompts = prompts,
-                                            model = repository.thumbModel(job.id),
-                                            availability = repository.offlineAvailability(job.id),
+                                            model = images.thumbModel(job.id),
+                                            availability = images.offlineAvailability(job.id),
                                             showMetadata = showImageMetadata,
                                             isSelected = isSelected,
                                             isSelectionMode = isSelectionMode,

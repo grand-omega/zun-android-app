@@ -11,7 +11,9 @@ import androidx.paging.map
 import dev.zun.flux.data.api.JobSummaryDto
 import dev.zun.flux.data.api.PromptDto
 import dev.zun.flux.data.api.effectivePromptId
+import dev.zun.flux.data.repo.ImageSourceRepository
 import dev.zun.flux.data.repo.JobRepository
+import dev.zun.flux.data.repo.PromptRepository
 import dev.zun.flux.util.formatTimestamp
 import dev.zun.flux.util.saveToPictures
 import dev.zun.flux.util.shareImages
@@ -49,17 +51,19 @@ sealed interface GalleryGridItem {
 }
 
 class GalleryViewModel(
-    private val repository: JobRepository,
+    private val jobRepo: JobRepository,
+    private val promptRepo: PromptRepository,
+    private val imageRepo: ImageSourceRepository,
 ) : ViewModel() {
     private val _selectedIds = MutableStateFlow<Set<String>>(emptySet())
     val selectedIds: StateFlow<Set<String>> = _selectedIds.asStateFlow()
 
     private val allJobs: StateFlow<List<JobSummaryDto>> =
-        repository.getJobsFlow()
+        jobRepo.getJobsFlow()
             .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     val prompts: StateFlow<List<PromptDto>> =
-        repository.promptsState
+        promptRepo.promptsState
             .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     private val _tagFilter = MutableStateFlow<TagFilter>(TagFilter.All)
@@ -90,7 +94,7 @@ class GalleryViewModel(
                 is TagFilter.ByPromptId -> filter.promptId to false
                 TagFilter.Custom -> null to true
             }
-            repository.pagedJobs(promptId, customOnly)
+            jobRepo.pagedJobs(promptId, customOnly)
         }.map { pagingData ->
             pagingData
                 .map<JobSummaryDto, GalleryGridItem> { GalleryGridItem.JobItem(it) }
@@ -108,7 +112,7 @@ class GalleryViewModel(
 
     /** Tag choices to show in the filter dropdown. Counts come from SQL aggregates. */
     val availableTags: StateFlow<List<TagOption>> =
-        combine(repository.jobTagStats(), prompts) { stats, ps ->
+        combine(jobRepo.jobTagStats(), prompts) { stats, ps ->
             buildList {
                 add(TagOption(TagFilter.All, "All", stats.totalCount))
                 stats.perPromptCounts.entries
@@ -158,7 +162,7 @@ class GalleryViewModel(
     fun refresh() {
         viewModelScope.launch {
             _isLoading.value = true
-            repository.syncHistory()
+            jobRepo.syncHistory()
             _isLoading.value = false
         }
     }
@@ -188,7 +192,7 @@ class GalleryViewModel(
         viewModelScope.launch {
             ids.forEach { id ->
                 try {
-                    repository.deleteJob(id)
+                    jobRepo.deleteJob(id)
                 } catch (t: Throwable) {
                     Log.w(TAG, "Failed to delete job id=$id", t)
                 }
@@ -203,7 +207,7 @@ class GalleryViewModel(
             val restoredIds = mutableSetOf<String>()
             ids.forEach { id ->
                 try {
-                    repository.restoreJob(id)
+                    jobRepo.restoreJob(id)
                     restoredIds += id
                 } catch (t: Throwable) {
                     _eventMessage.value = t.toUserMessage("restore")
@@ -230,7 +234,7 @@ class GalleryViewModel(
             var failures = 0
             ids.forEach { id ->
                 try {
-                    val model = repository.resultModel(id) ?: return@forEach
+                    val model = imageRepo.resultModel(id) ?: return@forEach
                     saveToPictures(context, model, "flux-$id.jpg")
                     savedIds += id
                 } catch (_: Throwable) {
@@ -258,7 +262,7 @@ class GalleryViewModel(
         viewModelScope.launch {
             _isSharing.value = true
             try {
-                val models = ids.mapNotNull { id -> repository.resultModel(id) }
+                val models = ids.mapNotNull { id -> imageRepo.resultModel(id) }
                 if (models.isNotEmpty()) {
                     shareImages(context, models)
                     clearSelection()
@@ -279,7 +283,7 @@ class GalleryViewModel(
         viewModelScope.launch {
             ids.forEach { id ->
                 try {
-                    repository.deleteJob(id)
+                    jobRepo.deleteJob(id)
                 } catch (_: Throwable) {
                 }
             }
@@ -298,7 +302,7 @@ class GalleryViewModel(
     fun deleteJob(jobId: String) {
         viewModelScope.launch {
             try {
-                repository.deleteJob(jobId)
+                jobRepo.deleteJob(jobId)
                 _pendingUndo.value = setOf(jobId)
             } catch (_: Throwable) {
             }

@@ -23,11 +23,11 @@ class GalleryScreenTest {
     @Test
     fun `empty repository renders the gallery title in its top bar`() {
         val repo = FakeJobRepository()
-        val viewModel = GalleryViewModel(repo)
+        val viewModel = GalleryViewModel(repo, repo, repo)
 
         rule.setContent {
             GalleryScreen(
-                repository = repo,
+                images = repo,
                 viewModel = viewModel,
                 onJobClick = {},
                 onBack = {},
@@ -47,7 +47,7 @@ class GalleryScreenTest {
     @Test
     fun `selection toolbar shows the selected count when items are picked`() {
         val repo = FakeJobRepository().apply { seedDoneJobs(listOf("a", "b", "c")) }
-        val viewModel = GalleryViewModel(repo).apply {
+        val viewModel = GalleryViewModel(repo, repo, repo).apply {
             // Skip the long-press gesture path — exercise the rendering
             // branch directly. The selection state machine is unit-tested
             // independently in GalleryViewModel.
@@ -56,7 +56,7 @@ class GalleryScreenTest {
 
         rule.setContent {
             GalleryScreen(
-                repository = repo,
+                images = repo,
                 viewModel = viewModel,
                 onJobClick = {},
                 onBack = {},
@@ -72,13 +72,13 @@ class GalleryScreenTest {
     @Test
     fun `tapping delete in selection mode opens confirmation with the right count`() {
         val repo = FakeJobRepository().apply { seedDoneJobs(listOf("a", "b", "c")) }
-        val viewModel = GalleryViewModel(repo).apply {
+        val viewModel = GalleryViewModel(repo, repo, repo).apply {
             setSelection(setOf("a", "b", "c"))
         }
 
         rule.setContent {
             GalleryScreen(
-                repository = repo,
+                images = repo,
                 viewModel = viewModel,
                 onJobClick = {},
                 onBack = {},
@@ -101,13 +101,13 @@ class GalleryScreenTest {
     @Test
     fun `clear selection action exits selection mode`() {
         val repo = FakeJobRepository().apply { seedDoneJobs(listOf("a", "b")) }
-        val viewModel = GalleryViewModel(repo).apply {
+        val viewModel = GalleryViewModel(repo, repo, repo).apply {
             setSelection(setOf("a"))
         }
 
         rule.setContent {
             GalleryScreen(
-                repository = repo,
+                images = repo,
                 viewModel = viewModel,
                 onJobClick = {},
                 onBack = {},

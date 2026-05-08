@@ -26,7 +26,11 @@ import java.util.concurrent.atomic.AtomicInteger
 class FakeJobRepository(
     private val queuedDurationMs: Long = 1_000,
     private val runningDurationMs: Long = 6_000,
-) : JobRepository {
+) : JobRepository,
+    HealthRepository,
+    PromptRepository,
+    UploadRepository,
+    ImageSourceRepository {
     private data class Entry(
         val id: String,
         val inputUri: Uri,

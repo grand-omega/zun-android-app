@@ -49,7 +49,11 @@ class RealJobRepository(
     private val settingsManager: SettingsManager,
     @Suppress("UNUSED_PARAMETER") okHttpClient: OkHttpClient,
     private val offlineImageCache: OfflineImageCache,
-) : JobRepository {
+) : JobRepository,
+    HealthRepository,
+    PromptRepository,
+    UploadRepository,
+    ImageSourceRepository {
     private val dao = AppDatabase.getDatabase(context).jobDao()
     private val connectionDiagnoser = ConnectionDiagnoser(settingsManager)
     private val jobUploader = JobUploader(context, api)
