@@ -1,6 +1,7 @@
 package dev.zun.flux.ui.gallery
 
 import android.content.Context
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
@@ -188,7 +189,8 @@ class GalleryViewModel(
             ids.forEach { id ->
                 try {
                     repository.deleteJob(id)
-                } catch (_: Throwable) {
+                } catch (t: Throwable) {
+                    Log.w(TAG, "Failed to delete job id=$id", t)
                 }
             }
             clearSelection()
@@ -301,5 +303,9 @@ class GalleryViewModel(
             } catch (_: Throwable) {
             }
         }
+    }
+
+    private companion object {
+        const val TAG = "GalleryViewModel"
     }
 }

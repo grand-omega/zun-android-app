@@ -1,6 +1,7 @@
 package dev.zun.flux.ui.home
 
 import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.zun.flux.data.api.JobCreatedResponse
@@ -263,7 +264,8 @@ class HomeViewModel(
                 try {
                     val resp = submitOne(uri, selectedPromptId, customPromptText, tryHarder)
                     submittedIds += resp.job_id
-                } catch (_: Throwable) {
+                } catch (t: Throwable) {
+                    Log.w(TAG, "Batch submit failed for image ${index + 1}/${inputUris.size}", t)
                     failed++
                 }
             }
@@ -365,6 +367,7 @@ class HomeViewModel(
     }
 
     private companion object {
+        const val TAG = "HomeViewModel"
         val CUSTOM_PROMPT = PromptDto(
             id = CUSTOM_PROMPT_ID,
             label = "Write your own...",

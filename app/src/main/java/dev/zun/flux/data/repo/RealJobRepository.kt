@@ -307,8 +307,8 @@ class RealJobRepository(
             val visibleItems = resp.items.filterNot { it.id in hiddenIds }
             dao.insertJobs(visibleItems.map { it.toEntity() })
             prefetchDone(visibleItems)
-        } catch (_: Exception) {
-            // Ignore background sync errors
+        } catch (e: Exception) {
+            Log.w(TAG, "Background syncHistory failed", e)
         }
         refreshPromptsQuietly()
     }

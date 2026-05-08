@@ -30,6 +30,7 @@
     <string name="camera_take_photo">Take photo</string>
     <string name="camera_close">Close</string>
     <string name="camera_flip">Flip camera</string>
+    <string name="camera_capture_failed">Couldn\'t capture photo. Try again.</string>
 
     <!-- Gallery -->
     <string name="gallery_title">Gallery</string>
