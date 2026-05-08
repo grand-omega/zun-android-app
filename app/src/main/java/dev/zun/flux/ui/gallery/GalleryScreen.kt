@@ -483,191 +483,21 @@ fun GalleryScreen(
     }
 
     if (showDeleteConfirm) {
-        AlertDialog(
-            onDismissRequest = { showDeleteConfirm = false },
-            title = { Text(stringResource(R.string.gallery_delete_confirm_title)) },
-            text = { Text(stringResource(R.string.gallery_delete_confirm_message, selectedIds.size)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.deleteSelected()
-                        showDeleteConfirm = false
-                    },
-                ) {
-                    Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error)
-                }
+        DeleteSelectedDialog(
+            selectedCount = selectedIds.size,
+            onConfirm = {
+                viewModel.deleteSelected()
+                showDeleteConfirm = false
             },
-            dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) {
-                    Text(stringResource(R.string.common_cancel))
-                }
-            },
+            onDismiss = { showDeleteConfirm = false },
         )
     }
 
     postSaveDelete?.let { savedIds ->
-        val n = savedIds.size
-        AlertDialog(
-            onDismissRequest = { viewModel.dismissPostSaveDelete() },
-            title = { Text(stringResource(R.string.gallery_post_save_delete_title)) },
-            text = {
-                Text(
-                    if (n == 1) {
-                        stringResource(R.string.gallery_post_save_delete_message_one)
-                    } else {
-                        stringResource(R.string.gallery_post_save_delete_message_many, n)
-                    },
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = { viewModel.confirmPostSaveDelete() }) {
-                    Text(stringResource(R.string.gallery_remove), color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { viewModel.dismissPostSaveDelete() }) {
-                    Text(stringResource(R.string.gallery_keep))
-                }
-            },
+        PostSaveDeleteDialog(
+            savedCount = savedIds.size,
+            onConfirm = { viewModel.confirmPostSaveDelete() },
+            onDismiss = { viewModel.dismissPostSaveDelete() },
         )
-    }
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun JobThumbnail(
-    job: JobSummaryDto,
-    prompts: List<PromptDto>,
-    model: Any?,
-    availability: OfflineImageAvailability,
-    showMetadata: Boolean,
-    isSelected: Boolean,
-    isSelectionMode: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Card(
-        modifier =
-        modifier
-            .fillMaxWidth()
-            .aspectRatio(1f)
-            .clip(RoundedCornerShape(8.dp))
-            .combinedClickable(
-                onClick = onClick,
-            ),
-        colors =
-        CardDefaults.cardColors(
-            containerColor =
-            if (isSelected) {
-                MaterialTheme.colorScheme.primaryContainer
-            } else {
-                MaterialTheme.colorScheme.surfaceVariant
-            },
-        ),
-        border =
-        if (isSelected) {
-            androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
-        } else {
-            null
-        },
-    ) {
-        val promptLabel = resolvePromptLabel(prompts, job.effectivePromptId, job.prompt_text)
-        val tileDescription = stringResource(R.string.gallery_thumbnail_description, promptLabel)
-        Box(modifier = Modifier.fillMaxSize()) {
-            SubcomposeAsyncImage(
-                model = model,
-                contentDescription = tileDescription,
-                contentScale = ContentScale.Crop,
-                modifier =
-                Modifier
-                    .fillMaxSize()
-                    .then(
-                        if (isSelected) Modifier.padding(8.dp).clip(RoundedCornerShape(4.dp)) else Modifier,
-                    ),
-                loading = {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.surfaceVariant),
-                    )
-                },
-                error = {
-                    MissingThumbnail()
-                },
-                success = {
-                    SubcomposeAsyncImageContent()
-                },
-            )
-
-            if (!isSelectionMode && !availability.resultCached) {
-                NeedsNetworkIcon(
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(4.dp),
-                )
-            }
-
-            if (!isSelectionMode && showMetadata) {
-                Text(
-                    text = resolvePromptLabel(prompts, job.effectivePromptId, job.prompt_text),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color.White,
-                    maxLines = 2,
-                    modifier =
-                    Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(4.dp)
-                        .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
-                        .padding(horizontal = 4.dp, vertical = 2.dp),
-                )
-            }
-
-            if (isSelected) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.20f)),
-                )
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(4.dp)
-                        .size(24.dp)
-                        .background(Color.White, CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
-                        contentDescription = stringResource(R.string.gallery_selected),
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun NeedsNetworkIcon(modifier: Modifier = Modifier) {
-    Box(modifier = modifier) {
-        Icon(
-            imageVector = Icons.Default.CloudOff,
-            contentDescription = stringResource(R.string.gallery_not_cached_needs_network),
-            tint = Color.White.copy(alpha = 0.82f),
-            modifier = Modifier.size(16.dp),
-        )
-    }
-}
-
-@Composable
-private fun MissingThumbnail() {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surfaceVariant),
-        contentAlignment = Alignment.Center,
-    ) {
-        MissingImageState(label = stringResource(R.string.gallery_unavailable), modifier = Modifier.fillMaxSize())
     }
 }
