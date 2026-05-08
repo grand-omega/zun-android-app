@@ -208,7 +208,7 @@
     <string name="setup_heading">Connect FluxEdit</string>
     <string name="setup_description">Enter your private server and the API token used by Project ZUN.</string>
     <string name="setup_server_title">Server</string>
-    <string name="setup_server_detail">Use your Caddy or Tailscale HTTPS hostname. Bare hostnames are saved as https://. Leave fallback blank unless you use a second route.</string>
+    <string name="setup_server_detail">Use your HTTPS server hostname. Bare hostnames are saved as https://. Leave fallback blank unless you use a second route.</string>
     <string name="setup_lan_url_label">Primary server</string>
     <string name="setup_lan_url_placeholder">flux.yourdomain.com</string>
     <string name="setup_tailscale_url_label">Fallback server (optional)</string>

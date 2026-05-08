@@ -15,12 +15,11 @@ enter them on the in-app **Setup** screen — they are persisted in
 `EncryptedSharedPreferences`.
 
 Setup accepts either a full URL or a bare host/IP. Bare entries are normalized
-to HTTPS, so `zun.tailnet-name.ts.net` becomes
-`https://zun.tailnet-name.ts.net`.
+to HTTPS, so `api.yourdomain.com` becomes `https://api.yourdomain.com`.
 
 > Release builds disallow cleartext HTTP (see `network_security_config.xml`).
-> Use an HTTPS endpoint (e.g. Tailscale MagicDNS) for release, or use a debug
-> build when targeting a plain `http://…` dev server.
+> Use an HTTPS hostname that resolves on the current network for release, or use
+> a debug build when targeting a plain `http://…` dev server.
 
 ### 3. Build & Run Commands
 
