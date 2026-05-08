@@ -3,8 +3,10 @@ package dev.zun.flux.data.repo
 import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
+import java.io.OutputStream
 import java.security.KeyStore
 import javax.crypto.Cipher
+import javax.crypto.CipherOutputStream
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
@@ -33,6 +35,22 @@ class EncryptedFileVault private constructor(private val keyAlias: String) {
         System.arraycopy(iv, 0, out, 1, GCM_IV_BYTES)
         System.arraycopy(ciphertext, 0, out, HEADER_BYTES, ciphertext.size)
         return out
+    }
+
+    /**
+     * Streaming variant of [encrypt]. Writes the on-disk header (version byte +
+     * IV) to [target], then returns a [CipherOutputStream] that callers feed
+     * plaintext into. Closing the returned stream flushes the GCM tag and
+     * closes [target]. Lets callers avoid buffering the full payload in heap.
+     */
+    fun encryptingStream(target: OutputStream): OutputStream {
+        val cipher = Cipher.getInstance(TRANSFORMATION)
+        cipher.init(Cipher.ENCRYPT_MODE, secretKey())
+        val iv = cipher.iv
+        check(iv.size == GCM_IV_BYTES) { "Unexpected IV length ${iv.size}" }
+        target.write(byteArrayOf(VERSION))
+        target.write(iv)
+        return CipherOutputStream(target, cipher)
     }
 
     fun decrypt(encrypted: ByteArray): ByteArray {
