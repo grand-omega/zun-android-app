@@ -56,5 +56,4 @@ internal object DatabasePassphrase {
  * unrecoverable. Recovery is wipe-and-reinit; the app should surface this
  * to the user rather than silently re-keying.
  */
-class DatabasePassphraseLostException :
-    IllegalStateException("Database passphrase was generated but is no longer retrievable from the Keystore")
+class DatabasePassphraseLostException : IllegalStateException("Database passphrase was generated but is no longer retrievable from the Keystore")
