@@ -18,7 +18,7 @@ import dev.zun.flux.FluxApp
 import dev.zun.flux.Repositories
 import dev.zun.flux.ui.capture.CameraScreen
 import dev.zun.flux.ui.gallery.GalleryScaffold
-import dev.zun.flux.ui.home.HomeScreen
+import dev.zun.flux.ui.home.HomeRoute
 import dev.zun.flux.ui.progress.BatchProgressScreen
 import dev.zun.flux.ui.progress.ProgressScreen
 import dev.zun.flux.ui.result.ResultScreen
@@ -57,7 +57,7 @@ fun AppNavHost(
                 }
             }
 
-            HomeScreen(
+            HomeRoute(
                 healthRepo = repositories.health,
                 promptRepo = repositories.prompts,
                 jobRepo = repositories.jobs,
