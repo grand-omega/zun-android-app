@@ -91,8 +91,7 @@ class FakeJobRepository(
 
     override suspend fun submitJob(
         inputUri: Uri,
-        promptId: Long?,
-        promptText: String?,
+        selection: PromptSelection,
         workflow: String?,
         onUploadProgress: ((Float) -> Unit)?,
     ): JobCreatedResponse {
@@ -105,6 +104,8 @@ class FakeJobRepository(
         delay(400)
         val id = "fake-${UUID.randomUUID().toString().take(8)}"
         val inputId = nextInputId.getAndIncrement()
+        val promptId = (selection as? PromptSelection.Saved)?.promptId
+        val promptText = (selection as? PromptSelection.Custom)?.text
         entries[id] = Entry(
             id = id,
             inputUri = inputUri,
@@ -120,13 +121,12 @@ class FakeJobRepository(
 
     override suspend fun enqueueJobUpload(
         inputUri: Uri,
-        promptId: Long?,
-        promptText: String?,
+        selection: PromptSelection,
         workflow: String?,
     ): java.util.UUID {
         // The fake fulfills the contract synchronously: it submits and stores
         // the result keyed by the returned UUID for [observeJobUpload].
-        val resp = submitJob(inputUri, promptId, promptText, workflow, onUploadProgress = null)
+        val resp = submitJob(inputUri, selection, workflow, onUploadProgress = null)
         val workId = java.util.UUID.randomUUID()
         completedUploads[workId] = resp
         return workId
@@ -149,14 +149,12 @@ class FakeJobRepository(
 
     override suspend fun submitStagedJob(
         filePath: String,
-        promptId: Long?,
-        promptText: String?,
+        selection: PromptSelection,
         workflow: String?,
         onUploadProgress: ((Float) -> Unit)?,
     ): JobCreatedResponse = submitJob(
         inputUri = Uri.fromFile(java.io.File(filePath)),
-        promptId = promptId,
-        promptText = promptText,
+        selection = selection,
         workflow = workflow,
         onUploadProgress = onUploadProgress,
     )

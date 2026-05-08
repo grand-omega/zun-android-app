@@ -61,6 +61,7 @@ import dev.zun.flux.data.api.effectivePromptId
 import dev.zun.flux.data.repo.ImageSourceRepository
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.data.repo.PromptRepository
+import dev.zun.flux.data.repo.PromptSelection
 import dev.zun.flux.data.repo.UploadRepository
 import dev.zun.flux.ui.common.ControlShape
 import dev.zun.flux.ui.gallery.BeforeAfterSlider
@@ -161,10 +162,14 @@ fun ResultScreen(
                     val inputUri = withContext(Dispatchers.IO) {
                         images.downloadInputToCache(inputId)
                     }
+                    val selection = if (promptId == CUSTOM_PROMPT_ID) {
+                        PromptSelection.Custom(customText)
+                    } else {
+                        PromptSelection.Saved(promptId)
+                    }
                     val resp = uploads.submitJob(
                         inputUri = inputUri,
-                        promptId = promptId.takeUnless { it == CUSTOM_PROMPT_ID },
-                        promptText = customText.takeIf { promptId == CUSTOM_PROMPT_ID },
+                        selection = selection,
                         workflow = if (tryHarder) TRY_HARDER_WORKFLOW else DEFAULT_CUSTOM_WORKFLOW,
                     )
                     onRegenerated(resp.job_id)

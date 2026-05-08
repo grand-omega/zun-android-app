@@ -6,6 +6,7 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import dev.zun.flux.FluxApp
 import dev.zun.flux.Tuning
+import dev.zun.flux.data.repo.PromptSelection
 import java.io.File
 import java.io.IOException
 
@@ -28,6 +29,11 @@ class JobUploadWorker(
         val promptId = inputData.getLong(KEY_PROMPT_ID, -1L).takeIf { it != -1L }
         val promptText = inputData.getString(KEY_PROMPT_TEXT)
         val workflow = inputData.getString(KEY_WORKFLOW)
+        val selection = when {
+            promptId != null -> PromptSelection.Saved(promptId)
+            promptText != null -> PromptSelection.Custom(promptText)
+            else -> return Result.failure(workDataOf(KEY_ERROR to "Missing prompt"))
+        }
 
         val file = File(filePath)
         if (!file.exists()) {
@@ -38,8 +44,7 @@ class JobUploadWorker(
         return try {
             val resp = uploads.submitStagedJob(
                 filePath = filePath,
-                promptId = promptId,
-                promptText = promptText,
+                selection = selection,
                 workflow = workflow,
                 onUploadProgress = { fraction ->
                     setProgressAsync(workDataOf(KEY_PROGRESS to fraction))

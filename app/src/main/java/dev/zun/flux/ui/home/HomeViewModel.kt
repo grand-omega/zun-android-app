@@ -11,6 +11,7 @@ import dev.zun.flux.data.repo.HealthRepository
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.data.repo.JobUploadStatus
 import dev.zun.flux.data.repo.PromptRepository
+import dev.zun.flux.data.repo.PromptSelection
 import dev.zun.flux.data.repo.UploadRepository
 import dev.zun.flux.util.toUserMessage
 import kotlinx.coroutines.TimeoutCancellationException
@@ -292,12 +293,14 @@ class HomeViewModel(
         tryHarder: Boolean,
     ): JobCreatedResponse {
         val workflow = if (tryHarder) TRY_HARDER_WORKFLOW else DEFAULT_CUSTOM_WORKFLOW
-        val promptId = selectedPromptId.takeUnless { it == CUSTOM_PROMPT_ID }
-        val promptText = customPromptText.takeIf { selectedPromptId == CUSTOM_PROMPT_ID }
+        val selection = if (selectedPromptId == CUSTOM_PROMPT_ID) {
+            PromptSelection.Custom(customPromptText)
+        } else {
+            PromptSelection.Saved(selectedPromptId)
+        }
         val workId = uploadRepo.enqueueJobUpload(
             inputUri = inputUri,
-            promptId = promptId,
-            promptText = promptText,
+            selection = selection,
             workflow = workflow,
         )
         val terminal = try {
