@@ -398,23 +398,12 @@ fun ResultScreen(
     }
 
     if (showDeleteConfirm) {
-        AlertDialog(
-            onDismissRequest = { showDeleteConfirm = false },
-            title = { Text(stringResource(R.string.result_delete_confirm_title)) },
-            text = { Text(stringResource(R.string.result_delete_confirm_message)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showDeleteConfirm = false
-                        deleteResult()
-                    },
-                ) {
-                    Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error)
-                }
+        DeleteResultDialog(
+            onConfirm = {
+                showDeleteConfirm = false
+                deleteResult()
             },
-            dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) { Text(stringResource(R.string.common_cancel)) }
-            },
+            onDismiss = { showDeleteConfirm = false },
         )
     }
 
@@ -441,81 +430,43 @@ fun ResultScreen(
     }
 
     if (showSavePromptDialog) {
-        AlertDialog(
-            onDismissRequest = { showSavePromptDialog = false },
-            title = { Text(stringResource(R.string.result_save_prompt_title)) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(
-                        text = customPromptText.trim(),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    androidx.compose.material3.OutlinedTextField(
-                        value = savePromptLabel,
-                        onValueChange = { savePromptLabel = it },
-                        label = { Text(stringResource(R.string.result_save_prompt_label)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
+        SavePromptDialog(
+            customPromptText = customPromptText,
+            label = savePromptLabel,
+            onLabelChange = { savePromptLabel = it },
+            onSave = {
+                val label = savePromptLabel.trim()
+                val text = customPromptText.trim()
+                scope.launch {
+                    try {
+                        val created = promptRepo.createPrompt(
+                            label = label,
+                            text = text,
+                            workflow = DEFAULT_CUSTOM_WORKFLOW,
+                        )
+                        selectedPromptId = created.id
+                        customPromptText = ""
+                        showSavePromptDialog = false
+                        showPromptSheet = false
+                        Toast.makeText(context, context.getString(R.string.result_prompt_saved), Toast.LENGTH_SHORT).show()
+                    } catch (t: Throwable) {
+                        Toast.makeText(
+                            context,
+                            t.toUserMessage("save prompt"),
+                            Toast.LENGTH_SHORT,
+                        ).show()
+                    }
                 }
             },
-            confirmButton = {
-                TextButton(
-                    enabled = savePromptLabel.isNotBlank() && customPromptText.isNotBlank(),
-                    onClick = {
-                        val label = savePromptLabel.trim()
-                        val text = customPromptText.trim()
-                        scope.launch {
-                            try {
-                                val created = promptRepo.createPrompt(
-                                    label = label,
-                                    text = text,
-                                    workflow = DEFAULT_CUSTOM_WORKFLOW,
-                                )
-                                selectedPromptId = created.id
-                                customPromptText = ""
-                                showSavePromptDialog = false
-                                showPromptSheet = false
-                                Toast.makeText(context, context.getString(R.string.result_prompt_saved), Toast.LENGTH_SHORT).show()
-                            } catch (t: Throwable) {
-                                Toast.makeText(
-                                    context,
-                                    t.toUserMessage("save prompt"),
-                                    Toast.LENGTH_SHORT,
-                                ).show()
-                            }
-                        }
-                    },
-                ) { Text(stringResource(R.string.common_save)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showSavePromptDialog = false }) { Text(stringResource(R.string.common_cancel)) }
-            },
+            onDismiss = { showSavePromptDialog = false },
         )
     }
 
     if (showDetails) {
-        val dto = jobDto
-        val locale = LocalLocale.current.platformLocale
-        AlertDialog(
-            onDismissRequest = { showDetails = false },
-            title = { Text(stringResource(R.string.result_details_title)) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (dto != null) {
-                        Text(stringResource(R.string.result_details_prompt_format, resolvePromptLabel(prompts, dto.effectivePromptId, dto.prompt_text)))
-                        Text(stringResource(R.string.result_details_created_format, SimpleDateFormat("MMM d, yyyy · HH:mm", locale).format(Date(dto.created_at * 1000))))
-                        val started = dto.started_at
-                        val completed = dto.completed_at
-                        if (started != null && completed != null) {
-                            Text(stringResource(R.string.result_details_duration_format, completed - started))
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showDetails = false }) { Text(stringResource(R.string.common_close)) }
-            },
+        ResultDetailsDialog(
+            jobDto = jobDto,
+            prompts = prompts,
+            onDismiss = { showDetails = false },
         )
     }
 }
