@@ -1,6 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    Permits plain HTTP for the discovery flow and any user-picked LAN server.
+    Android Network Security Config doesn't support CIDR matching, so we can't
+    selectively permit cleartext only for RFC1918 — it's all-or-nothing.
+
+    The app's threat model: the server is the user's own machine on their own
+    LAN. The user explicitly picks a server from a discovery list (or types
+    a URL manually) before any auth token is sent. There's no auto-connect to
+    arbitrary HTTP services. Bearer tokens sent over LAN HTTP are an accepted
+    trade-off for this self-hosted app; users with stricter requirements
+    should configure TLS via a reverse proxy and pick the HTTPS endpoint
+    from the discovery list.
+-->
 <network-security-config>
-    <base-config cleartextTrafficPermitted="false">
+    <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>
