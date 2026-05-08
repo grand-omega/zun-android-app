@@ -68,4 +68,36 @@ class ServerUrlsTest {
             normalizeOptionalServerUrl("https://example.com#section")
         }
     }
+
+    @Test
+    fun parseDiscoveryHost_acceptsBareHost() {
+        assertEquals(DiscoveryHost("192.168.1.5", null), parseDiscoveryHost("192.168.1.5"))
+        assertEquals(DiscoveryHost("flux.local", null), parseDiscoveryHost("flux.local"))
+    }
+
+    @Test
+    fun parseDiscoveryHost_extractsPort() {
+        assertEquals(DiscoveryHost("192.168.1.5", 8080), parseDiscoveryHost("192.168.1.5:8080"))
+        assertEquals(DiscoveryHost("flux.local", 9090), parseDiscoveryHost("flux.local:9090"))
+    }
+
+    @Test
+    fun parseDiscoveryHost_stripsScheme() {
+        assertEquals(DiscoveryHost("192.168.1.5", null), parseDiscoveryHost("https://192.168.1.5"))
+        assertEquals(DiscoveryHost("192.168.1.5", 8080), parseDiscoveryHost("http://192.168.1.5:8080/"))
+    }
+
+    @Test
+    fun parseDiscoveryHost_handlesIpv6Brackets() {
+        assertEquals(DiscoveryHost("::1", null), parseDiscoveryHost("[::1]"))
+        assertEquals(DiscoveryHost("::1", 8080), parseDiscoveryHost("[::1]:8080"))
+    }
+
+    @Test
+    fun parseDiscoveryHost_rejectsInvalid() {
+        assertNull(parseDiscoveryHost(""))
+        assertNull(parseDiscoveryHost("   "))
+        assertNull(parseDiscoveryHost("192.168.1.5:notaport"))
+        assertNull(parseDiscoveryHost("192.168.1.5:99999"))
+    }
 }

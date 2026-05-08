@@ -217,6 +217,18 @@
     <string name="setup_token_show">Show token</string>
     <string name="setup_token_hide">Hide token</string>
     <string name="setup_testing_connection">Testing connection...</string>
+    <string name="setup_lan_search_label">Server IP or hostname</string>
+    <string name="setup_lan_search_placeholder">192.168.1.5</string>
+    <string name="setup_lan_search_hint">Tap Search and we\'ll scan common ports for your server.</string>
+    <string name="setup_lan_search_button">Search</string>
+    <string name="setup_lan_searching">Searching for servers…</string>
+    <string name="setup_lan_search_invalid_host">Enter an IP address or hostname.</string>
+    <string name="setup_lan_search_no_results">Couldn\'t find a server at %1$s. Check the address, or enter the URL manually.</string>
+    <string name="setup_lan_found_format">version %1$s</string>
+    <string name="setup_lan_comfy_ok">ComfyUI ready</string>
+    <string name="setup_lan_comfy_down">ComfyUI down</string>
+    <string name="setup_lan_manual_entry">Enter URL manually</string>
+    <string name="setup_lan_manual_back">Back to search</string>
 
     <!-- Settings -->
     <string name="settings_title">Settings</string>

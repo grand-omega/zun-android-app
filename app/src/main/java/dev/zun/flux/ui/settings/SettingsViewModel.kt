@@ -62,12 +62,12 @@ class SettingsViewModel(
         val draft = _connectionDraft.value
         try {
             val lan = runCatching {
-                normalizeOptionalLanServerUrl(draft.lanUrl, allowHttp = BuildConfig.DEBUG)
+                normalizeOptionalLanServerUrl(draft.lanUrl, allowHttp = true)
             }.getOrElse {
                 throw IllegalArgumentException("Primary server: ${it.message}")
             }
             val tailscale = runCatching {
-                normalizeOptionalTailscaleServerUrl(draft.tailscaleUrl, allowHttp = BuildConfig.DEBUG)
+                normalizeOptionalTailscaleServerUrl(draft.tailscaleUrl, allowHttp = true)
             }.getOrElse {
                 throw IllegalArgumentException("Fallback server: ${it.message}")
             }

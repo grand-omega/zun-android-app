@@ -2,6 +2,7 @@ package dev.zun.flux.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -16,9 +17,11 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -35,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import dev.zun.flux.BuildConfig
 import dev.zun.flux.FluxApp
 import dev.zun.flux.R
+import dev.zun.flux.data.net.ServerDiscovery
 import dev.zun.flux.data.repo.ConnectionMode
 import dev.zun.flux.ui.common.ScreenPadding
 import dev.zun.flux.ui.common.SettingsGroup
@@ -42,8 +46,14 @@ import dev.zun.flux.ui.common.StatusPill
 import dev.zun.flux.ui.common.StatusTone
 import dev.zun.flux.util.normalizeOptionalLanServerUrl
 import dev.zun.flux.util.normalizeOptionalTailscaleServerUrl
+import dev.zun.flux.util.parseDiscoveryHost
 import dev.zun.flux.util.toUserMessage
 import kotlinx.coroutines.launch
+
+private sealed interface LanEntryMode {
+    data object Discovery : LanEntryMode
+    data object Manual : LanEntryMode
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,14 +62,26 @@ fun SetupScreen(
     onSuccess: () -> Unit,
 ) {
     val settings = app.settingsManager
-    var lanUrl by remember { mutableStateOf(settings.lanUrl ?: "") }
+    var lanEntryMode by remember { mutableStateOf<LanEntryMode>(LanEntryMode.Discovery) }
+    var hostInput by remember { mutableStateOf("") }
+    var manualLanUrl by remember { mutableStateOf(settings.lanUrl ?: "") }
+    var discovery by remember { mutableStateOf<DiscoveryState>(DiscoveryState.Idle) }
+    var selectedDiscoveredUrl by remember { mutableStateOf<String?>(null) }
     var tailscaleUrl by remember { mutableStateOf(settings.tailscaleUrl ?: "") }
     var token by remember { mutableStateOf(settings.apiToken ?: "") }
 
     var isTesting by remember { mutableStateOf(false) }
+    var isSearching by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var tokenVisible by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+
+    val noResolvedLan = when (lanEntryMode) {
+        LanEntryMode.Discovery -> selectedDiscoveredUrl == null
+        LanEntryMode.Manual -> manualLanUrl.isBlank()
+    }
+    val canSubmit = !isTesting && token.isNotBlank() &&
+        !(noResolvedLan && tailscaleUrl.isBlank())
 
     Scaffold(
         topBar = { TopAppBar(title = { Text(stringResource(R.string.setup_title)) }) },
@@ -88,18 +110,53 @@ fun SetupScreen(
                 title = stringResource(R.string.setup_server_title),
                 detail = stringResource(R.string.setup_server_detail),
             ) {
-                OutlinedTextField(
-                    value = lanUrl,
-                    onValueChange = {
-                        lanUrl = it
-                        error = null
-                    },
-                    label = { Text(stringResource(R.string.setup_lan_url_label)) },
-                    placeholder = { Text(stringResource(R.string.setup_lan_url_placeholder)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    isError = error != null,
-                )
+                when (lanEntryMode) {
+                    LanEntryMode.Discovery -> DiscoverySection(
+                        hostInput = hostInput,
+                        onHostInputChange = {
+                            hostInput = it
+                            error = null
+                        },
+                        isSearching = isSearching,
+                        discovery = discovery,
+                        selectedUrl = selectedDiscoveredUrl,
+                        onSearch = {
+                            val parsed = parseDiscoveryHost(hostInput)
+                            if (parsed == null) {
+                                discovery = DiscoveryState.Error(
+                                    app.getString(R.string.setup_lan_search_invalid_host),
+                                )
+                                return@DiscoverySection
+                            }
+                            isSearching = true
+                            discovery = DiscoveryState.Searching
+                            selectedDiscoveredUrl = null
+                            scope.launch {
+                                try {
+                                    val results = ServerDiscovery { app.okHttpClient }
+                                        .discover(parsed)
+                                    discovery = DiscoveryState.Done(parsed.host, results)
+                                    if (results.size == 1) selectedDiscoveredUrl = results[0].url
+                                } catch (t: Throwable) {
+                                    discovery = DiscoveryState.Error(t.toUserMessage("search"))
+                                } finally {
+                                    isSearching = false
+                                }
+                            }
+                        },
+                        onSelectResult = { selectedDiscoveredUrl = it.url },
+                        onManualEntry = { lanEntryMode = LanEntryMode.Manual },
+                    )
+
+                    LanEntryMode.Manual -> ManualSection(
+                        lanUrl = manualLanUrl,
+                        onLanUrlChange = {
+                            manualLanUrl = it
+                            error = null
+                        },
+                        onBackToSearch = { lanEntryMode = LanEntryMode.Discovery },
+                    )
+                }
 
                 OutlinedTextField(
                     value = tailscaleUrl,
@@ -154,18 +211,22 @@ fun SetupScreen(
                     error = null
                     scope.launch {
                         try {
-                            val lan = runCatching {
-                                normalizeOptionalLanServerUrl(lanUrl, allowHttp = BuildConfig.DEBUG)
-                            }.getOrElse {
-                                throw IllegalArgumentException("Primary server: ${it.message}")
+                            val resolvedLan = when (lanEntryMode) {
+                                LanEntryMode.Discovery -> selectedDiscoveredUrl
+
+                                LanEntryMode.Manual -> runCatching {
+                                    normalizeOptionalLanServerUrl(manualLanUrl, allowHttp = true)
+                                }.getOrElse {
+                                    throw IllegalArgumentException("Primary server: ${it.message}")
+                                }
                             }
                             val ts = runCatching {
-                                normalizeOptionalTailscaleServerUrl(tailscaleUrl, allowHttp = BuildConfig.DEBUG)
+                                normalizeOptionalTailscaleServerUrl(tailscaleUrl, allowHttp = true)
                             }.getOrElse {
                                 throw IllegalArgumentException("Fallback server: ${it.message}")
                             }
-                            require(lan != null || ts != null) {
-                                "Enter at least one server URL"
+                            require(resolvedLan != null || ts != null) {
+                                "Enter at least one server"
                             }
                             val oldLan = settings.lanUrl
                             val oldTailscale = settings.tailscaleUrl
@@ -175,7 +236,7 @@ fun SetupScreen(
                             val oldMode = settings.connectionMode
 
                             try {
-                                settings.lanUrl = lan
+                                settings.lanUrl = resolvedLan
                                 settings.tailscaleUrl = ts
                                 settings.connectionMode = ConnectionMode.AUTO
                                 settings.apiToken = token.trim()
@@ -206,7 +267,7 @@ fun SetupScreen(
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = !isTesting && (lanUrl.isNotBlank() || tailscaleUrl.isNotBlank()) && token.isNotBlank(),
+                enabled = canSubmit,
             ) {
                 if (isTesting) {
                     CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp), color = MaterialTheme.colorScheme.onPrimary)
@@ -216,5 +277,71 @@ fun SetupScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun DiscoverySection(
+    hostInput: String,
+    onHostInputChange: (String) -> Unit,
+    isSearching: Boolean,
+    discovery: DiscoveryState,
+    selectedUrl: String?,
+    onSearch: () -> Unit,
+    onSelectResult: (dev.zun.flux.data.net.DiscoveredServer) -> Unit,
+    onManualEntry: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        OutlinedTextField(
+            value = hostInput,
+            onValueChange = onHostInputChange,
+            label = { Text(stringResource(R.string.setup_lan_search_label)) },
+            placeholder = { Text(stringResource(R.string.setup_lan_search_placeholder)) },
+            modifier = Modifier.weight(1f),
+            singleLine = true,
+        )
+        Button(
+            onClick = onSearch,
+            enabled = hostInput.isNotBlank() && !isSearching,
+        ) {
+            Text(stringResource(R.string.setup_lan_search_button))
+        }
+    }
+    Text(
+        text = stringResource(R.string.setup_lan_search_hint),
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.secondary,
+    )
+    DiscoveryResultsList(
+        state = discovery,
+        selectedUrl = selectedUrl,
+        onSelect = onSelectResult,
+        onManualEntry = onManualEntry,
+    )
+}
+
+@Composable
+private fun ManualSection(
+    lanUrl: String,
+    onLanUrlChange: (String) -> Unit,
+    onBackToSearch: () -> Unit,
+) {
+    OutlinedTextField(
+        value = lanUrl,
+        onValueChange = onLanUrlChange,
+        label = { Text(stringResource(R.string.setup_lan_url_label)) },
+        placeholder = { Text(stringResource(R.string.setup_lan_url_placeholder)) },
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = true,
+    )
+    OutlinedButton(
+        onClick = onBackToSearch,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text(stringResource(R.string.setup_lan_manual_back))
     }
 }
