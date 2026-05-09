@@ -79,4 +79,4 @@ Working principles for contributors live in [`CLAUDE.md`](CLAUDE.md).
 
 ## License
 
-<!-- TODO: confirm license — no LICENSE file currently in the repo -->
+[MIT](LICENSE) © Yanwen Xu

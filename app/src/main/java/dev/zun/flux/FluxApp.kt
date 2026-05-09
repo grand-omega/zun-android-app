@@ -108,8 +108,8 @@ class FluxApp : Application() {
                         .build()
                 }
                 // No URL-keyed disk cache: OfflineImageCache is the canonical
-                // disk store and persists encrypted bytes. A second plaintext
-                // cache would defeat the encryption.
+                // disk store, keyed by jobId/variant. A second URL-keyed cache
+                // would duplicate bytes and fight the size budget.
                 .build()
         }
 
