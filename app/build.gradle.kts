@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.easylauncher)
 }
 
 val keystorePropsFile = rootProject.file("keystore.properties")
@@ -84,6 +85,15 @@ android {
     }
 
     buildTypes {
+        // Debug installs as dev.zun.flux.debug so it can coexist on-device with
+        // the release-signed dev.zun.flux. easylauncher (configured below) adds
+        // a "DEV" ribbon to the launcher icon, and the debug-only string
+        // override changes the launcher label to "FluxEdit Dev". Together they
+        // make the two builds unmistakable on the home screen.
+        debug {
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
@@ -132,6 +142,16 @@ gradle.taskGraph.whenReady {
 kotlin {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_17)
+    }
+}
+
+easylauncher {
+    buildTypes {
+        register("debug") {
+            // Chrome-style ribbon across the icon's bottom-left to bottom-right
+            // — readable on both adaptive (round/squircle) and legacy launchers.
+            filters(chromeLike(label = "DEV", ribbonColor = "#7B2D8E"))
+        }
     }
 }
 
