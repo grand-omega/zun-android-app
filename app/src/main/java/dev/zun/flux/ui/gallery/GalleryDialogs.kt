@@ -5,6 +5,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import dev.zun.flux.R
 
@@ -17,7 +18,7 @@ internal fun DeleteSelectedDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.gallery_delete_confirm_title)) },
-        text = { Text(stringResource(R.string.gallery_delete_confirm_message, selectedCount)) },
+        text = { Text(pluralStringResource(R.plurals.gallery_delete_confirm_message, selectedCount, selectedCount)) },
         confirmButton = {
             TextButton(onClick = onConfirm) {
                 Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error)
@@ -41,13 +42,7 @@ internal fun PostSaveDeleteDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.gallery_post_save_delete_title)) },
         text = {
-            Text(
-                if (savedCount == 1) {
-                    stringResource(R.string.gallery_post_save_delete_message_one)
-                } else {
-                    stringResource(R.string.gallery_post_save_delete_message_many, savedCount)
-                },
-            )
+            Text(pluralStringResource(R.plurals.gallery_post_save_delete_message, savedCount, savedCount))
         },
         confirmButton = {
             TextButton(onClick = onConfirm) {

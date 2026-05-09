@@ -16,4 +16,8 @@
       mid-session. Downgrade to Warning so it doesn't block CI/pre-push.
     -->
     <issue id="LocalContextGetResourceValueCall" severity="warning"/>
+    <!-- Intentional: this build targets Galaxy Z Fold-class arm64 devices only. -->
+    <issue id="ChromeOsAbiSupport" severity="ignore"/>
+    <!-- Intentional: self-hosted LAN HTTP is supported by product policy. -->
+    <issue id="InsecureBaseConfiguration" severity="ignore"/>
 </lint>
