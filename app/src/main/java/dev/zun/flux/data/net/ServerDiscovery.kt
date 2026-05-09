@@ -2,9 +2,11 @@ package dev.zun.flux.data.net
 
 import dev.zun.flux.data.api.HealthResponse
 import dev.zun.flux.util.DiscoveryHost
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
@@ -47,7 +49,7 @@ class ServerDiscovery(
         val client = okHttpClientFactory()
         candidates
             .map { (scheme, port) ->
-                async { probe(client, scheme, target.host, port) }
+                async(Dispatchers.IO) { probe(client, scheme, target.host, port) }
             }
             .awaitAll()
             .filterNotNull()
@@ -72,23 +74,30 @@ class ServerDiscovery(
             .get()
             .build()
 
+        // Cancellation must propagate to the underlying socket — withTimeoutOrNull
+        // alone can't preempt blocking I/O. runInterruptible interrupts the IO
+        // thread; we also cancel the OkHttp Call defensively in case the socket
+        // call is at a non-interruptible point.
+        val call = client.newCall(request)
         return withTimeoutOrNull(PROBE_TIMEOUT_MS) {
             runCatching {
-                client.newCall(request).execute().use { response ->
-                    if (!response.isSuccessful) return@use null
-                    val body = response.body.string()
-                    val parsed = runCatching {
-                        json.decodeFromString(HealthResponse.serializer(), body)
-                    }.getOrNull() ?: return@use null
-                    val version = parsed.version ?: return@use null
-                    DiscoveredServer(
-                        url = baseUrl,
-                        version = version,
-                        comfyOk = parsed.comfy?.ok == true,
-                    )
+                runInterruptible(Dispatchers.IO) {
+                    call.execute().use { response ->
+                        if (!response.isSuccessful) return@use null
+                        val body = response.body.string()
+                        val parsed = runCatching {
+                            json.decodeFromString(HealthResponse.serializer(), body)
+                        }.getOrNull() ?: return@use null
+                        val version = parsed.version ?: return@use null
+                        DiscoveredServer(
+                            url = baseUrl,
+                            version = version,
+                            comfyOk = parsed.comfy?.ok == true,
+                        )
+                    }
                 }
             }.getOrNull()
-        }
+        }.also { call.cancel() } // idempotent; ensures the socket is released on timeout
     }
 
     companion object {
