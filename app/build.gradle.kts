@@ -13,16 +13,29 @@ plugins {
 
 val keystorePropsFile = rootProject.file("keystore.properties")
 
+private val localProps: Properties = rootProject.file("local.properties").let { f ->
+    Properties().apply { if (f.exists()) f.inputStream().use { load(it) } }
+}
+
 /**
  * SENTRY_DSN from local.properties (gitignored). DSNs are not secret in
  * Sentry's threat model, but routing it through local.properties keeps
  * project-specific endpoints out of source control. If absent, the app
  * compiles fine — SentryAndroid.init silently no-ops on a blank DSN.
  */
-val sentryDsn: String = rootProject.file("local.properties").let { f ->
-    if (!f.exists()) return@let ""
-    Properties().apply { f.inputStream().use { load(it) } }.getProperty("SENTRY_DSN", "")
-}
+val sentryDsn: String = localProps.getProperty("SENTRY_DSN", "")
+
+/**
+ * SENTRY_AUTH_TOKEN — write-authority API token for the Sentry Gradle
+ * plugin's ProGuard mapping upload + source-context bundling. Sourced from
+ * local.properties for dev builds and from the SENTRY_AUTH_TOKEN env var in
+ * CI (set via the GitHub Actions secret of the same name in the release
+ * job). Mapping upload silently disables itself if no token is found, so
+ * CI's unsigned R8-verify build keeps working without the secret.
+ */
+val sentryAuthToken: String =
+    localProps.getProperty("SENTRY_AUTH_TOKEN", "")
+        .ifBlank { System.getenv("SENTRY_AUTH_TOKEN") ?: "" }
 
 /**
  * Run a command and return its trimmed stdout, or null on any failure
@@ -182,12 +195,20 @@ easylauncher {
 }
 
 sentry {
-    // ProGuard-mapping upload + source-context bundling both require an auth
-    // token; off until one is provisioned. R8 stack-traces in release builds
-    // will show obfuscated names until then. (Debug builds are unobfuscated
-    // so dev-time crashes are already readable.)
-    autoUploadProguardMapping.set(false)
-    includeSourceContext.set(false)
+    org.set("yanwen-xu")
+    projectName.set("android")
+
+    // Upload + source bundling are gated on having an auth token. Local dev
+    // with the token in local.properties → uploads. CI release-tag job with
+    // SENTRY_AUTH_TOKEN secret → uploads. CI's PR/push job (no secret) →
+    // silently skips so the R8 verify build still passes.
+    val haveToken = sentryAuthToken.isNotBlank()
+    autoUploadProguardMapping.set(haveToken)
+    includeSourceContext.set(haveToken)
+    if (haveToken) {
+        authToken.set(sentryAuthToken)
+    }
+
     autoInstallation.enabled.set(false)
     // Bytecode-level OkHttp/Room instrumentation is free regardless and adds
     // useful breadcrumbs (HTTP requests, DB queries) to crash reports.
