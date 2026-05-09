@@ -2,7 +2,7 @@
 
 A privacy-first Android client for your self-hosted Flux / Stable Diffusion server.
 
-FluxEdit pairs an Android phone with a [Zun Flux server](../zun-rust-server) on your LAN or Tailscale network. Pick a source image, choose a prompt, and generate. Results sync to a local gallery that stays usable when the server is offline. Tokens and prompts live in encrypted preferences; the app is biometric-locked by default.
+FluxEdit pairs an Android phone with a [Zun Flux server](../zun-rust-server) on your LAN or Tailscale network. Pick a source image, choose a prompt, and generate. Results sync to a local gallery that stays usable when the server is offline. API tokens are encrypted with an Android Keystore-backed AES key; the app is biometric-locked by default.
 
 <!-- TODO: screenshots — add files under docs/img/ and reference them here -->
 
@@ -11,7 +11,7 @@ FluxEdit pairs an Android phone with a [Zun Flux server](../zun-rust-server) on 
 - **First-time setup with LAN discovery.** Type your server's IP or hostname; the app probes common ports (`5000`, `5001`, `7860`, `8000`, `8188`) over both `http` and `https` and picks the one that responds.
 - **LAN ↔ Tailscale failover.** Configure a primary and an optional fallback URL. The app picks whichever route is currently reachable, or you can pin it manually.
 - **Offline gallery.** Recently viewed thumbnails, previews, and result images are cached on disk. The gallery still loads when the server is down; uncached items get an "unavailable offline" badge.
-- **Biometric lock.** Configurable lockout (always, 30s, 1m, 5m, 10m, 30m). Tokens are stored in `EncryptedSharedPreferences`.
+- **Biometric lock.** Configurable lockout (always, 30s, 1m, 5m, 10m, 30m). Tokens are stored in the app's Keystore-backed secure store.
 - **Optional certificate pinning.** Capture and pin server certs from Settings → Connection. Re-pin after renewal.
 - **Batch generation.** Submit multiple source images with the same prompt; per-job progress is tracked.
 - **Before/after viewer.** Compare source and result side-by-side with a zoomable image view.
@@ -25,7 +25,7 @@ FluxEdit pairs an Android phone with a [Zun Flux server](../zun-rust-server) on 
 
 ## Install
 
-Sideload the latest signed APK from the project Releases page. <!-- TODO: link Releases URL once published -->
+Sideload the latest signed APK from the [project Releases page](https://github.com/grand-omega/zun-android-app/releases).
 
 ## First run
 
@@ -37,8 +37,8 @@ You can change any of these later from **Settings → Connection**.
 
 ## Privacy & security
 
-- The APK ships with no server URL or token baked in — both are entered at first run and stored in `EncryptedSharedPreferences`.
-- Release builds enforce HTTPS for server connections; cleartext is allowed only for local LAN testing in debug builds.
+- The APK ships with no server URL or token baked in. URLs and routing preferences are stored in plain app-private preferences; API tokens are encrypted with an Android Keystore-backed AES key.
+- Plain HTTP is permitted for user-picked self-hosted LAN servers. Use HTTPS and optional certificate pinning for stricter deployments.
 - No analytics, no crash reporting, no third-party trackers.
 - Biometric/device unlock is required after the configured lockout window.
 - Backups (`allowBackup`) and Auto Backup are disabled so secrets don't leave the device.

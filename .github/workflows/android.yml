@@ -30,10 +30,9 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
-    - name: Create placeholder local.properties
+    - name: Create local.properties
       run: |
-        echo "server.url=https://example.com" > local.properties
-        echo "api.token=placeholder" >> local.properties
+        echo "sdk.dir=$ANDROID_HOME" > local.properties
 
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v4
@@ -42,16 +41,16 @@ jobs:
       uses: rhysd/actionlint@v1.7.12
 
     - name: Build Debug APK
-      run: ./gradlew assembleDebug --stacktrace -Porg.gradle.java.installations.auto-download=false -Porg.gradle.java.installations.auto-detect=true
+      run: ./gradlew assembleDebug --stacktrace
 
     - name: Run Unit Tests
-      run: ./gradlew testDebugUnitTest --stacktrace -Porg.gradle.java.installations.auto-download=false -Porg.gradle.java.installations.auto-detect=true
+      run: ./gradlew testDebugUnitTest --stacktrace
 
     - name: Run Lint
-      run: ./gradlew lintDebug --stacktrace -Porg.gradle.java.installations.auto-download=false -Porg.gradle.java.installations.auto-detect=true
+      run: ./gradlew lintDebug --stacktrace
 
     - name: Run Spotless Check
-      run: ./gradlew spotlessCheck --stacktrace -Porg.gradle.java.installations.auto-download=false -Porg.gradle.java.installations.auto-detect=true
+      run: ./gradlew spotlessCheck --stacktrace
 
     - name: Upload Debug Artifact
       uses: actions/upload-artifact@v4
@@ -82,10 +81,9 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
-    - name: Create placeholder local.properties
+    - name: Create local.properties
       run: |
-        echo "server.url=https://example.com" > local.properties
-        echo "api.token=placeholder" >> local.properties
+        echo "sdk.dir=$ANDROID_HOME" > local.properties
 
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v4
@@ -122,7 +120,7 @@ jobs:
         EOF
 
     - name: Build Release APK
-      run: ./gradlew assembleRelease --stacktrace -Porg.gradle.java.installations.auto-download=false -Porg.gradle.java.installations.auto-detect=true
+      run: ./gradlew assembleRelease --stacktrace
 
     - name: Stage release APK for release upload
       run: |

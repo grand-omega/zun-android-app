@@ -2,8 +2,8 @@
 
 ## Toolchain
 
-- **JDK 17** (the build pins `sourceCompatibility`, `targetCompatibility`, and `jvmTarget` to 17)
-- **Android SDK** with `compileSdk = 36` (compileSdkMinor `1`), `minSdk = 30`, `targetSdk = 36`
+- **JDK 21** for Gradle (the compiled bytecode still targets Java 17 via `sourceCompatibility`, `targetCompatibility`, and `jvmTarget`)
+- **Android SDK** with `compileSdk = 36` (compileSdkMinor `1`), `minSdk = 36`, `targetSdk = 36`
 - **Gradle** via the wrapper (`./gradlew`); AGP `9.2.1`, Kotlin `2.3.21`, KSP for Room
 - **Git** — recommended; `versionCode` and `versionName` are derived from git history (see [Versioning](#versioning))
 
@@ -16,7 +16,7 @@
    # edit and set sdk.dir=/path/to/Android/sdk
    ```
 
-   Server URL and API token are *not* configured here — both are entered at runtime from the in-app Setup screen and stored in `EncryptedSharedPreferences`.
+   Server URL and API token are *not* configured here. URLs are entered at runtime from the in-app Setup screen and stored in app-private preferences; the API token is stored in the Keystore-backed secure store.
 
 2. **`keystore.properties`** *(release builds only)* — copy the example and point it at a real keystore:
 
