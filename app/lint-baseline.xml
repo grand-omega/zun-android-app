@@ -10,7 +10,7 @@
     user CAs are intentionally trusted for mitmproxy/local-device testing.
     Release keeps system trust anchors only. Intentional; keep baselined.
 -->
-<issues format="6" by="lint 9.2.0" type="baseline" client="gradle" dependencies="false" name="AGP (9.2.0)" variant="all" version="9.2.0">
+<issues format="6" by="lint 9.2.1" type="baseline" client="gradle" dependencies="false" name="AGP (9.2.1)" variant="all" version="9.2.1">
 
     <issue
         id="OldTargetApi"
@@ -19,7 +19,7 @@
         errorLine2="        ~~~~~~~~~~~~~~">
         <location
             file="build.gradle.kts"
-            line="19"
+            line="79"
             column="9"/>
     </issue>
 
@@ -30,7 +30,7 @@
         errorLine2="    ~~~~~~~~~~~~~~~">
         <location
             file="build.gradle.kts"
-            line="14"
+            line="73"
             column="5"/>
     </issue>
 
