@@ -126,11 +126,18 @@ jobs:
         keyPassword=${{ secrets.KEYSTORE_KEY_PASSWORD }}
         EOF
 
+    # SENTRY_DSN ends up in BuildConfig.SENTRY_DSN at compile time so the
+    # signed release APK can actually report crashes. Without this, CI's
+    # auto-generated local.properties contains only sdk.dir, the gradle
+    # config reads an empty DSN, and SentryAndroid.init silently no-ops in
+    # the production binary — defeating the whole crash-reporting setup.
+    #
     # SENTRY_AUTH_TOKEN scopes ProGuard mapping upload + source-context
     # bundling. Tag-only — PR/push CI doesn't need it; the build's gradle
     # config gracefully skips upload when the token isn't set.
     - name: Build Release APK
       env:
+        SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
         SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
       run: ./gradlew assembleRelease --stacktrace
 

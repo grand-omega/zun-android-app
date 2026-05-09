@@ -18,12 +18,16 @@ private val localProps: Properties = rootProject.file("local.properties").let { 
 }
 
 /**
- * SENTRY_DSN from local.properties (gitignored). DSNs are not secret in
- * Sentry's threat model, but routing it through local.properties keeps
- * project-specific endpoints out of source control. If absent, the app
- * compiles fine — SentryAndroid.init silently no-ops on a blank DSN.
+ * SENTRY_DSN — Sentry project ingest endpoint. DSNs are not secret in
+ * Sentry's threat model, but routing it through local.properties (dev) /
+ * GitHub Actions secret (CI) keeps project-specific endpoints out of
+ * source control. If absent at build time, the app still compiles and
+ * runs — `SentryAndroid.init` silently no-ops on a blank DSN, so the
+ * binary just doesn't report crashes.
  */
-val sentryDsn: String = localProps.getProperty("SENTRY_DSN", "")
+val sentryDsn: String =
+    localProps.getProperty("SENTRY_DSN", "")
+        .ifBlank { System.getenv("SENTRY_DSN") ?: "" }
 
 /**
  * SENTRY_AUTH_TOKEN — write-authority API token for the Sentry Gradle
@@ -130,17 +134,6 @@ android {
         }
     }
 
-    // The baseline-profile plugin registers `nonMinifiedRelease` and
-    // `benchmarkRelease` build types lazily — they don't exist at config
-    // time. Apply the .bp applicationIdSuffix in afterEvaluate so the
-    // macrobenchmark APK installs as dev.zun.flux.bp and doesn't collide
-    // on-device with the release-signed production app at dev.zun.flux.
-    afterEvaluate {
-        listOf("nonMinifiedRelease", "benchmarkRelease").forEach { name ->
-            buildTypes.findByName(name)?.applicationIdSuffix = ".bp"
-        }
-    }
-
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -165,6 +158,23 @@ android {
     testOptions {
         unitTests.isIncludeAndroidResources = true
         unitTests.isReturnDefaultValues = true
+    }
+}
+
+// The baseline-profile plugin lazily registers `nonMinifiedRelease` and
+// `benchmarkRelease` build types from `release`. Both inherit the production
+// applicationId, which would collide on-device with the release-signed
+// dev.zun.flux. Override the applicationId on those variants with the .bp
+// suffix so the generator and benchmark APKs install side-by-side.
+//
+// onVariants runs after variant creation and lets us set `applicationId`
+// directly (the field is on Variant, not VariantBuilder). Configuration-
+// cache friendly, no afterEvaluate needed.
+androidComponents {
+    listOf("nonMinifiedRelease", "benchmarkRelease").forEach { buildType ->
+        onVariants(selector().withBuildType(buildType)) { variant ->
+            variant.applicationId.set("dev.zun.flux.bp")
+        }
     }
 }
 
