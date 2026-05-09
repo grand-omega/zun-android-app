@@ -34,7 +34,4 @@ Thumbs.db
 # Claude Code session artifacts
 .claude/
 .codex/
-
-keystore.properties
-*.jks
-*.keystore
+.agents/

@@ -1,97 +1,82 @@
-# FluxEdit — Project ZUN Android Client
+# FluxEdit
 
-A personal, high-performance image editing client for the **Project ZUN** stack. Optimized for **Samsung Galaxy Z Fold 7**.
+A privacy-first Android client for your self-hosted Flux / Stable Diffusion server.
 
-## 🚀 Quick Start Cookbook
+FluxEdit pairs an Android phone with a [Zun Flux server](../zun-rust-server) on your LAN or Tailscale network. Pick a source image, choose a prompt, and generate. Results sync to a local gallery that stays usable when the server is offline. Tokens and prompts live in encrypted preferences; the app is biometric-locked by default.
 
-### 1. Prerequisites
-- **Android Studio** (Koala or newer)
-- **Java 21** (JetBrains Runtime preferred)
-- **Rust Server** (Running on your workstation)
+<!-- TODO: screenshots — add files under docs/img/ and reference them here -->
 
-### 2. Configuration (The "Secrets")
-Server URL and API token are **not** baked into the APK. Install the app, then
-enter them on the in-app **Setup** screen — they are persisted in
-`EncryptedSharedPreferences`.
+## Features
 
-Setup accepts either a full URL or a bare host/IP. Bare entries are normalized
-to HTTPS, so `api.yourdomain.com` becomes `https://api.yourdomain.com`.
+- **First-time setup with LAN discovery.** Type your server's IP or hostname; the app probes common ports (`5000`, `5001`, `7860`, `8000`, `8188`) over both `http` and `https` and picks the one that responds.
+- **LAN ↔ Tailscale failover.** Configure a primary and an optional fallback URL. The app picks whichever route is currently reachable, or you can pin it manually.
+- **Offline gallery.** Recently viewed thumbnails, previews, and result images are cached on disk. The gallery still loads when the server is down; uncached items get an "unavailable offline" badge.
+- **Biometric lock.** Configurable lockout (always, 30s, 1m, 5m, 10m, 30m). Tokens are stored in `EncryptedSharedPreferences`.
+- **Optional certificate pinning.** Capture and pin server certs from Settings → Connection. Re-pin after renewal.
+- **Batch generation.** Submit multiple source images with the same prompt; per-job progress is tracked.
+- **Before/after viewer.** Compare source and result side-by-side with a zoomable image view.
+- **Soft delete with 30-day undo.** Deletions queue locally and sync to the server in the background.
 
-> Release builds disallow cleartext HTTP (see `network_security_config.xml`).
-> Use an HTTPS hostname that resolves on the current network for release, or use
-> a debug build when targeting a plain `http://…` dev server.
+## Requirements
 
-### 3. Build & Run Commands
+- Android 11 (API 30) or newer.
+- A running [Zun Flux server](../zun-rust-server) reachable over LAN or Tailscale.
+- An API token issued by that server.
 
-All commands are run from the repo root via the Gradle wrapper (`./gradlew`).
+## Install
 
-**Debug Build (Fastest for testing)**
+Sideload the latest signed APK from the project Releases page. <!-- TODO: link Releases URL once published -->
+
+## First run
+
+1. Launch FluxEdit. The Setup screen opens automatically until a server is configured.
+2. Either type your server's IP/hostname and tap **Search**, or tap **Enter URL manually** to paste a full URL. Optionally add a fallback URL (e.g. your Tailscale hostname).
+3. Paste your API token and tap **Connect**. The app verifies the connection before saving.
+
+You can change any of these later from **Settings → Connection**.
+
+## Privacy & security
+
+- The APK ships with no server URL or token baked in — both are entered at first run and stored in `EncryptedSharedPreferences`.
+- Release builds enforce HTTPS for server connections; cleartext is allowed only for local LAN testing in debug builds.
+- No analytics, no crash reporting, no third-party trackers.
+- Biometric/device unlock is required after the configured lockout window.
+- Backups (`allowBackup`) and Auto Backup are disabled so secrets don't leave the device.
+
+## Building from source
+
+See [docs/build.md](docs/build.md) for the full toolchain and commands. Short version:
+
 ```bash
-./gradlew installDebug                  # build + install to connected device
-./gradlew assembleDebug                 # APK only → app/build/outputs/apk/debug/
+cp local.properties.example local.properties   # set sdk.dir
+./gradlew assembleDebug
+./gradlew installDebug
 ```
 
-**Release Build (Optimized)**
+## Project layout
 
-The `release` build type has R8 code-shrinking, resource shrinking, and the
-optimizing ProGuard preset enabled (see `app/build.gradle.kts`). Output size is
-typically ~40–60% smaller than debug.
+Single-module Android app, Kotlin + Jetpack Compose, no DI framework. Top-level packages under `dev.zun.flux`:
 
-First-time setup for a personal signing key (one-time):
-```bash
-# 1. Generate a keystore in the repo root
-keytool -genkey -v -keystore flux-release.jks -alias flux \
-        -keyalg RSA -keysize 2048 -validity 36500
+- `data/` — API client, Room database, repositories, networking, WorkManager workers, diagnostics
+- `ui/` — Compose screens grouped by feature (`home`, `gallery`, `progress`, `result`, `settings`, `auth`, `capture`, `nav`, `theme`, `common`)
+- `util/` — small helpers (image decoding, error mapping, URL normalization, MediaStore saving)
 
-# 2. Copy the template and fill in the passwords you chose
-cp keystore.properties.example keystore.properties
-```
+For details and data-flow walkthroughs, see [docs/architecture.md](docs/architecture.md).
 
-Both `flux-release.jks` and `keystore.properties` are gitignored. Release builds
-require `keystore.properties`; Gradle fails the build if it is absent so a
-production APK is never published unsigned or debug-signed by accident.
+## Server
 
-Build and install:
-```bash
-./gradlew assembleRelease
-adb install -r app/build/outputs/apk/release/app-release.apk
-```
+This client expects the Zun Flux Rust server. The wire contract — endpoints, payloads, error codes — lives in the server repo:
 
-**Common install failures**
-- `INSTALL_FAILED_UPDATE_INCOMPATIBLE` → `adb uninstall dev.zun.flux` first (signature mismatch with an already-installed build).
-- `INSTALL_FAILED_VERSION_DOWNGRADE` → bump `versionCode` in `app/build.gradle.kts`.
-- `INSTALL_PARSE_FAILED_NO_CERTIFICATES` → `keystore.properties` paths or passwords are wrong.
+- Repo: `../zun-rust-server`
+- Contract: [`../zun-rust-server/API_CONTRACT.md`](../zun-rust-server/API_CONTRACT.md)
 
-**Other useful tasks**
-```bash
-./gradlew spotlessApply                 # format Kotlin sources
-./gradlew clean                         # wipe build/ directories
-./gradlew :app:tasks                    # list every task on the app module
-```
+## Documentation
 
-**Automate Formatting (Git Hooks)**
-To automatically run Spotless before every commit, run:
-```bash
-./scripts/setup-hooks.sh
-```
+- [docs/architecture.md](docs/architecture.md) — package map, data flow, wiring
+- [docs/build.md](docs/build.md) — toolchain, build commands, signing, versioning
 
----
+Working principles for contributors live in [`CLAUDE.md`](CLAUDE.md).
 
-## 🛠 Features
+## License
 
-- **Foldable Optimized**: Dynamic Two-Pane layouts and adaptive List-Detail scaffolds.
-- **Biometric Security**: Encrypted lockout with customizable timer (Settings).
-- **Immersive Photo Viewer**:
-    - **Normal Mode**: Swipe left/right between all generations.
-    - **Zoom Mode**: Double-tap to lock and pinch-to-zoom/pan on details.
-- **Performance**: Automatic **2048px downscaling** and real-time **upload progress tracking**.
-- **Robustness**: Diagnostic "Live Ping" connectivity tracking and server-side job cancellation.
-
----
-
-## 🔐 Security Note
-This app is designed for **single-user personal use**. It uses `EncryptedSharedPreferences` for user settings and strictly follows the `Authorization: Bearer` token contract defined in the Rust server.
-
-## 📱 Target Hardware
-Primary target: **Samsung Galaxy Z Fold 7** (Android 14+).
-The app handles fold/unfold transitions without state loss or Activity restarts.
+<!-- TODO: confirm license — no LICENSE file currently in the repo -->
