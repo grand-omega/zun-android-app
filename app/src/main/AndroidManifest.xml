@@ -20,6 +20,13 @@
         android:networkSecurityConfig="@xml/network_security_config"
         android:enableOnBackInvokedCallback="true">
 
+        <!-- Sentry auto-installs a ContentProvider that reads the DSN from a
+             manifest meta-data tag and inits the SDK before Application.onCreate.
+             We init manually from FluxApp so the DSN can flow through
+             BuildConfig (which manifest meta-data can't reference) — disable
+             the auto-init to avoid a "DSN is required" crash at app start. -->
+        <meta-data android:name="io.sentry.auto-init" android:value="false" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
