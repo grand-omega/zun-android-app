@@ -40,6 +40,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
@@ -87,7 +88,7 @@ fun ImageHero(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
-                text = stringResource(R.string.home_n_images_same_prompt_format, imageUris.size),
+                text = pluralStringResource(R.plurals.home_n_images_same_prompt_format, imageUris.size, imageUris.size),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.secondary,
             )
@@ -277,7 +278,7 @@ fun CompactSourceRow(
         Spacer(Modifier.weight(1f))
         if (imageCount > 1) {
             Text(
-                text = stringResource(R.string.home_n_selected_format, imageCount),
+                text = pluralStringResource(R.plurals.home_n_selected_format, imageCount, imageCount),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.secondary,
             )

@@ -57,6 +57,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -157,7 +158,7 @@ private fun BatchGrid(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.progress_batch_n_generations_format, jobIds.size)) },
+                title = { Text(pluralStringResource(R.plurals.progress_batch_n_generations_format, jobIds.size, jobIds.size)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))

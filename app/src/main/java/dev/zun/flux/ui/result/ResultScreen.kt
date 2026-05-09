@@ -111,6 +111,8 @@ fun ResultScreen(
     var showPromptManageSheet by remember { mutableStateOf(false) }
     var showSavePromptDialog by remember { mutableStateOf(false) }
     var savePromptLabel by remember { mutableStateOf("") }
+    val savedToPicturesMessage = stringResource(R.string.result_saved_to_pictures)
+    val promptSavedMessage = stringResource(R.string.result_prompt_saved)
     var selectedPromptId by remember(jobId) { mutableStateOf<Long?>(null) }
     var customPromptText by remember(jobId) { mutableStateOf("") }
     var tryHarder by remember(jobId) { mutableStateOf(false) }
@@ -329,7 +331,7 @@ fun ResultScreen(
                             val msg =
                                 try {
                                     saveToPictures(context, src, "flux-$jobId.jpg")
-                                    context.getString(R.string.result_saved_to_pictures)
+                                    savedToPicturesMessage
                                 } catch (t: Throwable) {
                                     t.toUserMessage("save")
                                 }
@@ -452,7 +454,7 @@ fun ResultScreen(
                         customPromptText = ""
                         showSavePromptDialog = false
                         showPromptSheet = false
-                        Toast.makeText(context, context.getString(R.string.result_prompt_saved), Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, promptSavedMessage, Toast.LENGTH_SHORT).show()
                     } catch (t: Throwable) {
                         Toast.makeText(
                             context,

@@ -73,6 +73,7 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -135,17 +136,15 @@ fun GalleryScreen(
         }
     }
 
+    val undoCount = pendingUndo?.size ?: 0
+    val undoDeletedMessage = pluralStringResource(R.plurals.gallery_undo_deleted, undoCount, undoCount)
+    val undoActionLabel = stringResource(R.string.gallery_undo)
     LaunchedEffect(pendingUndo, showUndoSnackbars) {
         if (!showUndoSnackbars) return@LaunchedEffect
         val undo = pendingUndo ?: return@LaunchedEffect
-        val message = if (undo.size == 1) {
-            context.getString(R.string.gallery_undo_deleted_one)
-        } else {
-            context.getString(R.string.gallery_undo_deleted_many, undo.size)
-        }
         val result = snackbarHostState.showSnackbar(
-            message = message,
-            actionLabel = context.getString(R.string.gallery_undo),
+            message = undoDeletedMessage,
+            actionLabel = undoActionLabel,
             duration = androidx.compose.material3.SnackbarDuration.Short,
         )
         if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
@@ -160,7 +159,7 @@ fun GalleryScreen(
         topBar = {
             if (isSelectionMode) {
                 TopAppBar(
-                    title = { Text(stringResource(R.string.gallery_n_selected, selectedIds.size)) },
+                    title = { Text(pluralStringResource(R.plurals.gallery_n_selected, selectedIds.size, selectedIds.size)) },
                     navigationIcon = {
                         IconButton(onClick = { viewModel.clearSelection() }, enabled = !isSaving) {
                             Icon(Icons.Default.Close, contentDescription = stringResource(R.string.gallery_clear_selection))

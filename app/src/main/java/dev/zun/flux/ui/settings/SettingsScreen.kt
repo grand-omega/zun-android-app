@@ -37,6 +37,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -219,7 +220,10 @@ fun SettingsScreen(
                 title = stringResource(R.string.settings_offline_cache_title),
                 detail = stringResource(R.string.settings_offline_cache_detail),
             ) {
-                InfoRow(stringResource(R.string.settings_cached_images), stringResource(R.string.settings_cached_files_format, offlineCache.stats.fileCount))
+                InfoRow(
+                    stringResource(R.string.settings_cached_images),
+                    pluralStringResource(R.plurals.settings_cached_files_format, offlineCache.stats.fileCount, offlineCache.stats.fileCount),
+                )
                 InfoRow(stringResource(R.string.settings_cache_size), formatBytes(offlineCache.stats.bytes))
                 StatusPill(label = offlineCache.status, tone = StatusTone.Neutral)
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
@@ -287,11 +291,7 @@ fun SettingsScreen(
                                     captured.forEach { (host, pin) -> app.certPinStore.setPin(host, pin) }
                                     app.rebuildOkHttp()
                                     app.rebuildRepository()
-                                    pinResult = if (captured.size == 1) {
-                                        app.getString(R.string.settings_pinned_one_format)
-                                    } else {
-                                        app.getString(R.string.settings_pinned_many_format, captured.size)
-                                    }
+                                    pinResult = app.resources.getQuantityString(R.plurals.settings_pinned_format, captured.size, captured.size)
                                 }
                                 pinningInProgress = false
                             }
@@ -334,7 +334,7 @@ fun SettingsScreen(
                 val pendingUploads = uploadQueue.count {
                     it.state == WorkInfo.State.ENQUEUED || it.state == WorkInfo.State.RUNNING
                 }
-                InfoRow(stringResource(R.string.settings_upload_queue), stringResource(R.string.settings_pending_format, pendingUploads))
+                InfoRow(stringResource(R.string.settings_upload_queue), pluralStringResource(R.plurals.settings_pending_format, pendingUploads, pendingUploads))
                 if (diagnostics.recentErrors.isNotEmpty()) {
                     Text(
                         text = stringResource(R.string.settings_recent_errors),

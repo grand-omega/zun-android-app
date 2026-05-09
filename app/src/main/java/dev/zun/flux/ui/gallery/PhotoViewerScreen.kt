@@ -58,6 +58,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -132,16 +133,14 @@ fun PhotoViewerScreen(
     val currentJob = jobs.getOrNull(pagerState.currentPage)
     val hasInput = currentJob?.input_id != null
 
+    val undoCount = pendingUndo?.size ?: 0
+    val undoDeletedMessage = pluralStringResource(R.plurals.gallery_undo_deleted, undoCount, undoCount)
+    val undoActionLabel = stringResource(R.string.gallery_undo)
     LaunchedEffect(pendingUndo) {
         val undo = pendingUndo ?: return@LaunchedEffect
-        val message = if (undo.size == 1) {
-            context.getString(R.string.gallery_undo_deleted_one)
-        } else {
-            context.getString(R.string.gallery_undo_deleted_many, undo.size)
-        }
         val result = snackbarHostState.showSnackbar(
-            message = message,
-            actionLabel = context.getString(R.string.gallery_undo),
+            message = undoDeletedMessage,
+            actionLabel = undoActionLabel,
             duration = androidx.compose.material3.SnackbarDuration.Short,
         )
         if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
@@ -157,6 +156,8 @@ fun PhotoViewerScreen(
         viewerNotice = null
     }
 
+    val savedToGalleryMessage = stringResource(R.string.viewer_saved_to_gallery)
+    val saveFailedMessage = stringResource(R.string.viewer_save_failed)
     Scaffold(
         containerColor = Color.Black,
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -213,9 +214,9 @@ fun PhotoViewerScreen(
                         scope.launch {
                             try {
                                 saveToPictures(context, src, "flux-${job.id}.jpg")
-                                Toast.makeText(context, context.getString(R.string.viewer_saved_to_gallery), Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, savedToGalleryMessage, Toast.LENGTH_SHORT).show()
                             } catch (e: Exception) {
-                                viewerNotice = context.getString(R.string.viewer_save_failed)
+                                viewerNotice = saveFailedMessage
                             }
                         }
                     },

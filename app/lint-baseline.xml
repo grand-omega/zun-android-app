@@ -6,12 +6,9 @@
     stable for the Android 16 / Z Fold 7 target. Bump deferred until we have a
     concrete reason (a 37-only API or Play Store deadline). Keep baselined.
 
-  - AcceptsUserCertificates / InsecureBaseConfiguration: lint reports these
-    from the debug overlay, where user CAs are intentionally trusted for
-    mitmproxy/local-device testing. Cleartext is permitted in both debug and
-    release because this self-hosted client supports user-picked LAN HTTP
-    servers; release keeps system trust anchors only. Intentional; keep
-    baselined.
+  - AcceptsUserCertificates: lint reports this from the debug overlay, where
+    user CAs are intentionally trusted for mitmproxy/local-device testing.
+    Release keeps system trust anchors only. Intentional; keep baselined.
 -->
 <issues format="6" by="lint 9.2.0" type="baseline" client="gradle" dependencies="false" name="AGP (9.2.0)" variant="all" version="9.2.0">
 
@@ -46,17 +43,6 @@
             file="src/debug/res/xml/network_security_config.xml"
             line="6"
             column="13"/>
-    </issue>
-
-    <issue
-        id="InsecureBaseConfiguration"
-        message="Insecure Base Configuration"
-        errorLine1="    &lt;base-config cleartextTrafficPermitted=&quot;true&quot;>"
-        errorLine2="                                            ~~~~">
-        <location
-            file="src/debug/res/xml/network_security_config.xml"
-            line="3"
-            column="45"/>
     </issue>
 
 </issues>

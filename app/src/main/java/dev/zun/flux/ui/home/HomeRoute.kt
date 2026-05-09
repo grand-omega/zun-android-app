@@ -52,6 +52,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -120,12 +121,19 @@ fun HomeRoute(
     val density = LocalDensity.current
     val refreshThresholdPx = with(density) { 96.dp.toPx() }
     var pullDistancePx by remember { mutableFloatStateOf(0f) }
+    val limitImagesMessage = pluralStringResource(R.plurals.home_limit_images_format, MAX_BATCH_IMAGES, MAX_BATCH_IMAGES)
+    val cappedImagesMessage = pluralStringResource(R.plurals.home_capped_images_format, MAX_BATCH_IMAGES, MAX_BATCH_IMAGES)
+    val promptSavedMessage = stringResource(R.string.home_prompt_saved)
+    val couldntLoadImageMessage = stringResource(R.string.home_couldnt_load_image)
+    val submittedFailedMessage = (state as? SubmitState.DoneBatch)
+        ?.takeIf { it.failed > 0 }
+        ?.let { pluralStringResource(R.plurals.home_submitted_failed_format, it.submittedIds.size, it.submittedIds.size, it.failed) }
 
     val appendUris: (List<Uri>) -> Unit = { newUris ->
         coroutineScope.launch {
             val remaining = MAX_BATCH_IMAGES - composer.inputUris.size
             if (remaining <= 0) {
-                snackbarHostState.showOne(context.getString(R.string.home_limit_images_format, MAX_BATCH_IMAGES))
+                snackbarHostState.showOne(limitImagesMessage)
                 return@launch
             }
             val toAdd = newUris.filter { it !in composer.inputUris }.take(remaining)
@@ -134,7 +142,7 @@ fun HomeRoute(
             }
             val result = viewModel.addInputUris(cached, MAX_BATCH_IMAGES)
             if (newUris.size > toAdd.size || result.capped) {
-                snackbarHostState.showOne(context.getString(R.string.home_capped_images_format, MAX_BATCH_IMAGES))
+                snackbarHostState.showOne(cappedImagesMessage)
             }
         }
     }
@@ -146,7 +154,7 @@ fun HomeRoute(
 
     LaunchedEffect(Unit) {
         viewModel.promptSavedEvents.collect {
-            snackbarHostState.showOne(context.getString(R.string.home_prompt_saved))
+            snackbarHostState.showOne(promptSavedMessage)
         }
     }
 
@@ -178,7 +186,7 @@ fun HomeRoute(
         val remaining = MAX_BATCH_IMAGES - composer.inputUris.size
         when {
             remaining <= 0 -> coroutineScope.launch {
-                snackbarHostState.showSnackbar(context.getString(R.string.home_limit_images_format, MAX_BATCH_IMAGES))
+                snackbarHostState.showSnackbar(limitImagesMessage)
             }
 
             remaining == 1 -> pickerSingle.launch(
@@ -200,9 +208,10 @@ fun HomeRoute(
 
             is SubmitState.DoneBatch -> {
                 viewModel.acknowledgeDone()
-                if (s.failed > 0) {
+                val message = submittedFailedMessage
+                if (message != null) {
                     snackbarHostState.showOne(
-                        context.getString(R.string.home_submitted_failed_format, s.submittedIds.size, s.failed),
+                        message,
                     )
                 }
                 onBatchSubmitted(s.submittedIds)
@@ -298,7 +307,7 @@ fun HomeRoute(
                             }
                             appendUris(listOf(uri))
                         } catch (_: Throwable) {
-                            snackbarHostState.showOne(context.getString(R.string.home_couldnt_load_image))
+                            snackbarHostState.showOne(couldntLoadImageMessage)
                         } finally {
                             isFetchingRecent = false
                         }
