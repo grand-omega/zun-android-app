@@ -28,11 +28,3 @@ Two `<!-- TODO -->` markers remain in `README.md`:
 1. **Screenshots** — add files under `docs/img/` and reference them from the Features section. Even one phone-frame screenshot of Home + Gallery is enough.
 2. **Releases page link** — once a fresh `v*` tag is published and the release artifact is attached, replace the placeholder with `https://github.com/<owner>/<repo>/releases`.
 
-## SQLCipher → plain-SQLite migration code
-
-Two files still carry migration code for the SQLCipher → plain Room switch (commit `8f05e6b`) and the offline-image-cache decryption removal (commit `49636c9`):
-
-- `app/src/main/java/dev/zun/flux/data/local/AppDatabase.kt` — first-launch passphrase wipe handling
-- `app/src/main/java/dev/zun/flux/data/repo/OfflineImageCache.kt` — `evictLegacyEncryptedFiles()`
-
-Both are load-bearing for users upgrading past those commits. **Keep through at least one full release cycle**, then file a follow-up to remove once telemetry / time has shown all installs have rolled forward.

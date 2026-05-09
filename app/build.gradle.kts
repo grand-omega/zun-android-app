@@ -61,10 +61,11 @@ android {
 
     defaultConfig {
         applicationId = "dev.zun.flux"
-        minSdk = 30
+        minSdk = 36
         targetSdk = 36
         versionCode = resolvedVersionCode
         versionName = resolvedVersionName
+        ndk { abiFilters += "arm64-v8a" }
     }
 
     val keystoreProps = Properties().apply {
@@ -146,7 +147,6 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
-    implementation(libs.androidx.compose.material3.windowsize)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     implementation(libs.androidx.navigation.compose)
@@ -175,7 +175,6 @@ dependencies {
 
     implementation(libs.androidx.biometric)
     implementation(libs.androidx.exifinterface)
-    implementation(libs.androidx.security.crypto)
 
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)

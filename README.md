@@ -19,7 +19,7 @@ FluxEdit pairs an Android phone with a [Zun Flux server](../zun-rust-server) on 
 
 ## Requirements
 
-- Android 11 (API 30) or newer.
+- Android 16 (API 36) or newer. Built and tested only on Samsung Galaxy Z Fold 7 (arm64-v8a).
 - A running [Zun Flux server](../zun-rust-server) reachable over LAN or Tailscale.
 - An API token issued by that server.
 
