@@ -32,6 +32,8 @@ benchmark = "1.5.0-alpha06"
 profileinstaller = "1.4.1"
 uiautomator = "2.3.0"
 androidxTestRunner = "1.7.0"
+sentry = "8.41.0"
+sentryGradlePlugin = "6.6.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -92,6 +94,7 @@ androidx-benchmark-macro-junit4 = { group = "androidx.benchmark", name = "benchm
 androidx-profileinstaller = { group = "androidx.profileinstaller", name = "profileinstaller", version.ref = "profileinstaller" }
 androidx-test-uiautomator = { group = "androidx.test.uiautomator", name = "uiautomator", version.ref = "uiautomator" }
 androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidxTestRunner" }
+sentry-android = { group = "io.sentry", name = "sentry-android", version.ref = "sentry" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
@@ -103,3 +106,4 @@ spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
 easylauncher = { id = "com.starter.easylauncher", version.ref = "easylauncher" }
 android-test = { id = "com.android.test", version.ref = "agp" }
 androidx-baselineprofile = { id = "androidx.baselineprofile", version.ref = "benchmark" }
+sentry-android = { id = "io.sentry.android.gradle", version.ref = "sentryGradlePlugin" }
