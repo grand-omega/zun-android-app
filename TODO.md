@@ -2,16 +2,6 @@
 
 Outstanding items from the production-readiness audit (2026-05). None are release blockers, but each should be resolved before announcing or growing the user base.
 
-## Lint baseline rationale is stale
-
-`app/lint-baseline.xml` (audit comment dated 2026-05) claims:
-
-> The release variant ships with `cleartextTrafficPermitted=false` and system trust anchors only.
-
-That is **not** what ships. `app/src/main/res/xml/network_security_config.xml` has `cleartextTrafficPermitted="true"` for both debug and release. The threat-model comment in the config file itself argues this is intentional (self-hosted LAN servers, no auto-connect, user-confirmed URL before any token is sent). The behaviour is fine — the **lint baseline rationale is wrong** and will mislead a future auditor.
-
-**Fix:** rewrite the `AcceptsUserCertificates / InsecureBaseConfiguration` paragraph in `app/lint-baseline.xml` to match reality: cleartext is permitted in both variants by design; the user-cert override is debug-only; HTTPS is enforced at input time via `ServerUrls.kt:92` (release builds reject `http://` URLs at save time).
-
 ## No instrumented tests in CI
 
 `app/src/androidTest/` contains the Room migration test (`AppDatabaseMigrationTest`). It runs locally on a connected device, but **CI does not run it**. Migration regressions could ship.
@@ -21,12 +11,11 @@ That is **not** what ships. `app/src/main/res/xml/network_security_config.xml` h
 - Or use `reactivecircus/android-emulator-runner` in the existing GitHub workflow to run `connectedDebugAndroidTest` on every PR.
 - Or accept the risk and add a PR-template checkbox: "I ran `./gradlew connectedDebugAndroidTest` locally."
 
-## README placeholders
+## README screenshot placeholder
 
-Two `<!-- TODO -->` markers remain in `README.md`:
+One `<!-- TODO -->` marker remains in `README.md`:
 
-1. **Screenshots** — add files under `docs/img/` and reference them from the Features section. Even one phone-frame screenshot of Home + Gallery is enough.
-2. **Releases page link** — once a fresh `v*` tag is published and the release artifact is attached, replace the placeholder with `https://github.com/<owner>/<repo>/releases`.
+**Screenshots** — add files under `docs/img/` and reference them from the Features section. Even one phone-frame screenshot of Home + Gallery is enough.
 
 ## Window-inset coverage sweep
 

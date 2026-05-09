@@ -1,6 +1,7 @@
 # local.properties is gitignored. The app no longer bakes the server URL or
 # API token into the APK; both are configured at runtime via the in-app Setup
-# screen (stored in EncryptedSharedPreferences).
+# screen. URLs are stored in app-private preferences; the API token is stored
+# in the Keystore-backed secure store.
 #
 # This file only needs Android SDK paths, e.g.:
 # sdk.dir=/Users/you/Library/Android/sdk

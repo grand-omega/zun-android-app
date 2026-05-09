@@ -30,8 +30,8 @@ All paths relative to `app/src/main/java/dev/zun/flux/`.
 |---|---|---|
 | `data/api` | Retrofit interface for the server contract | `FluxApi.kt` |
 | `data/local` | Room database, DAOs, entities | `AppDatabase.kt`, `JobDao.kt`, `JobEntity.kt`, `PendingDeleteEntity.kt` |
-| `data/repo` | Narrow repository interfaces + the unified implementation | `RealJobRepository.kt` (implements `JobRepository`, `HealthRepository`, `PromptRepository`, `UploadRepository`, `ImageSourceRepository`) |
-| `data/net` | Discovery, route selection, cert pinning, offline image cache | `ServerDiscovery.kt`, `NetworkResolver.kt`, `CertPinStore.kt`, `CertCapturer.kt`, `OfflineImageCache.kt` |
+| `data/repo` | Narrow repository interfaces + the unified implementation + persistence helpers | `RealJobRepository.kt`, `SettingsManager.kt`, `KeystoreSecureStore.kt`, `OfflineImageCache.kt` |
+| `data/net` | Discovery, route selection, cert pinning | `ServerDiscovery.kt`, `NetworkResolver.kt`, `CertPinStore.kt`, `CertCapturer.kt` |
 | `data/worker` | Background WorkManager jobs | `JobUploadWorker.kt`, `DeleteSyncWorker.kt` |
 | `data/diag` | OkHttp interceptor that records errors / timings for the Settings → Diagnostics panel | `Diagnostics.kt` |
 
@@ -68,7 +68,7 @@ Small helpers: `ImageUtils`, `ErrorMessages`, `ServerUrls`, `ShareUtils`, `Media
 2. The user enters an IP/hostname. `ServerDiscovery.scan(host)` tries `http`/`https` × `{5000, 5001, 7860, 8000, 8188}` against `/api/v1/health` with short timeouts, off the main thread.
 3. Each responding host returns its server version and ComfyUI status; the user picks one (or taps **Enter URL manually**).
 4. The user pastes their token. The screen calls `HealthRepository.check(url, token)` to verify.
-5. On success, the URL and token are written to `EncryptedSharedPreferences` via `SettingsManager`. `NetworkResolver.refresh()` rebuilds the OkHttp/Retrofit stack with the new credentials.
+5. On success, URLs/routing preferences are written to app-private preferences and the API token is written to `KeystoreSecureStore` via `SettingsManager`. `NetworkResolver.refresh()` rebuilds the OkHttp/Retrofit stack with the new credentials.
 
 ### 2. Submitting a job
 
@@ -108,7 +108,8 @@ When the user changes the server URL, token, or pinning state, `NetworkResolver.
 | Where | What |
 |---|---|
 | Room (`AppDatabase`, plain SQLite) | `jobs` and `pending_deletes` tables. Schema version 4. Schemas exported under `app/schemas/`. |
-| `EncryptedSharedPreferences` | Server URLs, API token, biometric lockout setting, `isAuthed` flag |
+| Plain SharedPreferences (`settings`) | Server URLs, active route, connection mode, biometric lockout duration, last successful unlock timestamp |
+| `KeystoreSecureStore` (`secure_v2`) | API token encrypted as AES/GCM ciphertext with the key held in Android Keystore |
 | `files/offline_images/` | JPEG cache for thumb / preview / result variants, LRU-evicted |
 | WorkManager | Upload and delete-sync work, persists across process death |
 
