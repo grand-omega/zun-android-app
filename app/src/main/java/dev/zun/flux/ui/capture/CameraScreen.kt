@@ -105,7 +105,11 @@ private fun CameraContent(
     val lifecycleOwner = LocalLifecycleOwner.current
     val haptic = LocalHapticFeedback.current
     var lensFacing by remember { mutableIntStateOf(CameraSelector.LENS_FACING_BACK) }
-    val imageCapture = remember { ImageCapture.Builder().build() }
+    val imageCapture = remember {
+        ImageCapture.Builder()
+            .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
+            .build()
+    }
     val preview = remember { Preview.Builder().build() }
     val previewView = remember { PreviewView(context) }
     val cameraSelector =
