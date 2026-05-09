@@ -133,8 +133,12 @@ fun SetupScreen(
                             selectedDiscoveredUrl = null
                             scope.launch {
                                 try {
-                                    val results = ServerDiscovery { app.okHttpClient }
-                                        .discover(parsed)
+                                    // Discovery uses its own short-timeout client
+                                    // — not app.okHttpClient, which has a 30s
+                                    // connect timeout, an auth interceptor, and
+                                    // cert pinning that doesn't apply to an
+                                    // unknown server.
+                                    val results = ServerDiscovery().discover(parsed)
                                     discovery = DiscoveryState.Done(parsed.host, results)
                                     if (results.size == 1) selectedDiscoveredUrl = results[0].url
                                 } catch (t: Throwable) {
