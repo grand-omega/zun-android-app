@@ -17,13 +17,13 @@ import java.io.IOException
 class ServerDiscoveryTest {
 
     @Test
-    fun `valid health response is returned with version and comfy state`() = runTest {
+    fun `valid health response is returned with version`() = runTest {
         val discovery = ServerDiscovery(
             okHttpClientFactory = {
                 stubClient { chain ->
                     val url = chain.request().url
                     if (url.scheme == "https" && url.host == "1.2.3.4" && url.port == 443) {
-                        ok(chain, """{"status":"ok","version":"0.4.0","comfy":{"ok":true}}""")
+                        ok(chain, """{"status":"ok","version":"0.4.0"}""")
                     } else {
                         notFound(chain)
                     }
@@ -36,7 +36,6 @@ class ServerDiscoveryTest {
         assertEquals(1, results.size)
         assertEquals("https://1.2.3.4:443", results[0].url)
         assertEquals("0.4.0", results[0].version)
-        assertTrue(results[0].comfyOk)
     }
 
     @Test

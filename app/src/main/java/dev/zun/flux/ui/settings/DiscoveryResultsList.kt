@@ -136,19 +136,6 @@ private fun DiscoveredServerCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.secondary,
             )
-            Text(
-                text = if (server.comfyOk) {
-                    stringResource(R.string.setup_lan_comfy_ok)
-                } else {
-                    stringResource(R.string.setup_lan_comfy_down)
-                },
-                style = MaterialTheme.typography.labelSmall,
-                color = if (server.comfyOk) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.error
-                },
-            )
         }
     }
 }

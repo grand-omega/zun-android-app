@@ -251,8 +251,6 @@
     <string name="setup_lan_search_invalid_host">Enter an IP address or hostname.</string>
     <string name="setup_lan_search_no_results">Couldn\'t find a server at %1$s. Check the address, or enter the URL manually.</string>
     <string name="setup_lan_found_format">version %1$s</string>
-    <string name="setup_lan_comfy_ok">ComfyUI ready</string>
-    <string name="setup_lan_comfy_down">ComfyUI down</string>
     <string name="setup_lan_manual_entry">Enter URL manually</string>
     <string name="setup_lan_manual_back">Back to search</string>
 

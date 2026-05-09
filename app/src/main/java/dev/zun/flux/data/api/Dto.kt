@@ -6,15 +6,7 @@ import kotlinx.serialization.Serializable
 data class HealthResponse(
     val status: String,
     val version: String? = null,
-    val comfy: ComfyHealth? = null,
     val disk: DiskHealth? = null,
-)
-
-@Serializable
-data class ComfyHealth(
-    val ok: Boolean,
-    val last_ok_at: Long? = null,
-    val consecutive_failures: Int = 0,
 )
 
 @Serializable
