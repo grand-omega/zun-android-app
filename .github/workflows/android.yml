@@ -126,7 +126,12 @@ jobs:
         keyPassword=${{ secrets.KEYSTORE_KEY_PASSWORD }}
         EOF
 
+    # SENTRY_AUTH_TOKEN scopes ProGuard mapping upload + source-context
+    # bundling. Tag-only — PR/push CI doesn't need it; the build's gradle
+    # config gracefully skips upload when the token isn't set.
     - name: Build Release APK
+      env:
+        SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
       run: ./gradlew assembleRelease --stacktrace
 
     - name: Stage release APK for release upload
