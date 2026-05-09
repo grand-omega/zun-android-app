@@ -1,6 +1,5 @@
 package dev.zun.flux.ui.settings
 
-import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,7 +37,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
@@ -62,7 +60,6 @@ import dev.zun.flux.ui.common.ScreenPadding
 import dev.zun.flux.ui.common.SettingsGroup
 import dev.zun.flux.ui.common.StatusPill
 import dev.zun.flux.ui.common.StatusTone
-import io.sentry.Sentry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -366,17 +363,6 @@ fun SettingsScreen(
                 InfoRow(stringResource(R.string.settings_active_url), settingsManager.serverUrl ?: stringResource(R.string.settings_value_none), isMonospace = true)
                 InfoRow(stringResource(R.string.settings_lan_url), settingsManager.lanUrl ?: stringResource(R.string.settings_value_not_set), isMonospace = true)
                 InfoRow(stringResource(R.string.settings_tailscale_url), settingsManager.tailscaleUrl ?: stringResource(R.string.settings_value_not_set), isMonospace = true)
-            }
-
-            if (BuildConfig.DEBUG) {
-                val ctx = LocalContext.current
-                OutlinedButton(
-                    onClick = {
-                        Sentry.captureMessage("Sentry wiring verified from ${BuildConfig.APPLICATION_ID}")
-                        Toast.makeText(ctx, "Test event sent to Sentry", Toast.LENGTH_SHORT).show()
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text("Send Sentry test event") }
             }
         }
     }
