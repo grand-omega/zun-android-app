@@ -36,9 +36,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.windowsizeclass.WindowSizeClass
-import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -83,7 +82,6 @@ fun HomeRoute(
     uploadRepo: UploadRepository,
     images: ImageSourceRepository,
     repositoryVersion: Long,
-    windowSizeClass: WindowSizeClass,
     capturedUri: Uri? = null,
     onTakePhoto: () -> Unit,
     onGalleryClick: () -> Unit,
@@ -214,7 +212,8 @@ fun HomeRoute(
         }
     }
 
-    val isWide = windowSizeClass.widthSizeClass >= WindowWidthSizeClass.Medium
+    val isWide = currentWindowAdaptiveInfo().windowSizeClass
+        .isWidthAtLeastBreakpoint(androidx.window.core.layout.WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },

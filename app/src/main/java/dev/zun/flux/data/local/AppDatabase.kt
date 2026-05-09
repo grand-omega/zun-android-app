@@ -1,7 +1,6 @@
 package dev.zun.flux.data.local
 
 import android.content.Context
-import androidx.core.content.edit
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -16,39 +15,14 @@ abstract class AppDatabase : RoomDatabase() {
         @Volatile
         private var instance: AppDatabase? = null
         private const val DB_NAME = "flux_database"
-        private const val MIGRATION_PREFS = "flux_db_migration_meta"
-        private const val UNENCRYPTED_KEY = "migrated_to_plain_v1"
 
         fun getDatabase(context: Context): AppDatabase = instance ?: synchronized(this) {
             instance ?: build(context.applicationContext).also { instance = it }
         }
 
-        private fun build(context: Context): AppDatabase {
-            wipeIfStillEncrypted(context)
-            return Room.databaseBuilder(context, AppDatabase::class.java, DB_NAME)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
-                .build()
-        }
-
-        /**
-         * On first launch after the SQLCipher → plain Room switch, any
-         * existing on-disk DB file is encrypted and Room can't open it.
-         * The data is a local cache of server state (jobs + pending deletes),
-         * so wipe and let it re-sync. A SharedPref sentinel makes this
-         * one-shot.
-         */
-        private fun wipeIfStillEncrypted(context: Context) {
-            val meta = context.getSharedPreferences(MIGRATION_PREFS, Context.MODE_PRIVATE)
-            if (meta.getBoolean(UNENCRYPTED_KEY, false)) return
-            val dbFile = context.getDatabasePath(DB_NAME)
-            if (dbFile.exists()) {
-                dbFile.delete()
-                java.io.File(dbFile.absolutePath + "-journal").delete()
-                java.io.File(dbFile.absolutePath + "-wal").delete()
-                java.io.File(dbFile.absolutePath + "-shm").delete()
-            }
-            meta.edit { putBoolean(UNENCRYPTED_KEY, true) }
-        }
+        private fun build(context: Context): AppDatabase = Room.databaseBuilder(context, AppDatabase::class.java, DB_NAME)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+            .build()
 
         val MIGRATION_1_2 = schemaMigration(1, 2)
         val MIGRATION_2_3 = schemaMigration(2, 3)

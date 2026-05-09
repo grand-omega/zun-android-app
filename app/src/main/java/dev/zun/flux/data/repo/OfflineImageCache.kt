@@ -36,10 +36,6 @@ class OfflineImageCache internal constructor(
         maxBytes = maxBytes,
     )
 
-    init {
-        evictLegacyEncryptedFiles()
-    }
-
     enum class Kind(val fileName: String) {
         Thumb("thumb.jpg"),
         Preview("preview.jpg"),
@@ -131,19 +127,6 @@ class OfflineImageCache internal constructor(
         }
     }
 
-    /**
-     * One-shot wipe of any cache files left over from the short-lived
-     * encrypted-cache era — those have a 13-byte vault header and won't
-     * decode as JPEG. Idempotent: a sentinel marks completion.
-     */
-    private fun evictLegacyEncryptedFiles() {
-        val sentinel = File(rootDir, PLAIN_SENTINEL)
-        if (sentinel.exists()) return
-        rootDir.deleteRecursively()
-        rootDir.mkdirs()
-        sentinel.createNewFile()
-    }
-
     private fun cacheFile(jobId: String, kind: Kind): File = File(jobDir(jobId), kind.fileName)
 
     private fun jobDir(jobId: String): File = File(rootDir, jobId.sanitizeFileName())
@@ -151,7 +134,6 @@ class OfflineImageCache internal constructor(
     private fun String.sanitizeFileName(): String = replace(Regex("[^A-Za-z0-9._-]"), "_")
 
     companion object {
-        private const val PLAIN_SENTINEL = ".plain-v1"
         private const val TAG = "OfflineImageCache"
     }
 }

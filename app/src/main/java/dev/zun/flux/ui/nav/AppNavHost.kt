@@ -1,6 +1,11 @@
 package dev.zun.flux.ui.nav
 
-import androidx.compose.material3.windowsizeclass.WindowSizeClass
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -36,7 +41,6 @@ private const val KEY_DELETED_JOB_ID = "deletedJobId"
 fun AppNavHost(
     repositories: Repositories,
     repositoryVersion: Long,
-    windowSizeClass: WindowSizeClass,
 ) {
     val context = LocalContext.current
     val app = context.applicationContext as FluxApp
@@ -44,7 +48,18 @@ fun AppNavHost(
     val startDestination = if (settingsManager.isConfigured) Routes.HOME else Routes.SETUP
 
     val nav = rememberNavController()
-    NavHost(navController = nav, startDestination = startDestination) {
+    val slideSpec = tween<IntOffset>(durationMillis = 300)
+    val fadeSpec = tween<Float>(durationMillis = 300)
+    NavHost(
+        navController = nav,
+        startDestination = startDestination,
+        // Forward navigation: new screen slides in from the right.
+        enterTransition = { slideInHorizontally(slideSpec) { it } + fadeIn(fadeSpec) },
+        exitTransition = { slideOutHorizontally(slideSpec) { -it / 4 } + fadeOut(fadeSpec) },
+        // Back navigation: predictive-back drives this in sync with the gesture.
+        popEnterTransition = { slideInHorizontally(slideSpec) { -it / 4 } + fadeIn(fadeSpec) },
+        popExitTransition = { slideOutHorizontally(slideSpec) { it } + fadeOut(fadeSpec) },
+    ) {
         composable(Routes.HOME) { entry ->
             // Check for photo capture result
             var capturedUri by remember { mutableStateOf<android.net.Uri?>(null) }
@@ -64,7 +79,6 @@ fun AppNavHost(
                 uploadRepo = repositories.uploads,
                 images = repositories.images,
                 repositoryVersion = repositoryVersion,
-                windowSizeClass = windowSizeClass,
                 capturedUri = capturedUri,
                 onTakePhoto = { nav.navigate(Routes.CAMERA) },
                 onGalleryClick = { nav.navigate(Routes.GALLERY) },
@@ -138,7 +152,6 @@ fun AppNavHost(
                 promptRepo = repositories.prompts,
                 uploads = repositories.uploads,
                 images = repositories.images,
-                windowSizeClass = windowSizeClass,
                 onRegenerated = { newJobId ->
                     nav.navigate(Routes.progress(newJobId)) {
                         popUpTo(Routes.HOME)
