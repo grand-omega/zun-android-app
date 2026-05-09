@@ -25,3 +25,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "zun-flux"
 include(":app")
+include(":baselineprofile")

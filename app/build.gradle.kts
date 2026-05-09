@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
     alias(libs.plugins.easylauncher)
+    alias(libs.plugins.androidx.baselineprofile)
 }
 
 val keystorePropsFile = rootProject.file("keystore.properties")
@@ -207,6 +208,13 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.guava)
     implementation(libs.androidx.compose.material.icons.extended)
+
+    // ProfileInstaller compiles the baseline profile on first install. The
+    // baselineProfile dependency below pulls the generated profile from the
+    // :baselineprofile module into app/src/<variant>/generated/baselineProfiles
+    // automatically when the producer plugin runs.
+    implementation(libs.androidx.profileinstaller)
+    "baselineProfile"(project(":baselineprofile"))
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
