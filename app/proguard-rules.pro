@@ -61,12 +61,6 @@
 -keep @androidx.room.Dao interface *
 -keep class * implements androidx.room.Entity
 
-# ---- SQLCipher --------------------------------------------------------------
-# JNI entry points + classes referenced from native code.
--keep class net.zetetic.database.** { *; }
--keep class net.zetetic.database.sqlcipher.** { *; }
--dontwarn net.zetetic.database.**
-
 # ---- Coil -------------------------------------------------------------------
 -dontwarn coil.**
 
