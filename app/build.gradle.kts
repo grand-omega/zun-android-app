@@ -117,6 +117,17 @@ android {
         }
     }
 
+    // The baseline-profile plugin registers `nonMinifiedRelease` and
+    // `benchmarkRelease` build types lazily — they don't exist at config
+    // time. Apply the .bp applicationIdSuffix in afterEvaluate so the
+    // macrobenchmark APK installs as dev.zun.flux.bp and doesn't collide
+    // on-device with the release-signed production app at dev.zun.flux.
+    afterEvaluate {
+        listOf("nonMinifiedRelease", "benchmarkRelease").forEach { name ->
+            buildTypes.findByName(name)?.applicationIdSuffix = ".bp"
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
