@@ -1,0 +1,76 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard",
+    ":semanticCommits"
+  ],
+  "schedule": ["before 4am on monday"],
+  "timezone": "Asia/Shanghai",
+  "labels": ["dependencies"],
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 0,
+  "rebaseWhen": "conflicted",
+  "packageRules": [
+    {
+      "matchPackageNames": [
+        "/^androidx\\.compose/",
+        "/^androidx\\.activity:activity-compose/",
+        "/^androidx\\.navigation:navigation-compose/",
+        "/^androidx\\.lifecycle.*compose/"
+      ],
+      "groupName": "Compose"
+    },
+    {
+      "matchPackageNames": [
+        "/^org\\.jetbrains\\.kotlin/",
+        "/^org\\.jetbrains\\.kotlinx/",
+        "/^com\\.google\\.devtools\\.ksp/"
+      ],
+      "groupName": "Kotlin + KSP"
+    },
+    {
+      "matchPackageNames": ["/^androidx\\.room/"],
+      "groupName": "Room"
+    },
+    {
+      "matchPackageNames": ["/^androidx\\.camera/"],
+      "groupName": "CameraX"
+    },
+    {
+      "matchPackageNames": ["/^androidx\\.paging/"],
+      "groupName": "Paging"
+    },
+    {
+      "matchPackageNames": ["/^androidx\\.benchmark/", "/^androidx\\.profileinstaller/", "/^androidx\\.test/"],
+      "groupName": "AndroidX test + benchmark"
+    },
+    {
+      "matchPackageNames": ["/^io\\.coil-kt/"],
+      "groupName": "Coil"
+    },
+    {
+      "matchPackageNames": ["/^com\\.squareup\\./"],
+      "groupName": "OkHttp + Retrofit"
+    },
+    {
+      "matchPackageNames": [
+        "/^com\\.android\\.tools\\.build/",
+        "/^com\\.android\\.application/",
+        "/^com\\.android\\.test/"
+      ],
+      "groupName": "AGP"
+    },
+    {
+      "description": "Don't auto-PR alpha→alpha bumps for already-pinned alphas — they churn faster than is useful. Stable→stable PRs are still produced.",
+      "matchCurrentVersion": "/-(alpha|beta|rc)/",
+      "matchUpdateTypes": ["patch", "minor"],
+      "enabled": false
+    },
+    {
+      "description": "Group all GitHub Actions bumps into one PR.",
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub Actions"
+    }
+  ]
+}
