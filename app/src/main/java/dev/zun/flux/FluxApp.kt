@@ -11,7 +11,6 @@ import dev.zun.flux.data.api.FluxApi
 import dev.zun.flux.data.diag.Diagnostics
 import dev.zun.flux.data.net.CertPinStore
 import dev.zun.flux.data.net.NetworkResolver
-import dev.zun.flux.data.repo.EncryptedCacheFetcherFactory
 import dev.zun.flux.data.repo.HealthRepository
 import dev.zun.flux.data.repo.ImageSourceRepository
 import dev.zun.flux.data.repo.JobRepository
@@ -99,9 +98,6 @@ class FluxApp : Application() {
         SingletonImageLoader.setSafe { ctx ->
             ImageLoader.Builder(ctx)
                 .components {
-                    // Custom fetcher decrypts flux-cache:// URIs produced by
-                    // OfflineImageCache when its Keystore-backed vault is active.
-                    add(EncryptedCacheFetcherFactory(offlineImageCache))
                     add(OkHttpNetworkFetcherFactory(callFactory = { okHttpClient }))
                 }
                 // Memory cache holds a few full-res bitmaps so scroll-back and Telephoto

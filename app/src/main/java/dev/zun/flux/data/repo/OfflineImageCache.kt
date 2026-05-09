@@ -2,6 +2,7 @@ package dev.zun.flux.data.repo
 
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import dev.zun.flux.Tuning
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -9,11 +10,16 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 
+/**
+ * Offline cache for server-served job images. Files are stored as plain JPEG
+ * bytes inside the app's private storage, which Android already protects via
+ * file-based encryption tied to the user lock. Coil loads them via its
+ * built-in `file://` fetcher.
+ */
 class OfflineImageCache internal constructor(
     val rootDir: File,
     private val okHttpClientProvider: () -> OkHttpClient,
     private val maxBytes: Long = Tuning.OFFLINE_IMAGE_CACHE_MAX_BYTES,
-    internal val vault: EncryptedFileVault? = null,
 ) {
     /**
      * Resolves the OkHttpClient at call time so that cert-pin / interceptor
@@ -28,11 +34,10 @@ class OfflineImageCache internal constructor(
         rootDir = File(context.filesDir, "offline_images"),
         okHttpClientProvider = okHttpClientProvider,
         maxBytes = maxBytes,
-        vault = EncryptedFileVault.from(context),
     )
 
     init {
-        if (vault != null) ensureEncryptedLayout()
+        evictLegacyEncryptedFiles()
     }
 
     enum class Kind(val fileName: String) {
@@ -51,7 +56,7 @@ class OfflineImageCache internal constructor(
 
     fun stats(): OfflineCacheStats {
         val files = rootDir.walkTopDown()
-            .filter { it.isFile && it.name != ENCRYPTED_SENTINEL }
+            .filter { it.isFile && !it.name.startsWith(".") }
             .toList()
         return OfflineCacheStats(
             bytes = files.sumOf { it.length() },
@@ -61,24 +66,7 @@ class OfflineImageCache internal constructor(
 
     fun localUri(jobId: String, kind: Kind): Uri? {
         if (!isCached(jobId, kind)) return null
-        return if (vault != null) {
-            // Custom scheme handled by EncryptedCacheFetcher in the Coil graph.
-            Uri.Builder()
-                .scheme(SCHEME)
-                .authority(jobId.sanitizeFileName())
-                .path("/${kind.fileName}")
-                .build()
-        } else {
-            Uri.fromFile(cacheFile(jobId, kind))
-        }
-    }
-
-    /** Returns decrypted bytes for the cached file, or null if absent. */
-    fun readDecrypted(safeJobId: String, kind: Kind): ByteArray? {
-        val file = File(File(rootDir, safeJobId), kind.fileName)
-        if (!file.exists() || file.length() == 0L) return null
-        val raw = file.readBytes()
-        return vault?.decrypt(raw) ?: raw
+        return Uri.fromFile(cacheFile(jobId, kind))
     }
 
     suspend fun prefetch(jobId: String, kind: Kind, url: String) {
@@ -96,10 +84,9 @@ class OfflineImageCache internal constructor(
                 val request = Request.Builder().url(url).build()
                 okHttpClientProvider().newCall(request).execute().use { response ->
                     if (!response.isSuccessful) error("Failed to cache image: ${response.code}")
-                    val source = response.body.byteStream()
-                    val rawSink = tempFile.outputStream()
-                    val sink = vault?.encryptingStream(rawSink) ?: rawSink
-                    sink.use { source.use { it.copyTo(sink) } }
+                    tempFile.outputStream().use { sink ->
+                        response.body.byteStream().use { it.copyTo(sink) }
+                    }
                 }
                 if (tempFile.length() > 0L) {
                     if (!tempFile.renameTo(outFile)) {
@@ -111,7 +98,8 @@ class OfflineImageCache internal constructor(
                 } else {
                     tempFile.delete()
                 }
-            }.onFailure {
+            }.onFailure { t ->
+                Log.w(TAG, "prefetch failed for $jobId/${kind.fileName} <- $url", t)
                 tempFile.delete()
             }
         }
@@ -123,7 +111,6 @@ class OfflineImageCache internal constructor(
 
     fun clear() {
         rootDir.deleteRecursively()
-        if (vault != null) ensureEncryptedLayout()
     }
 
     private fun isCached(jobId: String, kind: Kind): Boolean {
@@ -133,7 +120,7 @@ class OfflineImageCache internal constructor(
 
     private fun prune() {
         val files = rootDir.walkTopDown()
-            .filter { it.isFile && it.name != ENCRYPTED_SENTINEL }
+            .filter { it.isFile && !it.name.startsWith(".") }
             .sortedBy { it.lastModified() }
             .toList()
         var total = files.sumOf { it.length() }
@@ -145,13 +132,12 @@ class OfflineImageCache internal constructor(
     }
 
     /**
-     * One-shot wipe of any pre-existing plaintext cache files. Idempotent —
-     * subsequent runs see the sentinel and exit cheaply. Drops cached images
-     * (rather than re-encrypting them) because the data is replenishable from
-     * the server and a wipe avoids partial-migration edge cases.
+     * One-shot wipe of any cache files left over from the short-lived
+     * encrypted-cache era — those have a 13-byte vault header and won't
+     * decode as JPEG. Idempotent: a sentinel marks completion.
      */
-    private fun ensureEncryptedLayout() {
-        val sentinel = File(rootDir, ENCRYPTED_SENTINEL)
+    private fun evictLegacyEncryptedFiles() {
+        val sentinel = File(rootDir, PLAIN_SENTINEL)
         if (sentinel.exists()) return
         rootDir.deleteRecursively()
         rootDir.mkdirs()
@@ -165,7 +151,7 @@ class OfflineImageCache internal constructor(
     private fun String.sanitizeFileName(): String = replace(Regex("[^A-Za-z0-9._-]"), "_")
 
     companion object {
-        const val SCHEME = "flux-cache"
-        private const val ENCRYPTED_SENTINEL = ".encrypted"
+        private const val PLAIN_SENTINEL = ".plain-v1"
+        private const val TAG = "OfflineImageCache"
     }
 }
