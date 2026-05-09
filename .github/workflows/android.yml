@@ -39,7 +39,7 @@ jobs:
       uses: gradle/actions/setup-gradle@v4
 
     - name: Lint GitHub Actions workflows
-      uses: rhysd/actionlint@v1
+      uses: rhysd/actionlint@v1.7.12
 
     - name: Build Debug APK
       run: ./gradlew assembleDebug --stacktrace -Porg.gradle.java.installations.auto-download=false -Porg.gradle.java.installations.auto-detect=true
