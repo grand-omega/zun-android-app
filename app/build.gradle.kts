@@ -8,9 +8,21 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.easylauncher)
     alias(libs.plugins.androidx.baselineprofile)
+    alias(libs.plugins.sentry.android)
 }
 
 val keystorePropsFile = rootProject.file("keystore.properties")
+
+/**
+ * SENTRY_DSN from local.properties (gitignored). DSNs are not secret in
+ * Sentry's threat model, but routing it through local.properties keeps
+ * project-specific endpoints out of source control. If absent, the app
+ * compiles fine — SentryAndroid.init silently no-ops on a blank DSN.
+ */
+val sentryDsn: String = rootProject.file("local.properties").let { f ->
+    if (!f.exists()) return@let ""
+    Properties().apply { f.inputStream().use { load(it) } }.getProperty("SENTRY_DSN", "")
+}
 
 /**
  * Run a command and return its trimmed stdout, or null on any failure
@@ -68,6 +80,8 @@ android {
         versionCode = resolvedVersionCode
         versionName = resolvedVersionName
         ndk { abiFilters += "arm64-v8a" }
+
+        buildConfigField("String", "SENTRY_DSN", "\"$sentryDsn\"")
     }
 
     val keystoreProps = Properties().apply {
@@ -156,6 +170,21 @@ easylauncher {
     }
 }
 
+sentry {
+    // ProGuard-mapping upload + source-context bundling both require an auth
+    // token; off until one is provisioned. R8 stack-traces in release builds
+    // will show obfuscated names until then. (Debug builds are unobfuscated
+    // so dev-time crashes are already readable.)
+    autoUploadProguardMapping.set(false)
+    includeSourceContext.set(false)
+    autoInstallation.enabled.set(false)
+    // Bytecode-level OkHttp/Room instrumentation is free regardless and adds
+    // useful breadcrumbs (HTTP requests, DB queries) to crash reports.
+    tracingInstrumentation {
+        enabled.set(true)
+    }
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -215,6 +244,8 @@ dependencies {
     // automatically when the producer plugin runs.
     implementation(libs.androidx.profileinstaller)
     "baselineProfile"(project(":baselineprofile"))
+
+    implementation(libs.sentry.android)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
