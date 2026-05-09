@@ -33,8 +33,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.windowsizeclass.WindowSizeClass
-import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -89,7 +88,6 @@ fun ResultScreen(
     promptRepo: PromptRepository,
     uploads: UploadRepository,
     images: ImageSourceRepository,
-    windowSizeClass: WindowSizeClass,
     onRegenerated: (String) -> Unit,
     onNewImage: () -> Unit,
     onDeleted: () -> Unit,
@@ -119,7 +117,8 @@ fun ResultScreen(
     val prompts by promptRepo.promptsState.collectAsState()
     val app = context.applicationContext as dev.zun.flux.FluxApp
     val pinnedIds by app.pinnedPrompts.ids.collectAsState()
-    val isWide = windowSizeClass.widthSizeClass >= WindowWidthSizeClass.Medium
+    val isWide = currentWindowAdaptiveInfo().windowSizeClass
+        .isWidthAtLeastBreakpoint(androidx.window.core.layout.WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)
 
     LaunchedEffect(jobDto?.id) {
         val dto = jobDto ?: return@LaunchedEffect

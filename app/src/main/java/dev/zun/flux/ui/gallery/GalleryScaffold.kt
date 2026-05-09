@@ -1,11 +1,11 @@
 package dev.zun.flux.ui.gallery
 
 import android.net.Uri
-import androidx.activity.compose.BackHandler
+import androidx.compose.animation.fadeOut
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.layout.AnimatedPane
-import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffold
 import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffoldRole
+import androidx.compose.material3.adaptive.navigation.NavigableListDetailPaneScaffold
 import androidx.compose.material3.adaptive.navigation.rememberListDetailPaneScaffoldNavigator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
@@ -38,11 +38,8 @@ fun GalleryScaffold(
     val navigator = rememberListDetailPaneScaffoldNavigator<String>()
     val scope = rememberCoroutineScope()
 
-    BackHandler(navigator.canNavigateBack()) { scope.launch { navigator.navigateBack() } }
-
-    ListDetailPaneScaffold(
-        directive = navigator.scaffoldDirective,
-        value = navigator.scaffoldValue,
+    NavigableListDetailPaneScaffold(
+        navigator = navigator,
         listPane = {
             AnimatedPane {
                 GalleryScreen(
@@ -57,7 +54,10 @@ fun GalleryScaffold(
             }
         },
         detailPane = {
-            AnimatedPane {
+            // Fade out only — no slide — when leaving the photo viewer back to
+            // the gallery list, so predictive-back doesn't tow a heavy dark
+            // pane across the screen.
+            AnimatedPane(exitTransition = fadeOut()) {
                 val jobId = navigator.currentDestination?.contentKey
                 if (jobId != null) {
                     PhotoViewerScreen(

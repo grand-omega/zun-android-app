@@ -5,8 +5,6 @@ import android.util.Log
 import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
-import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -25,7 +23,6 @@ private const val TAG = "MainActivity"
 class MainActivity : FragmentActivity() {
     private var unlockMessage by mutableStateOf<String?>(null)
 
-    @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
@@ -45,7 +42,6 @@ class MainActivity : FragmentActivity() {
         )
 
         setContent {
-            val windowSizeClass = calculateWindowSizeClass(this)
             val repoState by app.repositoryState.collectAsStateWithLifecycle()
             ZunFluxTheme {
                 val current = repoState
@@ -53,7 +49,6 @@ class MainActivity : FragmentActivity() {
                     AppNavHost(
                         repositories = current.repositories,
                         repositoryVersion = current.version,
-                        windowSizeClass = windowSizeClass,
                     )
                 } else {
                     LockScreen(
