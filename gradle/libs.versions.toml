@@ -17,6 +17,7 @@ camerax = "1.6.1"
 biometric = "1.1.0"
 exifinterface = "1.4.2"
 spotless = "8.4.0"
+easylauncher = "6.4.1"
 ktlint = "1.8.0"
 ksp = "2.3.7"
 room = "2.8.4"
@@ -91,3 +92,4 @@ kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "ko
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
+easylauncher = { id = "com.starter.easylauncher", version.ref = "easylauncher" }
