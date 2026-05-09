@@ -52,6 +52,13 @@ jobs:
     - name: Run Spotless Check
       run: ./gradlew spotlessCheck --stacktrace
 
+    # Catch R8/minification regressions on PR rather than at tag time. The
+    # build's signing-config guard skips the keystore requirement when CI=true,
+    # so this produces an unsigned release APK — fine for verifying that R8
+    # rules are still consistent with the source.
+    - name: Verify Release Build (R8)
+      run: ./gradlew assembleRelease --stacktrace
+
     - name: Upload Debug Artifact
       uses: actions/upload-artifact@v4
       with:
