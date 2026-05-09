@@ -32,6 +32,7 @@ abstract class AppDatabase : RoomDatabase() {
             // path. The encrypt/decrypt round-trip itself is exercised in
             // AppDatabaseEncryptionMigrationTest (instrumented).
             if (!isRobolectric()) {
+                ensureSqlcipherLoaded()
                 val passphrase = DatabasePassphrase.get(context)
                 migratePlaintextIfNeeded(context, DB_NAME, passphrase)
                 builder.openHelperFactory(SupportOpenHelperFactory(passphrase.toByteArray(Charsets.UTF_8)))
@@ -44,6 +45,18 @@ abstract class AppDatabase : RoomDatabase() {
         }.isSuccess
 
         /**
+         * Loads SQLCipher's native library. The new
+         * `net.zetetic:sqlcipher-android` package (unlike the legacy
+         * `net.sqlcipher` package) does NOT self-load — without this call,
+         * nativeOpen throws UnsatisfiedLinkError on first DB access. Called
+         * from every entry point that opens an encrypted DB.
+         * `System.loadLibrary` is idempotent.
+         */
+        private fun ensureSqlcipherLoaded() {
+            System.loadLibrary("sqlcipher")
+        }
+
+        /**
          * If the on-disk database is unencrypted (i.e. predates this version of
          * the app), re-encrypt it in place using [sqlcipher_export]. No-op if the
          * file is missing or already encrypted.
@@ -53,6 +66,7 @@ abstract class AppDatabase : RoomDatabase() {
          */
         @JvmStatic
         internal fun migratePlaintextIfNeeded(context: Context, dbName: String, passphrase: String) {
+            ensureSqlcipherLoaded()
             val dbFile = context.getDatabasePath(dbName)
             if (!dbFile.exists()) return
             if (!isPlaintextDatabase(dbFile)) return
