@@ -20,7 +20,6 @@ import java.util.concurrent.TimeUnit
 data class DiscoveredServer(
     val url: String,
     val version: String,
-    val comfyOk: Boolean,
 )
 
 /**
@@ -92,7 +91,6 @@ class ServerDiscovery(
                         DiscoveredServer(
                             url = baseUrl,
                             version = version,
-                            comfyOk = parsed.comfy?.ok == true,
                         )
                     }
                 }
