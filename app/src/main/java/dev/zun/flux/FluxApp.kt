@@ -118,6 +118,8 @@ class FluxApp : Application() {
 
         rebuildRepository()
 
+        sweepStagedUploadFiles()
+
         // Re-pick LAN vs Tailscale on every default-network change. Network changes
         // must bypass the resolver's debounce cache — otherwise a Wi-Fi → cellular
         // transition shortly after a successful probe keeps the stale URL until the
@@ -156,6 +158,21 @@ class FluxApp : Application() {
             options.isAttachScreenshot = false
             options.isAttachViewHierarchy = false
         }
+    }
+
+    /**
+     * Delete staged upload files orphaned by a crash or a cancellation whose
+     * cleanup failed (see RealJobRepository.cancelJobUpload — the staged path
+     * is recovered from a WorkManager tag, which can miss). Without this they
+     * sit in cacheDir until Android trims it.
+     */
+    private fun sweepStagedUploadFiles() {
+        Thread {
+            val cutoff = System.currentTimeMillis() - Tuning.STAGED_UPLOAD_MAX_AGE_MS
+            cacheDir.listFiles()
+                ?.filter { it.name.startsWith("upload_preprocessed_") && it.lastModified() < cutoff }
+                ?.forEach { it.delete() }
+        }.start()
     }
 
     /** Rebuild OkHttpClient — called when cert pins change so the new pinner takes effect. */

@@ -9,6 +9,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import dev.zun.flux.FluxApp
+import retrofit2.HttpException
 import java.io.IOException
 
 class DeleteSyncWorker(
@@ -21,10 +22,16 @@ class DeleteSyncWorker(
         return try {
             jobs.syncPendingDeletes()
             Result.success()
+        } catch (e: HttpException) {
+            // 429/5xx may resolve on their own; other 4xx (bad token, forbidden)
+            // won't, so don't burn WorkManager backoff on them. Terminal failures
+            // keep the pending_deletes rows in Room — the next deleteJob() or
+            // syncHistory() re-enqueues this worker, so nothing is lost.
+            if (e.code() == 429 || e.code() >= 500) Result.retry() else Result.failure()
         } catch (_: IOException) {
             Result.retry()
         } catch (_: Exception) {
-            Result.retry()
+            Result.failure()
         }
     }
 

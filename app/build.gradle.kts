@@ -96,7 +96,7 @@ android {
         targetSdk = 36
         versionCode = resolvedVersionCode
         versionName = resolvedVersionName
-        ndk { abiFilters += "arm64-v8a" }
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "SENTRY_DSN", "\"$sentryDsn\"")
     }
@@ -131,6 +131,9 @@ android {
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfigs.findByName("release")?.let { signingConfig = it }
+            // arm64-only is fine for the sideloaded device build, but debug must
+            // keep x86_64 native libs so instrumented tests run on CI emulators.
+            ndk { abiFilters += "arm64-v8a" }
         }
     }
 
@@ -297,7 +300,7 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 
     androidTestImplementation(libs.androidx.test.ext.junit)
-    androidTestImplementation(libs.androidx.room.testing)
+    androidTestImplementation(libs.androidx.test.runner)
 }
 
 ksp {
