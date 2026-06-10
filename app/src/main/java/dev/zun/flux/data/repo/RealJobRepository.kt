@@ -61,11 +61,22 @@ class RealJobRepository(
     private val cacheScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val cachedPromptsStore = CachedPromptsStore(context)
 
-    // Seed from the persisted copy so the prompt picker isn't empty after
-    // process death while the server is unreachable.
-    private val _promptsState = MutableStateFlow(cachedPromptsStore.load())
+    private val _promptsState = MutableStateFlow<List<PromptDto>>(emptyList())
     override val promptsState: StateFlow<List<PromptDto>> = _promptsState.asStateFlow()
     private val localDeletedIds = MutableStateFlow<Set<String>>(emptySet())
+
+    init {
+        // Seed from the persisted copy so the prompt picker isn't empty after
+        // process death while the server is unreachable. Loaded off the main
+        // thread (first SharedPreferences read does disk I/O); only applied if
+        // a server fetch hasn't already populated the list.
+        cacheScope.launch {
+            val cached = cachedPromptsStore.load()
+            if (cached.isNotEmpty()) {
+                _promptsState.compareAndSet(emptyList(), cached)
+            }
+        }
+    }
 
     override suspend fun health(): HealthResponse = api.health()
 
