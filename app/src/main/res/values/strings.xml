@@ -17,6 +17,25 @@
     <string name="common_clear">Clear</string>
     <string name="common_connect">Connect</string>
     <string name="common_more">More</string>
+    <string name="common_image_unavailable">Image unavailable</string>
+
+    <!-- Health status (Home top bar) -->
+    <string name="health_checking">Checking</string>
+    <string name="health_online">Online</string>
+    <string name="health_invalid_token">Invalid token</string>
+    <string name="health_service_down_short">Server app not running</string>
+    <string name="health_host_unreachable_short">Machine unreachable</string>
+    <string name="health_network_issue_short">Network route issue</string>
+    <string name="health_server_error_short_format">Server %1$d</string>
+    <string name="health_desc_checking">Checking connection</string>
+    <string name="health_desc_connected">Connected</string>
+    <string name="health_desc_invalid_token">Invalid API token</string>
+    <string name="health_desc_service_down">Server PC is reachable, but the server app is not responding. Start the server binary.</string>
+    <string name="health_desc_server_error_format">Server error %1$d</string>
+    <string name="health_route_none">No route</string>
+
+    <!-- Before/after compare -->
+    <string name="compare_before_after">Before / After</string>
 
     <!-- Auth / Lock -->
     <string name="auth_locked_title">FluxEdit is locked</string>
@@ -304,7 +323,11 @@
         <item quantity="other">%1$d pending</item>
     </plurals>
     <string name="settings_recent_errors">Recent Errors</string>
+    <string name="settings_copy_errors">Copy</string>
+    <string name="settings_errors_copied">Errors copied to clipboard</string>
     <string name="settings_no_errors_recorded">No errors recorded</string>
+    <string name="settings_server_version">Server Version</string>
+    <string name="settings_server_storage">Server Storage</string>
     <string name="settings_app_info_title">App Info</string>
     <string name="settings_version">Version</string>
     <string name="settings_build">Build</string>

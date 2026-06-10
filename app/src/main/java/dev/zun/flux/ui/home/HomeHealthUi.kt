@@ -8,9 +8,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import dev.zun.flux.R
 import dev.zun.flux.data.repo.ActiveRoute
 
 @Composable
@@ -40,28 +42,31 @@ fun healthColor(health: HealthState): Color = when (health) {
     -> MaterialTheme.colorScheme.error
 }
 
+@Composable
 fun healthShortLabel(health: HealthState): String = when (health) {
-    HealthState.Checking -> "Checking"
-    HealthState.Connected -> "Online"
-    HealthState.Unauthorized -> "Invalid token"
-    is HealthState.ServiceDown -> "Server app not running"
-    is HealthState.HostUnreachable -> "Machine unreachable"
-    is HealthState.NetworkError -> "Network route issue"
-    is HealthState.ServerError -> "Server ${health.code}"
+    HealthState.Checking -> stringResource(R.string.health_checking)
+    HealthState.Connected -> stringResource(R.string.health_online)
+    HealthState.Unauthorized -> stringResource(R.string.health_invalid_token)
+    is HealthState.ServiceDown -> stringResource(R.string.health_service_down_short)
+    is HealthState.HostUnreachable -> stringResource(R.string.health_host_unreachable_short)
+    is HealthState.NetworkError -> stringResource(R.string.health_network_issue_short)
+    is HealthState.ServerError -> stringResource(R.string.health_server_error_short_format, health.code)
 }
 
+@Composable
 fun healthDescription(health: HealthState): String = when (health) {
-    HealthState.Checking -> "Checking connection"
-    HealthState.Connected -> "Connected"
-    HealthState.Unauthorized -> "Invalid API token"
-    is HealthState.ServiceDown -> "Server PC is reachable, but the server app is not responding. Start the server binary."
+    HealthState.Checking -> stringResource(R.string.health_desc_checking)
+    HealthState.Connected -> stringResource(R.string.health_desc_connected)
+    HealthState.Unauthorized -> stringResource(R.string.health_desc_invalid_token)
+    is HealthState.ServiceDown -> stringResource(R.string.health_desc_service_down)
     is HealthState.HostUnreachable -> health.message
     is HealthState.NetworkError -> health.message
-    is HealthState.ServerError -> "Server error ${health.code}"
+    is HealthState.ServerError -> stringResource(R.string.health_desc_server_error_format, health.code)
 }
 
+@Composable
 fun activeRouteLabel(route: ActiveRoute): String = when (route) {
-    ActiveRoute.NONE -> "No route"
-    ActiveRoute.LAN -> "LAN"
-    ActiveRoute.TAILSCALE -> "Tailscale"
+    ActiveRoute.NONE -> stringResource(R.string.health_route_none)
+    ActiveRoute.LAN -> stringResource(R.string.settings_active_route_lan)
+    ActiveRoute.TAILSCALE -> stringResource(R.string.settings_active_route_tailscale)
 }

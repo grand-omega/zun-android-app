@@ -82,6 +82,7 @@ fun SettingsScreen(
     var lockoutDuration by remember { mutableLongStateOf(settingsManager.lockoutDurationMs) }
     val connectionDraft by viewModel.connectionDraft.collectAsStateWithLifecycle()
     val offlineCache by viewModel.offlineCache.collectAsStateWithLifecycle()
+    val serverHealth by viewModel.serverHealth.collectAsStateWithLifecycle()
     val diagnostics by app.diagnostics.state.collectAsStateWithLifecycle()
     val certPins by app.certPinStore.pins.collectAsStateWithLifecycle()
     val uploadQueueFlow = remember(app) {
@@ -331,16 +332,42 @@ fun SettingsScreen(
             ) {
                 InfoRow(stringResource(R.string.settings_active_route), activeRouteLabel(settingsManager.activeRoute))
                 InfoRow(stringResource(R.string.settings_last_successful_request), relativeTimeOrDash(diagnostics.lastSuccessAtMs))
+                serverHealth?.version?.let { version ->
+                    InfoRow(stringResource(R.string.settings_server_version), version)
+                }
+                serverHealth?.disk?.data_bytes?.let { bytes ->
+                    InfoRow(stringResource(R.string.settings_server_storage), formatBytes(bytes))
+                }
                 val pendingUploads = uploadQueue.count {
                     it.state == WorkInfo.State.ENQUEUED || it.state == WorkInfo.State.RUNNING
                 }
                 InfoRow(stringResource(R.string.settings_upload_queue), pluralStringResource(R.plurals.settings_pending_format, pendingUploads, pendingUploads))
                 if (diagnostics.recentErrors.isNotEmpty()) {
-                    Text(
-                        text = stringResource(R.string.settings_recent_errors),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.secondary,
-                    )
+                    val context = androidx.compose.ui.platform.LocalContext.current
+                    val copiedMessage = stringResource(R.string.settings_errors_copied)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.settings_recent_errors),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.weight(1f),
+                        )
+                        TextButton(
+                            onClick = {
+                                val text = diagnostics.recentErrors.joinToString("\n") { err ->
+                                    "${formatClock(err.timestampMs)}  ${err.path}  —  ${err.message}"
+                                }
+                                val clipboard = context.getSystemService(android.content.ClipboardManager::class.java)
+                                clipboard?.setPrimaryClip(android.content.ClipData.newPlainText("FluxEdit errors", text))
+                                android.widget.Toast.makeText(context, copiedMessage, android.widget.Toast.LENGTH_SHORT).show()
+                            },
+                        ) {
+                            Text(stringResource(R.string.settings_copy_errors))
+                        }
+                    }
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         diagnostics.recentErrors.forEach { err ->
                             Text(

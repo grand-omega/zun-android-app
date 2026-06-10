@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.zun.flux.BuildConfig
 import dev.zun.flux.FluxApp
+import dev.zun.flux.data.api.HealthResponse
 import dev.zun.flux.data.repo.ConnectionMode
 import dev.zun.flux.data.repo.OfflineCacheStats
 import dev.zun.flux.util.normalizeOptionalLanServerUrl
@@ -49,6 +50,16 @@ class SettingsViewModel(
         OfflineCacheState(stats = app.repositories.images.offlineCacheStats()),
     )
     val offlineCache: StateFlow<OfflineCacheState> = _offlineCache.asStateFlow()
+
+    /** Best-effort snapshot of /health for the Diagnostics panel; null until fetched or on failure. */
+    private val _serverHealth = MutableStateFlow<HealthResponse?>(null)
+    val serverHealth: StateFlow<HealthResponse?> = _serverHealth.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            _serverHealth.value = runCatching { app.repositories.health.health() }.getOrNull()
+        }
+    }
 
     fun updateLanUrl(value: String) = updateDraft { copy(lanUrl = value, error = null, status = "Unsaved changes") }
 
