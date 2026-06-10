@@ -1,5 +1,6 @@
 package dev.zun.flux.ui.common
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -23,12 +24,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import dev.zun.flux.R
 
 val ScreenPadding = 24.dp
 val CompactScreenPadding = 16.dp
@@ -102,7 +106,7 @@ fun EmptyState(
 @Composable
 fun MissingImageState(
     modifier: Modifier = Modifier,
-    label: String = "Image unavailable",
+    label: String = stringResource(R.string.common_image_unavailable),
     dark: Boolean = false,
 ) {
     val contentColor =
@@ -135,13 +139,15 @@ fun StatusPill(
     tone: StatusTone = StatusTone.Info,
     icon: ImageVector? = null,
 ) {
-    val color = when (tone) {
+    val toneColor = when (tone) {
         StatusTone.Info -> MaterialTheme.colorScheme.primary
         StatusTone.Success -> Color(0xFF1D9E75)
         StatusTone.Warning -> Color(0xFFAA6A00)
         StatusTone.Error -> MaterialTheme.colorScheme.error
         StatusTone.Neutral -> MaterialTheme.colorScheme.onSurfaceVariant
     }
+    // Animate so tone flips (e.g. Connecting → Error) don't snap.
+    val color by animateColorAsState(toneColor, label = "statusPillColor")
     val resolvedIcon = icon ?: when (tone) {
         StatusTone.Success -> Icons.Default.CheckCircle
         StatusTone.Error -> Icons.Default.ErrorOutline

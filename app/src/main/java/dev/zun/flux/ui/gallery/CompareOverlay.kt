@@ -32,8 +32,10 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import dev.zun.flux.R
 
 @Composable
 fun CompareOverlay(
@@ -61,7 +63,7 @@ fun CompareOverlay(
                 .padding(12.dp)
                 .background(Color.Black.copy(alpha = 0.55f), CircleShape),
         ) {
-            Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.common_close), tint = Color.White)
         }
     }
 }
@@ -97,13 +99,13 @@ fun BeforeAfterSlider(
     ) {
         AsyncImage(
             model = afterModel,
-            contentDescription = "After",
+            contentDescription = stringResource(R.string.result_after),
             contentScale = ContentScale.Fit,
             modifier = Modifier.fillMaxSize(),
         )
         AsyncImage(
             model = beforeModel,
-            contentDescription = "Before",
+            contentDescription = stringResource(R.string.result_before),
             contentScale = ContentScale.Fit,
             modifier = Modifier
                 .fillMaxSize()
@@ -149,7 +151,7 @@ fun BeforeAfterSlider(
             shape = RoundedCornerShape(16.dp),
         ) {
             Text(
-                text = "Before / After",
+                text = stringResource(R.string.compare_before_after),
                 color = Color.White,
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                 style = MaterialTheme.typography.labelMedium,
