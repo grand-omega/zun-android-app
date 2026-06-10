@@ -355,6 +355,16 @@ class HomeViewModel(
         }
     }
 
+    fun updatePrompt(promptId: Long, label: String, text: String) {
+        viewModelScope.launch {
+            try {
+                promptRepo.updatePrompt(promptId, label.trim(), text.trim())
+            } catch (t: Throwable) {
+                _promptErrors.trySend(t.message ?: "Failed to update prompt")
+            }
+        }
+    }
+
     fun deletePrompt(promptId: Long) {
         viewModelScope.launch {
             try {

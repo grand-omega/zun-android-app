@@ -191,6 +191,10 @@
     <string name="prompts_manage_title">Manage prompts</string>
     <string name="prompts_no_saved">No saved prompts yet</string>
     <string name="prompts_delete">Delete prompt</string>
+    <string name="prompts_edit">Edit prompt</string>
+    <string name="prompts_edit_title">Edit prompt</string>
+    <string name="prompts_edit_label">Label</string>
+    <string name="prompts_edit_text">Prompt text</string>
     <string name="prompts_write_your_own">Write your own…</string>
     <string name="prompts_custom_placeholder">e.g. A cat wearing a spacesuit</string>
     <string name="prompts_save_prompt">Save prompt</string>

@@ -84,6 +84,8 @@ fun HomeRoute(
     images: ImageSourceRepository,
     repositoryVersion: Long,
     capturedUri: Uri? = null,
+    sharedUris: List<Uri> = emptyList(),
+    onSharedUrisConsumed: () -> Unit = {},
     onTakePhoto: () -> Unit,
     onGalleryClick: () -> Unit,
     onSettingsClick: () -> Unit,
@@ -150,6 +152,15 @@ fun HomeRoute(
     LaunchedEffect(capturedUri) {
         val src = capturedUri ?: return@LaunchedEffect
         appendUris(listOf(src))
+    }
+
+    // Images arriving via the system share sheet. Consume immediately so a
+    // recomposition doesn't re-add them.
+    LaunchedEffect(sharedUris) {
+        if (sharedUris.isNotEmpty()) {
+            appendUris(sharedUris)
+            onSharedUrisConsumed()
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -328,6 +339,7 @@ fun HomeRoute(
                 tryHarder = composer.tryHarder,
                 onTryHarderChange = viewModel::setTryHarder,
                 onDeletePrompt = viewModel::deletePrompt,
+                onUpdatePrompt = viewModel::updatePrompt,
                 onSavePromptClick = {
                     saveDialogLabel = ""
                     showSaveDialog = true
@@ -345,6 +357,7 @@ fun HomeRoute(
                 onPickRecent = onPickRecent,
                 pinnedIds = pinnedIds,
                 onTogglePin = { app.pinnedPrompts.toggle(it) },
+                onImagesDropped = appendUris,
             )
             if (isRefreshing || pullDistancePx > 0f) {
                 Surface(

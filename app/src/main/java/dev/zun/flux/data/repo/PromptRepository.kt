@@ -13,6 +13,9 @@ interface PromptRepository {
     /** Creates a new server-side prompt and refreshes [promptsState]. Returns the new row. */
     suspend fun createPrompt(label: String, text: String, workflow: String): PromptDto
 
+    /** Updates an existing server-side prompt and refreshes [promptsState]. Returns the updated row. */
+    suspend fun updatePrompt(promptId: Long, label: String, text: String): PromptDto
+
     /** Soft-deletes a server-side prompt and refreshes [promptsState]. */
     suspend fun deletePrompt(promptId: Long)
 }

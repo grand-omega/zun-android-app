@@ -86,6 +86,15 @@ class RealJobRepository(
         return created
     }
 
+    override suspend fun updatePrompt(promptId: Long, label: String, text: String): PromptDto {
+        val updated = api.updatePrompt(
+            promptId,
+            PromptDto(id = promptId, label = label, text = text),
+        )
+        refreshPromptsQuietly()
+        return updated
+    }
+
     override suspend fun deletePrompt(promptId: Long) {
         api.deletePrompt(promptId)
         refreshPromptsQuietly()

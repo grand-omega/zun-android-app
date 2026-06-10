@@ -1,5 +1,7 @@
 package dev.zun.flux
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.WindowManager
@@ -8,6 +10,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -22,11 +25,14 @@ private const val TAG = "MainActivity"
 
 class MainActivity : FragmentActivity() {
     private var unlockMessage by mutableStateOf<String?>(null)
+    private var sharedUris by mutableStateOf<List<Uri>>(emptyList())
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
         enableEdgeToEdge()
+        sharedUris = sharedImageUris(intent)
         val app = application as FluxApp
         val auth = app.authStateHolder
 
@@ -49,6 +55,8 @@ class MainActivity : FragmentActivity() {
                     AppNavHost(
                         repositories = current.repositories,
                         repositoryVersion = current.version,
+                        sharedUris = sharedUris,
+                        onSharedUrisConsumed = { sharedUris = emptyList() },
                     )
                 } else {
                     LockScreen(
@@ -58,6 +66,23 @@ class MainActivity : FragmentActivity() {
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        val uris = sharedImageUris(intent)
+        if (uris.isNotEmpty()) sharedUris = uris
+    }
+
+    /** Image URIs delivered via the system share sheet (ACTION_SEND[_MULTIPLE]). */
+    private fun sharedImageUris(intent: Intent?): List<Uri> = when (intent?.action) {
+        Intent.ACTION_SEND ->
+            listOfNotNull(intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java))
+
+        Intent.ACTION_SEND_MULTIPLE ->
+            intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java).orEmpty()
+
+        else -> emptyList()
     }
 
     private fun tryUnlock(auth: dev.zun.flux.ui.auth.AuthStateHolder) {
