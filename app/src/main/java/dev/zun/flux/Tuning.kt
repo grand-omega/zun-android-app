@@ -29,6 +29,11 @@ object Tuning {
     /** Max IOException retries before [data.worker.JobUploadWorker] gives up. */
     const val MAX_UPLOAD_RETRIES = 4
 
+    /** Age after which orphaned staged-upload files in cacheDir are swept at app
+     *  start. Active uploads are awaited at most ~60s before being cancelled, so
+     *  anything this old was leaked by a crash or failed cancellation cleanup. */
+    const val STAGED_UPLOAD_MAX_AGE_MS = 24L * 60L * 60L * 1000L
+
     // --- Caching --------------------------------------------------------------
 
     /** Disk budget for the offline image cache (thumb/preview/result). 1GB strikes

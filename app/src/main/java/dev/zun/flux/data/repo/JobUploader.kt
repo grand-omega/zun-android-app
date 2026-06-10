@@ -15,6 +15,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import retrofit2.HttpException
 import java.io.File
 import java.io.IOException
 
@@ -69,7 +70,7 @@ class JobUploader(
                     return body
                 }
                 if (jsonResp.code() != 409) {
-                    throw IOException("Submit failed: HTTP ${jsonResp.code()}")
+                    throw HttpException(jsonResp)
                 }
 
                 val errText = jsonResp.errorBody()?.string().orEmpty()
@@ -77,7 +78,9 @@ class JobUploader(
                     json.decodeFromString(NeedUploadResponse.serializer(), errText)
                 }.getOrNull()
                 if (needUpload?.need_upload != true && needUpload?.code != "need_upload") {
-                    throw IOException("Unexpected 409 body: $errText")
+                    // A 409 we can't interpret is a server-contract problem, not a
+                    // transient fault — fail fast instead of looping the retries.
+                    error("Unexpected 409 body: $errText")
                 }
 
                 val rawBody = file.asRequestBody("image/jpeg".toMediaType())
@@ -96,6 +99,15 @@ class JobUploader(
                     workflow = workflow?.toRequestBody(TEXT_PLAIN),
                 )
             } catch (e: IOException) {
+                attempt++
+                lastError = e
+                if (attempt < MAX_ATTEMPTS) {
+                    delay(1000L * (1 shl (attempt - 1)))
+                }
+            } catch (e: HttpException) {
+                // Only 429/5xx are worth retrying; auth and validation errors are
+                // terminal no matter how many times we resend the same request.
+                if (e.code() != 429 && e.code() < 500) throw e
                 attempt++
                 lastError = e
                 if (attempt < MAX_ATTEMPTS) {
