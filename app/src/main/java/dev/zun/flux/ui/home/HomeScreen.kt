@@ -36,6 +36,7 @@ fun HomeScreen(
     tryHarder: Boolean,
     onTryHarderChange: (Boolean) -> Unit,
     onDeletePrompt: (Long) -> Unit,
+    onUpdatePrompt: (Long, String, String) -> Unit,
     onSavePromptClick: () -> Unit,
     state: SubmitState,
     uploadProgress: Float?,
@@ -50,9 +51,11 @@ fun HomeScreen(
     onPickRecent: (Int) -> Unit,
     pinnedIds: Set<Long>,
     onTogglePin: (Long) -> Unit,
+    onImagesDropped: (List<Uri>) -> Unit = {},
 ) {
     var showPromptSheet by rememberSaveable { mutableStateOf(false) }
     var showPromptManageSheet by rememberSaveable { mutableStateOf(false) }
+    val dropTargetModifier = rememberImageDropTarget(onImagesDropped)
 
     val canSubmit = imageUris.isNotEmpty() &&
         selectedPromptId != null &&
@@ -98,7 +101,7 @@ fun HomeScreen(
                 .padding(24.dp),
             horizontalArrangement = Arrangement.spacedBy(24.dp),
         ) {
-            Box(modifier = Modifier.weight(1f).fillMaxSize()) {
+            Box(modifier = Modifier.weight(1f).fillMaxSize().then(dropTargetModifier)) {
                 ImageHero(
                     imageUris = imageUris,
                     recents = recents,
@@ -123,7 +126,7 @@ fun HomeScreen(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            Box(modifier = Modifier.weight(1f).fillMaxWidth().then(dropTargetModifier)) {
                 ImageHero(
                     imageUris = imageUris,
                     recents = recents,
@@ -166,6 +169,7 @@ fun HomeScreen(
             prompts = prompts,
             selectedPromptId = selectedPromptId,
             onDeletePrompt = onDeletePrompt,
+            onUpdatePrompt = onUpdatePrompt,
             onDismiss = { showPromptManageSheet = false },
         )
     }

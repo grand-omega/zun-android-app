@@ -61,6 +61,12 @@ class RecordingRepository :
         return prompt
     }
 
+    override suspend fun updatePrompt(promptId: Long, label: String, text: String): PromptDto {
+        val updated = _promptsState.value.first { it.id == promptId }.copy(label = label, text = text)
+        _promptsState.value = _promptsState.value.map { if (it.id == promptId) updated else it }
+        return updated
+    }
+
     override suspend fun deletePrompt(promptId: Long) {
         _promptsState.value = _promptsState.value.filterNot { it.id == promptId }
     }

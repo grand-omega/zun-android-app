@@ -84,6 +84,14 @@ class FakeJobRepository(
         return created
     }
 
+    override suspend fun updatePrompt(promptId: Long, label: String, text: String): PromptDto {
+        val updated = (fakePrompts + extraPrompts.value).first { it.id == promptId }
+            .copy(label = label, text = text)
+        extraPrompts.value = extraPrompts.value.map { if (it.id == promptId) updated else it }
+        listPrompts()
+        return updated
+    }
+
     override suspend fun deletePrompt(promptId: Long) {
         extraPrompts.value = extraPrompts.value.filterNot { it.id == promptId }
         listPrompts()

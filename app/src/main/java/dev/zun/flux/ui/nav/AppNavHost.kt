@@ -41,6 +41,8 @@ private const val KEY_DELETED_JOB_ID = "deletedJobId"
 fun AppNavHost(
     repositories: Repositories,
     repositoryVersion: Long,
+    sharedUris: List<android.net.Uri> = emptyList(),
+    onSharedUrisConsumed: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val app = context.applicationContext as FluxApp
@@ -80,6 +82,8 @@ fun AppNavHost(
                 images = repositories.images,
                 repositoryVersion = repositoryVersion,
                 capturedUri = capturedUri,
+                sharedUris = sharedUris,
+                onSharedUrisConsumed = onSharedUrisConsumed,
                 onTakePhoto = { nav.navigate(Routes.CAMERA) },
                 onGalleryClick = { nav.navigate(Routes.GALLERY) },
                 onSettingsClick = { nav.navigate(Routes.SETTINGS) },

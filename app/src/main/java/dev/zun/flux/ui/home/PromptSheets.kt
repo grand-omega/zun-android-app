@@ -18,9 +18,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.PushPin
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -249,10 +251,12 @@ fun PromptManageSheet(
     prompts: List<PromptDto>,
     selectedPromptId: Long?,
     onDeletePrompt: (Long) -> Unit,
+    onUpdatePrompt: (Long, String, String) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val savedPrompts = prompts.filter { it.id != CUSTOM_PROMPT_ID }
+    var editingPrompt by remember { mutableStateOf<PromptDto?>(null) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -296,6 +300,7 @@ fun PromptManageSheet(
                             label = prompt.label,
                             description = prompt.description,
                             selected = selectedPromptId == prompt.id,
+                            onEdit = { editingPrompt = prompt },
                             onDelete = { onDeletePrompt(prompt.id) },
                         )
                     }
@@ -303,6 +308,62 @@ fun PromptManageSheet(
             }
         }
     }
+
+    editingPrompt?.let { prompt ->
+        PromptEditDialog(
+            prompt = prompt,
+            onSave = { label, text ->
+                onUpdatePrompt(prompt.id, label, text)
+                editingPrompt = null
+            },
+            onDismiss = { editingPrompt = null },
+        )
+    }
+}
+
+@Composable
+private fun PromptEditDialog(
+    prompt: PromptDto,
+    onSave: (String, String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var label by remember { mutableStateOf(prompt.label) }
+    var text by remember { mutableStateOf(prompt.text.orEmpty()) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.prompts_edit_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = label,
+                    onValueChange = { label = it },
+                    label = { Text(stringResource(R.string.prompts_edit_label)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    label = { Text(stringResource(R.string.prompts_edit_text)) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = label.isNotBlank() && text.isNotBlank(),
+                onClick = { onSave(label, text) },
+            ) {
+                Text(stringResource(R.string.common_save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.common_cancel))
+            }
+        },
+    )
 }
 
 @Composable
@@ -310,6 +371,7 @@ private fun PromptManageRow(
     label: String,
     description: String?,
     selected: Boolean,
+    onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
     Surface(
@@ -353,6 +415,13 @@ private fun PromptManageRow(
                         color = MaterialTheme.colorScheme.secondary,
                     )
                 }
+            }
+            IconButton(onClick = onEdit) {
+                Icon(
+                    Icons.Default.Edit,
+                    contentDescription = stringResource(R.string.prompts_edit),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             IconButton(onClick = onDelete) {
                 Icon(
