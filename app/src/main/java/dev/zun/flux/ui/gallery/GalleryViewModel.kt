@@ -101,8 +101,8 @@ class GalleryViewModel(
      */
     @OptIn(ExperimentalCoroutinesApi::class)
     val pagedGridItems: Flow<PagingData<GalleryGridItem>> =
-        combine(_tagFilter, _searchQuery) { filter, query -> filter to query.trim() }
-            .flatMapLatest { (filter, query) ->
+        combine(_tagFilter, _searchQuery, prompts) { filter, query, ps -> Triple(filter, query.trim(), ps) }
+            .flatMapLatest { (filter, query, ps) ->
                 val (promptId, customOnly) = when (filter) {
                     TagFilter.All -> null to false
                     is TagFilter.ByPromptId -> filter.promptId to false
@@ -114,7 +114,7 @@ class GalleryViewModel(
                     } else {
                         // Prompt list is small and already in memory; filtering the
                         // Room-backed pages here avoids duplicating labels into SQL.
-                        pagingData.filter { it.matchesQuery(query, prompts.value) }
+                        pagingData.filter { it.matchesQuery(query, ps) }
                     }
                 }
             }.map { pagingData ->
