@@ -31,6 +31,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -113,6 +115,13 @@ fun ResultScreen(
     var showPromptManageSheet by remember { mutableStateOf(false) }
     var showSavePromptDialog by remember { mutableStateOf(false) }
     var savePromptLabel by remember { mutableStateOf("") }
+    val snackbarHostState = remember { SnackbarHostState() }
+    var notice by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(notice) {
+        val msg = notice ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(msg)
+        notice = null
+    }
     val savedToPicturesMessage = stringResource(R.string.result_saved_to_pictures)
     val promptSavedMessage = stringResource(R.string.result_prompt_saved)
     var selectedPromptId by remember(jobId) { mutableStateOf<Long?>(null) }
@@ -177,11 +186,7 @@ fun ResultScreen(
                     )
                     onRegenerated(resp.job_id)
                 } catch (t: Throwable) {
-                    Toast.makeText(
-                        context,
-                        t.toUserMessage("regenerate"),
-                        Toast.LENGTH_SHORT,
-                    ).show()
+                    notice = t.toUserMessage("regenerate")
                 } finally {
                     regenerating = false
                 }
@@ -195,11 +200,7 @@ fun ResultScreen(
                 jobs.deleteJob(jobId)
                 onDeleted()
             } catch (t: Throwable) {
-                Toast.makeText(
-                    context,
-                    t.toUserMessage("delete"),
-                    Toast.LENGTH_SHORT,
-                ).show()
+                notice = t.toUserMessage("delete")
             }
         }
     }
@@ -244,6 +245,7 @@ fun ResultScreen(
             )
         },
         contentWindowInsets = WindowInsets.safeDrawing,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { inner ->
         Column(
             modifier =
@@ -339,7 +341,7 @@ fun ResultScreen(
                                     t.toUserMessage("save")
                                 }
                             saving = false
-                            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                            notice = msg
                         }
                     },
                     enabled = resultModel != null && !saving,
@@ -355,11 +357,7 @@ fun ResultScreen(
                             try {
                                 shareImage(context, src)
                             } catch (t: Throwable) {
-                                Toast.makeText(
-                                    context,
-                                    t.toUserMessage("share"),
-                                    Toast.LENGTH_SHORT,
-                                ).show()
+                                notice = t.toUserMessage("share")
                             }
                         }
                     },
@@ -426,6 +424,8 @@ fun ResultScreen(
                         promptRepo.deletePrompt(promptId)
                         if (selectedPromptId == promptId) selectedPromptId = null
                     } catch (t: Throwable) {
+                        // Toast, not snackbar: the manage sheet stays open and
+                        // would cover a Scaffold-hosted snackbar.
                         Toast.makeText(
                             context,
                             t.toUserMessage("delete prompt"),
@@ -470,7 +470,7 @@ fun ResultScreen(
                         customPromptText = ""
                         showSavePromptDialog = false
                         showPromptSheet = false
-                        Toast.makeText(context, promptSavedMessage, Toast.LENGTH_SHORT).show()
+                        notice = promptSavedMessage
                     } catch (t: Throwable) {
                         Toast.makeText(
                             context,
