@@ -20,7 +20,7 @@ interface JobDao {
         """
         SELECT * FROM jobs
         WHERE id NOT IN (SELECT jobId FROM pending_deletes)
-        ORDER BY createdAt DESC
+        ORDER BY createdAt DESC, id DESC
         """,
     )
     fun getVisibleJobs(): Flow<List<JobEntity>>
@@ -30,7 +30,7 @@ interface JobDao {
         SELECT * FROM jobs
         WHERE status = 'done'
         AND id NOT IN (SELECT jobId FROM pending_deletes)
-        ORDER BY createdAt DESC
+        ORDER BY createdAt DESC, id DESC
         """,
     )
     fun pagedDoneJobsAll(): PagingSource<Int, JobEntity>
@@ -41,7 +41,7 @@ interface JobDao {
         WHERE status = 'done'
         AND promptId = :promptId
         AND id NOT IN (SELECT jobId FROM pending_deletes)
-        ORDER BY createdAt DESC
+        ORDER BY createdAt DESC, id DESC
         """,
     )
     fun pagedDoneJobsByPromptId(promptId: Long): PagingSource<Int, JobEntity>
@@ -53,7 +53,7 @@ interface JobDao {
         AND promptId IS NULL
         AND promptText IS NOT NULL
         AND id NOT IN (SELECT jobId FROM pending_deletes)
-        ORDER BY createdAt DESC
+        ORDER BY createdAt DESC, id DESC
         """,
     )
     fun pagedDoneJobsCustom(): PagingSource<Int, JobEntity>
