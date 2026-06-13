@@ -1,6 +1,9 @@
 package dev.zun.flux.ui.gallery
 
 import android.net.Uri
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.layout.AnimatedPane
@@ -8,6 +11,7 @@ import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffoldRole
 import androidx.compose.material3.adaptive.navigation.NavigableListDetailPaneScaffold
 import androidx.compose.material3.adaptive.navigation.rememberListDetailPaneScaffoldNavigator
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
@@ -17,7 +21,7 @@ import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.data.repo.PromptRepository
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3AdaptiveApi::class)
+@OptIn(ExperimentalMaterial3AdaptiveApi::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun GalleryScaffold(
     jobs: JobRepository,
@@ -38,37 +42,45 @@ fun GalleryScaffold(
     val navigator = rememberListDetailPaneScaffoldNavigator<String>()
     val scope = rememberCoroutineScope()
 
-    NavigableListDetailPaneScaffold(
-        navigator = navigator,
-        listPane = {
-            AnimatedPane {
-                GalleryScreen(
-                    images = images,
-                    viewModel = viewModel,
-                    onJobClick = { jobId ->
-                        scope.launch { navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, jobId) }
-                    },
-                    onBack = onBack,
-                    showUndoSnackbars = navigator.currentDestination?.contentKey == null,
-                )
-            }
-        },
-        detailPane = {
-            // Fade out only — no slide — when leaving the photo viewer back to
-            // the gallery list, so predictive-back doesn't tow a heavy dark
-            // pane across the screen.
-            AnimatedPane(exitTransition = fadeOut()) {
-                val jobId = navigator.currentDestination?.contentKey
-                if (jobId != null) {
-                    PhotoViewerScreen(
-                        initialJobId = jobId,
-                        viewModel = viewModel,
-                        images = images,
-                        onUseInput = onUseInput,
-                        onBack = { scope.launch { navigator.navigateBack() } },
-                    )
-                }
-            }
-        },
-    )
+    SharedTransitionLayout {
+        CompositionLocalProvider(LocalSharedTransitionScope provides this) {
+            NavigableListDetailPaneScaffold(
+                navigator = navigator,
+                listPane = {
+                    AnimatedPane {
+                        CompositionLocalProvider(LocalPaneAnimatedVisibilityScope provides this) {
+                            GalleryScreen(
+                                images = images,
+                                viewModel = viewModel,
+                                onJobClick = { jobId ->
+                                    scope.launch { navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, jobId) }
+                                },
+                                onBack = onBack,
+                                showUndoSnackbars = navigator.currentDestination?.contentKey == null,
+                            )
+                        }
+                    }
+                },
+                detailPane = {
+                    // Fade only — no slide — so the shared-element image carries
+                    // the motion, and predictive-back doesn't tow a heavy dark
+                    // pane across the screen.
+                    AnimatedPane(enterTransition = fadeIn(), exitTransition = fadeOut()) {
+                        CompositionLocalProvider(LocalPaneAnimatedVisibilityScope provides this) {
+                            val jobId = navigator.currentDestination?.contentKey
+                            if (jobId != null) {
+                                PhotoViewerScreen(
+                                    initialJobId = jobId,
+                                    viewModel = viewModel,
+                                    images = images,
+                                    onUseInput = onUseInput,
+                                    onBack = { scope.launch { navigator.navigateBack() } },
+                                )
+                            }
+                        }
+                    }
+                },
+            )
+        }
+    }
 }
