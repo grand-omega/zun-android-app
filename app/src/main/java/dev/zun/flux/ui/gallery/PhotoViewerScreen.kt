@@ -51,8 +51,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -113,17 +115,36 @@ fun PhotoViewerScreen(
             pageCount = { jobs.size },
         )
 
-    // jobs may still be loading on first entry, so the index isn't resolvable
-    // at composition time. Scroll once it is — but only once, so user swipes
-    // aren't yanked back.
-    var didInitialScroll by rememberSaveable(initialJobId) { mutableStateOf(false) }
-    LaunchedEffect(jobs, initialJobId) {
-        if (didInitialScroll) return@LaunchedEffect
-        val idx = jobs.indexOfFirst { it.id == initialJobId }
+    // The viewer is anchored to a *job*, not a list index. The gallery list can
+    // grow or reorder while the viewer is open (a new generation finishes, a
+    // sync runs) — every new job is prepended, shifting indices. Pinning the
+    // pager to a fixed index then slides a different photo under it (the "shows
+    // the next image" / "stuck between two pages" bug). Instead we track the
+    // anchored job's id and keep the pager snapped to wherever that job sits.
+    var anchorJobId by rememberSaveable(initialJobId) { mutableStateOf(initialJobId) }
+    var aligned by remember(initialJobId) { mutableStateOf(false) }
+    val latestJobs by rememberUpdatedState(jobs)
+
+    // Keep the anchored job under the pager when the list changes (or finishes
+    // loading on first entry). Snap to it; don't fight an in-progress swipe.
+    LaunchedEffect(jobs) {
+        val idx = jobs.indexOfFirst { it.id == anchorJobId }
         if (idx >= 0) {
-            pagerState.scrollToPage(idx)
-            didInitialScroll = true
+            if (idx != pagerState.currentPage && !pagerState.isScrollInProgress) {
+                pagerState.scrollToPage(idx)
+            }
+            aligned = true
         }
+    }
+
+    // Once aligned, follow user swipes: a settled page becomes the new anchor.
+    // snapshotFlow only emits on settledPage *changes*, so a list re-emission
+    // that leaves the page number unchanged can't clobber the anchor, and the
+    // gate keeps the initial settle (page 0) from overriding the tapped photo.
+    LaunchedEffect(pagerState, aligned) {
+        if (!aligned) return@LaunchedEffect
+        snapshotFlow { pagerState.settledPage }
+            .collect { page -> latestJobs.getOrNull(page)?.id?.let { anchorJobId = it } }
     }
 
     var showDetails by remember { mutableStateOf(false) }
