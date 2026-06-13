@@ -177,6 +177,18 @@ class GalleryViewModel(
     private val _pendingUndo = MutableStateFlow<Set<String>?>(null)
     val pendingUndo: StateFlow<Set<String>?> = _pendingUndo.asStateFlow()
 
+    /**
+     * Job the photo viewer is currently showing. The grid scrolls its tile
+     * into view so the shared-element return transition has a target even
+     * after the user paged away from the tile they opened.
+     */
+    private val _viewerJobId = MutableStateFlow<String?>(null)
+    val viewerJobId: StateFlow<String?> = _viewerJobId.asStateFlow()
+
+    fun setViewerJob(jobId: String?) {
+        _viewerJobId.value = jobId
+    }
+
     /** Non-null when a "remove from app after save?" dialog should show. */
     private val _postSaveDelete = MutableStateFlow<Set<String>?>(null)
     val postSaveDelete: StateFlow<Set<String>?> = _postSaveDelete.asStateFlow()
