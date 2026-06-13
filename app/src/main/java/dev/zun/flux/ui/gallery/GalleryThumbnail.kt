@@ -25,10 +25,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import coil3.compose.SubcomposeAsyncImage
 import coil3.compose.SubcomposeAsyncImageContent
+import coil3.request.ImageRequest
+import coil3.request.crossfade
 import dev.zun.flux.R
 import dev.zun.flux.data.api.JobSummaryDto
 import dev.zun.flux.data.api.PromptDto
@@ -79,12 +82,16 @@ internal fun JobThumbnail(
         val tileDescription = stringResource(R.string.gallery_thumbnail_description, promptLabel)
         Box(modifier = Modifier.fillMaxSize()) {
             SubcomposeAsyncImage(
-                model = model,
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(model)
+                    .crossfade(true)
+                    .build(),
                 contentDescription = tileDescription,
                 contentScale = ContentScale.Crop,
                 modifier =
                 Modifier
                     .fillMaxSize()
+                    .sharedImageBounds(job.id)
                     .then(
                         if (isSelected) Modifier.padding(8.dp).clip(RoundedCornerShape(4.dp)) else Modifier,
                     ),

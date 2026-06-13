@@ -396,6 +396,20 @@ fun GalleryScreen(
                     }
                 } else {
                     val gridState = rememberLazyGridState()
+
+                    // Keep the viewed photo's tile in view so the shared-element
+                    // return transition has a visible target even after the user
+                    // paged away in the viewer.
+                    val viewerJobId by viewModel.viewerJobId.collectAsStateWithLifecycle()
+                    LaunchedEffect(viewerJobId) {
+                        val target = viewerJobId ?: return@LaunchedEffect
+                        val idx = pagedItems.itemSnapshotList.items.indexOfFirst {
+                            it is GalleryGridItem.JobItem && it.job.id == target
+                        }
+                        if (idx >= 0 && gridState.layoutInfo.visibleItemsInfo.none { it.index == idx }) {
+                            gridState.requestScrollToItem(idx)
+                        }
+                    }
                     // Tile bounds keyed by jobId, in root coords. Updated on
                     // every layout pass (so scroll keeps them fresh).
                     val tileBounds = remember { mutableStateMapOf<String, Rect>() }
@@ -411,13 +425,17 @@ fun GalleryScreen(
                         val rangeIds = (lo..hi).asSequence()
                             .mapNotNull { (snapshot.getOrNull(it) as? GalleryGridItem.JobItem)?.job?.id }
                             .toSet()
-                        viewModel.setSelection(
-                            if (dragMode == DragMode.Add) {
-                                baseSelection + rangeIds
-                            } else {
-                                baseSelection - rangeIds
-                            },
-                        )
+                        val newSelection = if (dragMode == DragMode.Add) {
+                            baseSelection + rangeIds
+                        } else {
+                            baseSelection - rangeIds
+                        }
+                        // Tick as the drag sweeps over tiles; the initial
+                        // long-press already gave LongPress feedback.
+                        if (cursorIdx != anchor && newSelection != latestSelectedIds) {
+                            haptic.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
+                        }
+                        viewModel.setSelection(newSelection)
                     }
 
                     fun hitTest(rootPos: Offset): Int {
