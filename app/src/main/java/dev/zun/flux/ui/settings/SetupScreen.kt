@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -38,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import dev.zun.flux.BuildConfig
 import dev.zun.flux.FluxApp
 import dev.zun.flux.R
+import dev.zun.flux.Tuning
 import dev.zun.flux.ui.common.ScreenPadding
 import dev.zun.flux.ui.common.SettingsGroup
 import dev.zun.flux.ui.common.StatusPill
@@ -77,110 +79,116 @@ fun SetupScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterVertically),
         ) {
-            Text(
-                text = stringResource(R.string.setup_heading),
-                style = MaterialTheme.typography.headlineSmall,
-            )
-
-            Text(
-                text = stringResource(R.string.setup_description),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.secondary,
-            )
-
-            SettingsGroup(
-                title = stringResource(R.string.setup_server_title),
-                detail = stringResource(R.string.setup_server_detail),
+            Column(
+                modifier = Modifier.widthIn(max = Tuning.MAX_CONTENT_WIDTH),
+                verticalArrangement = Arrangement.spacedBy(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                OutlinedTextField(
-                    value = serverUrl,
-                    onValueChange = {
-                        serverUrl = it
-                        error = null
-                    },
-                    label = { Text(stringResource(R.string.setup_server_url_label)) },
-                    placeholder = { Text(stringResource(R.string.setup_server_url_placeholder)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    isError = error != null,
+                Text(
+                    text = stringResource(R.string.setup_heading),
+                    style = MaterialTheme.typography.headlineSmall,
                 )
 
-                OutlinedTextField(
-                    value = token,
-                    onValueChange = {
-                        token = it
-                        error = null
-                    },
-                    label = { Text(stringResource(R.string.setup_token_label)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    isError = error != null,
-                    visualTransformation = if (tokenVisible) {
-                        VisualTransformation.None
-                    } else {
-                        PasswordVisualTransformation()
-                    },
-                    trailingIcon = {
-                        IconButton(onClick = { tokenVisible = !tokenVisible }) {
-                            Icon(
-                                imageVector = if (tokenVisible) {
-                                    Icons.Default.VisibilityOff
-                                } else {
-                                    Icons.Default.Visibility
-                                },
-                                contentDescription = stringResource(if (tokenVisible) R.string.setup_token_hide else R.string.setup_token_show),
-                            )
-                        }
-                    },
+                Text(
+                    text = stringResource(R.string.setup_description),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.secondary,
                 )
 
-                error?.let {
-                    StatusPill(label = it, tone = StatusTone.Error)
-                }
-            }
+                SettingsGroup(
+                    title = stringResource(R.string.setup_server_title),
+                    detail = stringResource(R.string.setup_server_detail),
+                ) {
+                    OutlinedTextField(
+                        value = serverUrl,
+                        onValueChange = {
+                            serverUrl = it
+                            error = null
+                        },
+                        label = { Text(stringResource(R.string.setup_server_url_label)) },
+                        placeholder = { Text(stringResource(R.string.setup_server_url_placeholder)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        isError = error != null,
+                    )
 
-            Button(
-                onClick = {
-                    isTesting = true
-                    error = null
-                    scope.launch {
-                        try {
-                            val url = requireNotNull(normalizeOptionalServerUrl(serverUrl, allowHttp = BuildConfig.DEBUG)) {
-                                "Enter a server URL"
+                    OutlinedTextField(
+                        value = token,
+                        onValueChange = {
+                            token = it
+                            error = null
+                        },
+                        label = { Text(stringResource(R.string.setup_token_label)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        isError = error != null,
+                        visualTransformation = if (tokenVisible) {
+                            VisualTransformation.None
+                        } else {
+                            PasswordVisualTransformation()
+                        },
+                        trailingIcon = {
+                            IconButton(onClick = { tokenVisible = !tokenVisible }) {
+                                Icon(
+                                    imageVector = if (tokenVisible) {
+                                        Icons.Default.VisibilityOff
+                                    } else {
+                                        Icons.Default.Visibility
+                                    },
+                                    contentDescription = stringResource(if (tokenVisible) R.string.setup_token_hide else R.string.setup_token_show),
+                                )
                             }
-                            val oldServerUrl = settings.serverUrl
-                            val oldToken = settings.apiToken
+                        },
+                    )
 
-                            try {
-                                settings.serverUrl = url
-                                settings.apiToken = token.trim()
-                                app.rebuildRepository()
-
-                                // Validate token & connectivity (listPrompts requires auth).
-                                app.repositories.prompts.listPrompts()
-
-                                onSuccess()
-                            } catch (t: Throwable) {
-                                settings.serverUrl = oldServerUrl
-                                settings.apiToken = oldToken
-                                app.rebuildRepository()
-                                throw t
-                            }
-                        } catch (t: Throwable) {
-                            error = t.toUserMessage("connect")
-                        } finally {
-                            isTesting = false
-                        }
+                    error?.let {
+                        StatusPill(label = it, tone = StatusTone.Error)
                     }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = canSubmit,
-            ) {
-                if (isTesting) {
-                    CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp), color = MaterialTheme.colorScheme.onPrimary)
-                    Text(stringResource(R.string.setup_testing_connection))
-                } else {
-                    Text(stringResource(R.string.common_connect))
+                }
+
+                Button(
+                    onClick = {
+                        isTesting = true
+                        error = null
+                        scope.launch {
+                            try {
+                                val url = requireNotNull(normalizeOptionalServerUrl(serverUrl, allowHttp = BuildConfig.DEBUG)) {
+                                    "Enter a server URL"
+                                }
+                                val oldServerUrl = settings.serverUrl
+                                val oldToken = settings.apiToken
+
+                                try {
+                                    settings.serverUrl = url
+                                    settings.apiToken = token.trim()
+                                    app.rebuildRepository()
+
+                                    // Validate token & connectivity (listPrompts requires auth).
+                                    app.repositories.prompts.listPrompts()
+
+                                    onSuccess()
+                                } catch (t: Throwable) {
+                                    settings.serverUrl = oldServerUrl
+                                    settings.apiToken = oldToken
+                                    app.rebuildRepository()
+                                    throw t
+                                }
+                            } catch (t: Throwable) {
+                                error = t.toUserMessage("connect")
+                            } finally {
+                                isTesting = false
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = canSubmit,
+                ) {
+                    if (isTesting) {
+                        CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp), color = MaterialTheme.colorScheme.onPrimary)
+                        Text(stringResource(R.string.setup_testing_connection))
+                    } else {
+                        Text(stringResource(R.string.common_connect))
+                    }
                 }
             }
         }
