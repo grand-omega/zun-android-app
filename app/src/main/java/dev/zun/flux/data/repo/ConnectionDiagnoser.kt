@@ -40,7 +40,7 @@ class ConnectionDiagnoser(
         } catch (e: SocketTimeoutException) {
             HostUnreachable("Timed out reaching $host:$port. The PC may be off, asleep, or unreachable over this network.")
         } catch (e: NoRouteToHostException) {
-            HostUnreachable("No route to $host:$port. Check Wi-Fi, VPN, or Tailscale connectivity.")
+            HostUnreachable("No route to $host:$port. Check Wi-Fi or VPN connectivity.")
         } catch (e: UnknownHostException) {
             HostUnreachable("Cannot resolve $host. Check DNS, MagicDNS, or the server URL.")
         } catch (e: IOException) {
