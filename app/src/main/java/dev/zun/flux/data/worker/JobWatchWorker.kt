@@ -11,6 +11,7 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import dev.zun.flux.FluxApp
 import dev.zun.flux.util.JobNotifications
+import kotlinx.coroutines.delay
 import retrofit2.HttpException
 import java.io.IOException
 
@@ -33,6 +34,7 @@ class JobWatchWorker(
         // job re-enqueues via retry so long generations are still caught.
         val deadline = System.currentTimeMillis() + MAX_WATCH_MS
         while (System.currentTimeMillis() < deadline) {
+            val iterationStart = System.currentTimeMillis()
             val job = try {
                 jobs.getJob(jobId, waitSeconds = WAIT_SECONDS)
             } catch (e: HttpException) {
@@ -56,6 +58,12 @@ class JobWatchWorker(
 
                 "cancelled" -> return Result.success()
             }
+            // A server without long-poll support answers instantly; pace the
+            // loop so that degrades to ~one poll per window instead of a
+            // tight request storm.
+            val elapsed = System.currentTimeMillis() - iterationStart
+            val minIntervalMs = MIN_POLL_INTERVAL_SECONDS * 1_000L
+            if (elapsed < minIntervalMs) delay(minIntervalMs - elapsed)
         }
         return Result.retry()
     }
@@ -63,6 +71,7 @@ class JobWatchWorker(
     companion object {
         const val KEY_JOB_ID = "job_id"
         private const val WAIT_SECONDS = 25
+        private const val MIN_POLL_INTERVAL_SECONDS = 5
         private const val MAX_WATCH_MS = 8L * 60L * 1000L
 
         /** Idempotent per job: re-enqueueing an already-watched job is a no-op. */

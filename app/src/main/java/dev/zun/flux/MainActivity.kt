@@ -86,6 +86,7 @@ class MainActivity : FragmentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
         val uris = sharedImageUris(intent)
         if (uris.isNotEmpty()) sharedUris = uris
         if (intent.action == ACTION_GALLERY) pendingGalleryNav = true

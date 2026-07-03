@@ -91,7 +91,9 @@ class RealJobRepository(
     override suspend fun listPrompts(): List<PromptDto> {
         val fetched = api.listPrompts().items
         _promptsState.value = fetched
-        cachedPromptsStore.save(fetched)
+        // Persisting is JSON encode + prefs write; keep it off the caller
+        // (often viewModelScope on Main).
+        cacheScope.launch { cachedPromptsStore.save(fetched) }
         return fetched
     }
 
