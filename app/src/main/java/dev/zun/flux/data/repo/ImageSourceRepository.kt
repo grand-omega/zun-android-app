@@ -2,6 +2,7 @@ package dev.zun.flux.data.repo
 
 import android.net.Uri
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
 
 data class OfflineImageAvailability(
     val thumbCached: Boolean,
@@ -53,6 +54,9 @@ interface ImageSourceRepository {
 
     /** Current private offline image cache state for a job. */
     fun offlineAvailability(jobId: String): OfflineImageAvailability
+
+    /** Bumps whenever offline cache contents change; UI keys availability re-reads off it. */
+    val offlineCacheVersion: StateFlow<Long>
 
     /** Current private offline image cache size. */
     fun offlineCacheStats(): OfflineCacheStats

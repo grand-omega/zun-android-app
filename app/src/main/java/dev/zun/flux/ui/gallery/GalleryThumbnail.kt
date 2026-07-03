@@ -46,7 +46,7 @@ internal fun JobThumbnail(
     job: JobSummaryDto,
     prompts: List<PromptDto>,
     model: Any?,
-    availability: OfflineImageAvailability,
+    availability: OfflineImageAvailability?,
     showMetadata: Boolean,
     isSelected: Boolean,
     isSelectionMode: Boolean,
@@ -109,7 +109,7 @@ internal fun JobThumbnail(
                 },
             )
 
-            if (!isSelectionMode && !availability.resultCached) {
+            if (!isSelectionMode && availability?.resultCached == false) {
                 NeedsNetworkIcon(
                     modifier = Modifier
                         .align(Alignment.TopStart)

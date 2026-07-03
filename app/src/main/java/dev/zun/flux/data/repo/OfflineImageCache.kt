@@ -4,6 +4,9 @@ import android.content.Context
 import android.net.Uri
 import android.util.Log
 import dev.zun.flux.Tuning
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import okhttp3.OkHttpClient
@@ -43,6 +46,10 @@ class OfflineImageCache internal constructor(
     }
 
     private val semaphore = Semaphore(Tuning.OFFLINE_PREFETCH_CONCURRENCY)
+
+    /** Bumps whenever cache contents change; UI keys availability re-reads off it. */
+    private val _version = MutableStateFlow(0L)
+    val version: StateFlow<Long> = _version.asStateFlow()
 
     fun availability(jobId: String): OfflineImageAvailability = OfflineImageAvailability(
         thumbCached = isCached(jobId, Kind.Thumb),
@@ -91,6 +98,7 @@ class OfflineImageCache internal constructor(
                     }
                     outFile.setLastModified(System.currentTimeMillis())
                     prune()
+                    _version.value++
                 } else {
                     tempFile.delete()
                 }
@@ -103,10 +111,12 @@ class OfflineImageCache internal constructor(
 
     fun delete(jobId: String) {
         jobDir(jobId).deleteRecursively()
+        _version.value++
     }
 
     fun clear() {
         rootDir.deleteRecursively()
+        _version.value++
     }
 
     private fun isCached(jobId: String, kind: Kind): Boolean {

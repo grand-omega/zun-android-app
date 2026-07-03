@@ -61,6 +61,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -95,10 +96,18 @@ import dev.zun.flux.data.repo.OfflineImageAvailability
 import dev.zun.flux.ui.common.EmptyState
 import dev.zun.flux.ui.common.MissingImageState
 import dev.zun.flux.util.resolvePromptLabel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /** Whether a drag-select session is adding tiles to or removing them from the
  *  base selection. Determined by the state of the anchor tile at long-press. */
 private enum class DragMode { Add, Remove }
+
+/** Per-tile Coil model + offline badge state, resolved off the main thread. */
+private data class TileMedia(
+    val model: Any?,
+    val availability: OfflineImageAvailability?,
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -110,6 +119,7 @@ fun GalleryScreen(
     showUndoSnackbars: Boolean = true,
 ) {
     val pagedItems = viewModel.pagedGridItems.collectAsLazyPagingItems()
+    val cacheVersion by images.offlineCacheVersion.collectAsStateWithLifecycle()
     val prompts by viewModel.prompts.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val isSaving by viewModel.isSaving.collectAsStateWithLifecycle()
@@ -487,6 +497,16 @@ fun GalleryScreen(
                                         val job = item.job
                                         val isSelected = selectedIds.contains(job.id)
                                         val jobIndex = idx
+                                        // File-existence checks are stat syscalls; keep them off
+                                        // the main thread and re-read only when the cache changes.
+                                        val media by produceState<TileMedia?>(null, job.id, cacheVersion) {
+                                            value = withContext(Dispatchers.IO) {
+                                                TileMedia(
+                                                    model = images.thumbModel(job.id),
+                                                    availability = images.offlineAvailability(job.id),
+                                                )
+                                            }
+                                        }
                                         JobThumbnail(
                                             modifier = Modifier
                                                 .onGloballyPositioned { coords ->
@@ -523,8 +543,8 @@ fun GalleryScreen(
                                                 },
                                             job = job,
                                             prompts = prompts,
-                                            model = images.thumbModel(job.id),
-                                            availability = images.offlineAvailability(job.id),
+                                            model = media?.model,
+                                            availability = media?.availability,
                                             showMetadata = showImageMetadata,
                                             isSelected = isSelected,
                                             isSelectionMode = isSelectionMode,

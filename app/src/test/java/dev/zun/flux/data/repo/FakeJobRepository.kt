@@ -365,6 +365,8 @@ class FakeJobRepository(
         resultCached = entries.containsKey(jobId),
     )
 
+    override val offlineCacheVersion = MutableStateFlow(0L)
+
     override fun offlineCacheStats(): OfflineCacheStats = OfflineCacheStats(bytes = 0L, fileCount = 0)
 
     override fun clearOfflineImageCache() = Unit

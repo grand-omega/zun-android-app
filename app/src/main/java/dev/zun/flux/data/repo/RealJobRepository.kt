@@ -370,6 +370,8 @@ class RealJobRepository(
 
     override fun offlineAvailability(jobId: String): OfflineImageAvailability = offlineImageCache.availability(jobId)
 
+    override val offlineCacheVersion get() = offlineImageCache.version
+
     override fun offlineCacheStats(): OfflineCacheStats = offlineImageCache.stats()
 
     override fun clearOfflineImageCache() {
