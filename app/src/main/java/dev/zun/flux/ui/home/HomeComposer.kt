@@ -41,6 +41,7 @@ internal fun Composer(
     isFetchingRecent: Boolean,
     onPickRecent: (Int) -> Unit,
     showSourceRow: Boolean,
+    showPromptStrip: Boolean = true,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (showSourceRow) {
@@ -54,11 +55,13 @@ internal fun Composer(
             )
         }
 
-        PromptStrip(
-            selectedLabel = selectedLabel,
-            tryHarder = tryHarder,
-            onClick = onPromptStripClick,
-        )
+        if (showPromptStrip) {
+            PromptStrip(
+                selectedLabel = selectedLabel,
+                tryHarder = tryHarder,
+                onClick = onPromptStripClick,
+            )
+        }
 
         UploadProgressSection(uploadProgress = uploadProgress, batchProgress = batchProgress)
 

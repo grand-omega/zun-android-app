@@ -74,7 +74,7 @@ fun HomeScreen(
         }
     }
 
-    val composer: @Composable () -> Unit = {
+    val composer: @Composable (Boolean) -> Unit = { showPromptStrip ->
         Composer(
             selectedLabel = selectedLabel,
             tryHarder = tryHarder,
@@ -91,6 +91,7 @@ fun HomeScreen(
             isFetchingRecent = isFetchingRecent,
             onPickRecent = onPickRecent,
             showSourceRow = imageUris.isNotEmpty(),
+            showPromptStrip = showPromptStrip,
         )
     }
 
@@ -116,7 +117,24 @@ fun HomeScreen(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                composer()
+                // Prompt selection lives inline on wide screens, so the
+                // composer drops its prompt strip (no duplicate affordance).
+                PromptLibraryContent(
+                    prompts = prompts,
+                    selectedPromptId = selectedPromptId,
+                    customPromptText = customPromptText,
+                    onCustomPromptChange = onCustomPromptChange,
+                    tryHarder = tryHarder,
+                    onTryHarderChange = onTryHarderChange,
+                    onSavePromptClick = onSavePromptClick,
+                    onManagePrompts = { showPromptManageSheet = true },
+                    onSelectPrompt = onSelectPrompt,
+                    pinnedIds = pinnedIds,
+                    onTogglePin = onTogglePin,
+                    modifier = Modifier.weight(1f),
+                    fillHeight = true,
+                )
+                composer(false)
             }
         }
     } else {
@@ -137,11 +155,13 @@ fun HomeScreen(
                     onRemove = onRemoveImage,
                 )
             }
-            composer()
+            composer(true)
         }
     }
 
-    if (showPromptSheet) {
+    // On wide screens the library is an inline pane; the modal collapses into
+    // it if the user unfolds with the sheet open.
+    if (showPromptSheet && !isWide) {
         PromptLibrarySheet(
             prompts = prompts,
             selectedPromptId = selectedPromptId,
