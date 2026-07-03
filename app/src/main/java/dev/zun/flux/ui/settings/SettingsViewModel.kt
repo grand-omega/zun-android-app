@@ -7,10 +7,12 @@ import dev.zun.flux.data.api.HealthResponse
 import dev.zun.flux.data.repo.OfflineCacheStats
 import dev.zun.flux.util.normalizeOptionalServerUrl
 import dev.zun.flux.util.toUserMessage
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class ConnectionDraftState(
     val serverUrl: String = "",
@@ -40,7 +42,7 @@ class SettingsViewModel(
     val connectionDraft: StateFlow<ConnectionDraftState> = _connectionDraft.asStateFlow()
 
     private val _offlineCache = MutableStateFlow(
-        OfflineCacheState(stats = app.repositories.images.offlineCacheStats()),
+        OfflineCacheState(status = "Calculating cache size..."),
     )
     val offlineCache: StateFlow<OfflineCacheState> = _offlineCache.asStateFlow()
 
@@ -49,6 +51,11 @@ class SettingsViewModel(
     val serverHealth: StateFlow<HealthResponse?> = _serverHealth.asStateFlow()
 
     init {
+        viewModelScope.launch {
+            // stats() walks the whole cache dir — keep it off the main thread.
+            val stats = withContext(Dispatchers.IO) { app.repositories.images.offlineCacheStats() }
+            _offlineCache.value = _offlineCache.value.copy(stats = stats, status = "Offline cache ready.")
+        }
         viewModelScope.launch {
             _serverHealth.value = runCatching { app.repositories.health.health() }.getOrNull()
         }
@@ -110,7 +117,7 @@ class SettingsViewModel(
             try {
                 app.repositories.jobs.syncHistory()
                 _offlineCache.value = OfflineCacheState(
-                    stats = app.repositories.images.offlineCacheStats(),
+                    stats = withContext(Dispatchers.IO) { app.repositories.images.offlineCacheStats() },
                     status = "Offline cache refresh started. Images continue caching in the background.",
                 )
             } catch (t: Throwable) {
@@ -123,11 +130,16 @@ class SettingsViewModel(
     }
 
     fun clearOfflineCache() {
-        app.repositories.images.clearOfflineImageCache()
-        _offlineCache.value = OfflineCacheState(
-            stats = app.repositories.images.offlineCacheStats(),
-            status = "Offline image cache cleared.",
-        )
+        viewModelScope.launch {
+            val stats = withContext(Dispatchers.IO) {
+                app.repositories.images.clearOfflineImageCache()
+                app.repositories.images.offlineCacheStats()
+            }
+            _offlineCache.value = OfflineCacheState(
+                stats = stats,
+                status = "Offline image cache cleared.",
+            )
+        }
     }
 
     private fun updateDraft(block: ConnectionDraftState.() -> ConnectionDraftState) {
