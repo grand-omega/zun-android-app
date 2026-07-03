@@ -56,8 +56,6 @@ import dev.zun.flux.BuildConfig
 import dev.zun.flux.FluxApp
 import dev.zun.flux.R
 import dev.zun.flux.data.net.captureCertificatePin
-import dev.zun.flux.data.repo.ActiveRoute
-import dev.zun.flux.data.repo.ConnectionMode
 import dev.zun.flux.data.worker.JobUploadWorker
 import dev.zun.flux.ui.common.ScreenPadding
 import dev.zun.flux.ui.common.SettingsGroup
@@ -148,29 +146,13 @@ fun SettingsScreen(
                 title = stringResource(R.string.settings_connection_title),
                 detail = stringResource(R.string.settings_connection_detail),
             ) {
-                Text(stringResource(R.string.settings_connection_mode_label), style = MaterialTheme.typography.bodyMedium)
-                OptionDropdown(
-                    options = connectionModeOptions(),
-                    selected = connectionDraft.connectionMode,
-                    onSelected = viewModel::updateConnectionMode,
-                )
-
                 OutlinedTextField(
-                    value = connectionDraft.lanUrl,
-                    onValueChange = viewModel::updateLanUrl,
-                    label = { Text(stringResource(R.string.settings_lan_url_label)) },
+                    value = connectionDraft.serverUrl,
+                    onValueChange = viewModel::updateServerUrl,
+                    label = { Text(stringResource(R.string.settings_server_url_label)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    isError = connectionDraft.error?.startsWith("Primary server:") == true,
-                )
-
-                OutlinedTextField(
-                    value = connectionDraft.tailscaleUrl,
-                    onValueChange = viewModel::updateTailscaleUrl,
-                    label = { Text(stringResource(R.string.settings_tailscale_url_label)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    isError = connectionDraft.error?.startsWith("Fallback server:") == true,
+                    isError = connectionDraft.error != null,
                 )
 
                 val connectionError = connectionDraft.error
@@ -285,8 +267,7 @@ fun SettingsScreen(
                             pinResult = null
                             scope.launch {
                                 val urls = listOfNotNull(
-                                    settingsManager.lanUrl?.takeUnless { it.isBlank() },
-                                    settingsManager.tailscaleUrl?.takeUnless { it.isBlank() },
+                                    settingsManager.serverUrl?.takeUnless { it.isBlank() },
                                 )
                                 val captured = withContext(Dispatchers.IO) {
                                     urls.mapNotNull { captureCertificatePin(app.okHttpClient, it) }
@@ -335,7 +316,6 @@ fun SettingsScreen(
                 title = stringResource(R.string.settings_diagnostics_title),
                 detail = stringResource(R.string.settings_diagnostics_detail),
             ) {
-                InfoRow(stringResource(R.string.settings_active_route), activeRouteLabel(settingsManager.activeRoute))
                 InfoRow(stringResource(R.string.settings_last_successful_request), relativeTimeOrDash(diagnostics.lastSuccessAtMs))
                 serverHealth?.version?.let { version ->
                     InfoRow(stringResource(R.string.settings_server_version), version)
@@ -391,10 +371,7 @@ fun SettingsScreen(
                 InfoRow(stringResource(R.string.settings_version), BuildConfig.VERSION_NAME)
                 InfoRow(stringResource(R.string.settings_build), BuildConfig.VERSION_CODE.toString())
                 InfoRow(stringResource(R.string.settings_package), BuildConfig.APPLICATION_ID)
-                InfoRow(stringResource(R.string.settings_mode), connectionModeLabel(settingsManager.connectionMode))
-                InfoRow(stringResource(R.string.settings_active_url), settingsManager.serverUrl ?: stringResource(R.string.settings_value_none), isMonospace = true)
-                InfoRow(stringResource(R.string.settings_lan_url), settingsManager.lanUrl ?: stringResource(R.string.settings_value_not_set), isMonospace = true)
-                InfoRow(stringResource(R.string.settings_tailscale_url), settingsManager.tailscaleUrl ?: stringResource(R.string.settings_value_not_set), isMonospace = true)
+                InfoRow(stringResource(R.string.settings_server_url_label), settingsManager.serverUrl ?: stringResource(R.string.settings_value_none), isMonospace = true)
             }
         }
     }
@@ -421,27 +398,6 @@ fun SettingsScreen(
             },
         )
     }
-}
-
-@Composable
-private fun connectionModeOptions(): List<Pair<ConnectionMode, String>> = listOf(
-    ConnectionMode.AUTO to stringResource(R.string.settings_connection_mode_auto),
-    ConnectionMode.LAN_ONLY to stringResource(R.string.settings_connection_mode_lan_only),
-    ConnectionMode.TAILSCALE_ONLY to stringResource(R.string.settings_connection_mode_tailscale_only),
-)
-
-@Composable
-private fun connectionModeLabel(mode: ConnectionMode): String = when (mode) {
-    ConnectionMode.AUTO -> stringResource(R.string.settings_connection_mode_auto_short)
-    ConnectionMode.LAN_ONLY -> stringResource(R.string.settings_connection_mode_lan_only)
-    ConnectionMode.TAILSCALE_ONLY -> stringResource(R.string.settings_connection_mode_tailscale_only)
-}
-
-@Composable
-private fun activeRouteLabel(route: ActiveRoute): String = when (route) {
-    ActiveRoute.NONE -> stringResource(R.string.settings_value_none)
-    ActiveRoute.LAN -> stringResource(R.string.settings_active_route_lan)
-    ActiveRoute.TAILSCALE -> stringResource(R.string.settings_active_route_tailscale)
 }
 
 @Composable

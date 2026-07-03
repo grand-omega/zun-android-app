@@ -32,7 +32,6 @@
     <string name="health_desc_invalid_token">Invalid API token</string>
     <string name="health_desc_service_down">Server PC is reachable, but the server app is not responding. Start the server binary.</string>
     <string name="health_desc_server_error_format">Server error %1$d</string>
-    <string name="health_route_none">No route</string>
 
     <!-- Before/after compare -->
     <string name="compare_before_after">Before / After</string>
@@ -124,7 +123,6 @@
 
     <!-- Home -->
     <string name="home_app_title">FluxEdit</string>
-    <string name="home_status_format">%1$s · %2$s</string>
     <string name="home_gallery">Gallery</string>
     <string name="home_settings">Settings</string>
     <string name="home_save_prompt_title">Save this prompt</string>
@@ -260,25 +258,13 @@
     <string name="setup_heading">Connect FluxEdit</string>
     <string name="setup_description">Enter your private server and the API token used by Project ZUN.</string>
     <string name="setup_server_title">Server</string>
-    <string name="setup_server_detail">Use your HTTPS server hostname. Bare hostnames are saved as https://. Leave fallback blank unless you use a second route.</string>
-    <string name="setup_lan_url_label">Primary server</string>
-    <string name="setup_lan_url_placeholder">flux.yourdomain.com</string>
-    <string name="setup_tailscale_url_label">Fallback server (optional)</string>
-    <string name="setup_tailscale_url_placeholder">server.tailnet-name.ts.net</string>
+    <string name="setup_server_detail">Use your HTTPS server hostname. Bare hostnames are saved as https://.</string>
+    <string name="setup_server_url_label">Server URL</string>
+    <string name="setup_server_url_placeholder">flux.yourdomain.com</string>
     <string name="setup_token_label">API Token</string>
     <string name="setup_token_show">Show token</string>
     <string name="setup_token_hide">Hide token</string>
     <string name="setup_testing_connection">Testing connection…</string>
-    <string name="setup_lan_search_label">Server IP or hostname</string>
-    <string name="setup_lan_search_placeholder">192.168.1.5</string>
-    <string name="setup_lan_search_hint">Tap Search and we\'ll scan common ports for your server.</string>
-    <string name="setup_lan_search_button">Search</string>
-    <string name="setup_lan_searching">Searching for servers…</string>
-    <string name="setup_lan_search_invalid_host">Enter an IP address or hostname.</string>
-    <string name="setup_lan_search_no_results">Couldn\'t find a server at %1$s. Check the address, or enter the URL manually.</string>
-    <string name="setup_lan_found_format">version %1$s</string>
-    <string name="setup_lan_manual_entry">Enter URL manually</string>
-    <string name="setup_lan_manual_back">Back to search</string>
 
     <!-- Settings -->
     <string name="settings_title">Settings</string>
@@ -291,10 +277,8 @@
     <string name="settings_lockout_10m">10 minutes</string>
     <string name="settings_lockout_30m">30 minutes</string>
     <string name="settings_connection_title">Connection</string>
-    <string name="settings_connection_detail">Changes are tested before replacing the active server route. Use HTTPS with certificate pinning for stricter deployments.</string>
-    <string name="settings_connection_mode_label">Mode</string>
-    <string name="settings_lan_url_label">Primary server</string>
-    <string name="settings_tailscale_url_label">Fallback server</string>
+    <string name="settings_connection_detail">Changes are tested before replacing the current server settings. Use HTTPS with certificate pinning for stricter deployments.</string>
+    <string name="settings_server_url_label">Server URL</string>
     <string name="settings_token_label">API Token</string>
     <string name="settings_token_show">Show token</string>
     <string name="settings_token_hide">Hide token</string>
@@ -322,7 +306,6 @@
     <string name="settings_all_pins_cleared">All pins cleared.</string>
     <string name="settings_diagnostics_title">Diagnostics</string>
     <string name="settings_diagnostics_detail">Snapshot of recent network activity. Useful when something feels off.</string>
-    <string name="settings_active_route">Active Route</string>
     <string name="settings_last_successful_request">Last Successful Request</string>
     <string name="settings_upload_queue">Upload Queue</string>
     <plurals name="settings_pending_format">
@@ -339,18 +322,7 @@
     <string name="settings_version">Version</string>
     <string name="settings_build">Build</string>
     <string name="settings_package">Package</string>
-    <string name="settings_mode">Mode</string>
-    <string name="settings_active_url">Active URL</string>
-    <string name="settings_lan_url">LAN URL</string>
-    <string name="settings_tailscale_url">Tailscale URL</string>
     <string name="settings_value_none">(none)</string>
-    <string name="settings_value_not_set">(not set)</string>
     <string name="settings_clear_cache_title">Clear offline cache?</string>
     <string name="settings_clear_cache_message">Cached image files will be removed from this device. Server history and settings stay unchanged.</string>
-    <string name="settings_connection_mode_auto">Auto (LAN first, Tailscale fallback)</string>
-    <string name="settings_connection_mode_auto_short">Auto</string>
-    <string name="settings_connection_mode_lan_only">LAN only</string>
-    <string name="settings_connection_mode_tailscale_only">Tailscale only</string>
-    <string name="settings_active_route_lan">LAN</string>
-    <string name="settings_active_route_tailscale">Tailscale</string>
 </resources>

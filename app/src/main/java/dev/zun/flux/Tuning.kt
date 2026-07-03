@@ -11,20 +11,11 @@ object Tuning {
 
     // --- Networking -----------------------------------------------------------
 
-    /** OkHttp connect timeout. Long enough to traverse Tailscale wakeup latency. */
+    /** OkHttp connect timeout. Long enough to traverse slow remote links. */
     const val HTTP_CONNECT_TIMEOUT_SECONDS = 30L
 
     /** OkHttp read timeout. Generation jobs themselves use polling, not long-poll. */
     const val HTTP_READ_TIMEOUT_SECONDS = 60L
-
-    /** TCP probe timeout used by [data.net.NetworkResolver] when picking LAN vs Tailscale.
-     *  Too low → LAN false-negatives on slow home routers; too high → user waits on every
-     *  network change. 400ms is the empirical sweet spot. */
-    const val NETWORK_PROBE_TIMEOUT_MS = 400
-
-    /** How long a NetworkResolver result is considered fresh. Avoids re-probing on every
-     *  ConnectivityManager callback when WiFi flaps. */
-    const val NETWORK_RESOLVE_CACHE_MS = 30_000L
 
     /** Max IOException retries before [data.worker.JobUploadWorker] gives up. */
     const val MAX_UPLOAD_RETRIES = 4

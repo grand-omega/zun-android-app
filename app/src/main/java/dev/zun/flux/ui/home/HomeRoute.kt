@@ -246,11 +246,7 @@ fun HomeRoute(
                         HealthDot(health = health)
                         Spacer(Modifier.width(6.dp))
                         Text(
-                            text = stringResource(
-                                R.string.home_status_format,
-                                activeRouteLabel(app.settingsManager.activeRoute),
-                                healthShortLabel(health),
-                            ),
+                            text = healthShortLabel(health),
                             style = MaterialTheme.typography.labelSmall,
                             color = healthColor(health),
                         )

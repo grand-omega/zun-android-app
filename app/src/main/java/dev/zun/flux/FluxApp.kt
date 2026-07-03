@@ -1,8 +1,6 @@
 package dev.zun.flux
 
 import android.app.Application
-import android.net.ConnectivityManager
-import android.net.Network
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
 import coil3.memory.MemoryCache
@@ -10,7 +8,6 @@ import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import dev.zun.flux.data.api.FluxApi
 import dev.zun.flux.data.diag.Diagnostics
 import dev.zun.flux.data.net.CertPinStore
-import dev.zun.flux.data.net.NetworkResolver
 import dev.zun.flux.data.repo.HealthRepository
 import dev.zun.flux.data.repo.ImageSourceRepository
 import dev.zun.flux.data.repo.JobRepository
@@ -68,9 +65,6 @@ class FluxApp : Application() {
     lateinit var authStateHolder: AuthStateHolder
         private set
 
-    lateinit var networkResolver: NetworkResolver
-        private set
-
     lateinit var pinnedPrompts: PinnedPromptsStore
         private set
 
@@ -91,7 +85,6 @@ class FluxApp : Application() {
         authStateHolder = AuthStateHolder(settingsManager)
         pinnedPrompts = PinnedPromptsStore(this)
         certPinStore = CertPinStore(this)
-        networkResolver = NetworkResolver(settingsManager) { rebuildRepository() }
 
         rebuildOkHttp()
         // Resolves the client at call time so cert-pin / interceptor changes
@@ -119,23 +112,6 @@ class FluxApp : Application() {
         rebuildRepository()
 
         sweepStagedUploadFiles()
-
-        // Re-pick LAN vs Tailscale on every default-network change. Network changes
-        // must bypass the resolver's debounce cache — otherwise a Wi-Fi → cellular
-        // transition shortly after a successful probe keeps the stale URL until the
-        // window expires, and LAN↔Tailscale failover stops working.
-        val cm = getSystemService(ConnectivityManager::class.java)
-        cm?.registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: Network) {
-                networkResolver.invalidateCache()
-                networkResolver.refresh()
-            }
-            override fun onLost(network: Network) {
-                networkResolver.invalidateCache()
-                networkResolver.refresh()
-            }
-        })
-        networkResolver.refresh()
     }
 
     /**
@@ -193,7 +169,7 @@ class FluxApp : Application() {
             .build()
     }
 
-    /** Rebuild Retrofit when the active base URL changes. */
+    /** Rebuild Retrofit when the server URL changes. */
     fun rebuildRepository() {
         val baseUrl = settingsManager.serverUrl.takeIf { !it.isNullOrBlank() } ?: "https://example.invalid"
 

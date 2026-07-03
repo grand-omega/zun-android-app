@@ -13,7 +13,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.zun.flux.R
-import dev.zun.flux.data.repo.ActiveRoute
 
 @Composable
 fun HealthDot(health: HealthState) {
@@ -62,11 +61,4 @@ fun healthDescription(health: HealthState): String = when (health) {
     is HealthState.HostUnreachable -> health.message
     is HealthState.NetworkError -> health.message
     is HealthState.ServerError -> stringResource(R.string.health_desc_server_error_format, health.code)
-}
-
-@Composable
-fun activeRouteLabel(route: ActiveRoute): String = when (route) {
-    ActiveRoute.NONE -> stringResource(R.string.health_route_none)
-    ActiveRoute.LAN -> stringResource(R.string.settings_active_route_lan)
-    ActiveRoute.TAILSCALE -> stringResource(R.string.settings_active_route_tailscale)
 }
