@@ -209,7 +209,7 @@ private fun BatchTile(
         },
     )
     val state by viewModel.state.collectAsStateWithLifecycle()
-    LaunchedEffect(jobId) { viewModel.start(jobId) }
+    PollWhileStarted(viewModel, jobId)
 
     val currentDto = (state as? PollState.Running)?.dto ?: (state as? PollState.Done)?.dto
     val inputModel = remember(currentDto?.input_id) { images.inputModel(currentDto?.input_id) }
@@ -398,7 +398,7 @@ private fun BatchPage(
     }
     val haptic = LocalHapticFeedback.current
 
-    LaunchedEffect(jobId) { viewModel.start(jobId) }
+    PollWhileStarted(viewModel, jobId)
     LaunchedEffect(isDone) {
         if (isDone) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
     }

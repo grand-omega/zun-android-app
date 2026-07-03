@@ -135,10 +135,19 @@ class HomeViewModel(
     }
 
     suspend fun runHealthChecks() {
+        var failures = 0
         while (currentCoroutineContext().isActive) {
             performHealthCheck()
-            delay(30_000)
+            failures = if (_health.value == HealthState.Connected) 0 else failures + 1
+            delay(healthPollDelayMs(failures))
         }
+    }
+
+    /** 30s while connected; back off to 60s then 120s while the server stays unreachable. */
+    private fun healthPollDelayMs(failures: Int): Long = when {
+        failures <= 1 -> 30_000L
+        failures == 2 -> 60_000L
+        else -> 120_000L
     }
 
     private suspend fun performHealthCheck() {
