@@ -38,6 +38,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -64,7 +65,53 @@ fun PromptLibrarySheet(
     onTogglePin: (Long) -> Unit = {},
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var query by remember { mutableStateOf("") }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+    ) {
+        PromptLibraryContent(
+            prompts = prompts,
+            selectedPromptId = selectedPromptId,
+            customPromptText = customPromptText,
+            onCustomPromptChange = onCustomPromptChange,
+            tryHarder = tryHarder,
+            onTryHarderChange = onTryHarderChange,
+            onSavePromptClick = onSavePromptClick,
+            onManagePrompts = onManagePrompts,
+            onSelectPrompt = onSelectPrompt,
+            pinnedIds = pinnedIds,
+            onTogglePin = onTogglePin,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 24.dp),
+        )
+    }
+}
+
+/**
+ * The prompt library body, shared between the modal sheet (phone/folded) and
+ * the embedded wide-screen pane. [fillHeight] lets the prompt list grow to
+ * fill the pane instead of capping at sheet height.
+ */
+@Composable
+fun PromptLibraryContent(
+    prompts: List<PromptDto>,
+    selectedPromptId: Long?,
+    customPromptText: String,
+    onCustomPromptChange: (String) -> Unit,
+    tryHarder: Boolean,
+    onTryHarderChange: (Boolean) -> Unit,
+    onSavePromptClick: () -> Unit,
+    onManagePrompts: () -> Unit,
+    onSelectPrompt: (Long) -> Unit,
+    pinnedIds: Set<Long> = emptySet(),
+    onTogglePin: (Long) -> Unit = {},
+    modifier: Modifier = Modifier,
+    fillHeight: Boolean = false,
+) {
+    var query by rememberSaveable { mutableStateOf("") }
 
     val builtIns = prompts.filter { it.id != CUSTOM_PROMPT_ID }
     val matched = remember(query, builtIns) {
@@ -80,97 +127,89 @@ fun PromptLibrarySheet(
         pinned + rest
     }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp)
-                .padding(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(
+                text = stringResource(R.string.prompts_choose),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            TextButton(onClick = onManagePrompts) { Text(stringResource(R.string.prompts_manage)) }
+        }
+
+        Surface(
+            shape = RoundedCornerShape(8.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            modifier = Modifier.fillMaxWidth(),
         ) {
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(
-                    text = stringResource(R.string.prompts_choose),
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                TextButton(onClick = onManagePrompts) { Text(stringResource(R.string.prompts_manage)) }
-            }
-
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = stringResource(R.string.prompts_high_quality),
-                            style = MaterialTheme.typography.bodyLarge,
-                        )
-                        Text(
-                            text = stringResource(R.string.prompts_high_quality_detail),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.secondary,
-                        )
-                    }
-                    Switch(checked = tryHarder, onCheckedChange = onTryHarderChange)
-                }
-            }
-
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it },
-                placeholder = { Text(stringResource(R.string.prompts_search_placeholder)) },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            CustomPromptItem(
-                expanded = selectedPromptId == CUSTOM_PROMPT_ID,
-                customText = customPromptText,
-                onClick = { onSelectPrompt(CUSTOM_PROMPT_ID) },
-                onTextChange = onCustomPromptChange,
-                onSaveClick = onSavePromptClick,
-            )
-
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(4.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 360.dp),
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                items(ordered, key = { it.id }) { prompt ->
-                    PromptRow(
-                        label = prompt.label,
-                        description = prompt.description,
-                        selected = selectedPromptId == prompt.id,
-                        pinned = prompt.id in pinnedIds,
-                        onClick = { onSelectPrompt(prompt.id) },
-                        onTogglePin = { onTogglePin(prompt.id) },
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.prompts_high_quality),
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    Text(
+                        text = stringResource(R.string.prompts_high_quality_detail),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary,
                     )
                 }
-                if (ordered.isEmpty()) {
-                    item {
-                        Text(
-                            text = stringResource(R.string.prompts_no_match_format, query),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.secondary,
-                            modifier = Modifier.padding(vertical = 12.dp),
-                        )
-                    }
+                Switch(checked = tryHarder, onCheckedChange = onTryHarderChange)
+            }
+        }
+
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            placeholder = { Text(stringResource(R.string.prompts_search_placeholder)) },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        CustomPromptItem(
+            expanded = selectedPromptId == CUSTOM_PROMPT_ID,
+            customText = customPromptText,
+            onClick = { onSelectPrompt(CUSTOM_PROMPT_ID) },
+            onTextChange = onCustomPromptChange,
+            onSaveClick = onSavePromptClick,
+        )
+
+        LazyColumn(
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(if (fillHeight) Modifier.weight(1f) else Modifier.heightIn(max = 360.dp)),
+        ) {
+            items(ordered, key = { it.id }) { prompt ->
+                PromptRow(
+                    label = prompt.label,
+                    description = prompt.description,
+                    selected = selectedPromptId == prompt.id,
+                    pinned = prompt.id in pinnedIds,
+                    onClick = { onSelectPrompt(prompt.id) },
+                    onTogglePin = { onTogglePin(prompt.id) },
+                )
+            }
+            if (ordered.isEmpty()) {
+                item {
+                    Text(
+                        text = stringResource(R.string.prompts_no_match_format, query),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.padding(vertical = 12.dp),
+                    )
                 }
             }
         }
