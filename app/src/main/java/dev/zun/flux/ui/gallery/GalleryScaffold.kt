@@ -15,6 +15,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import dev.zun.flux.data.repo.ImageSourceRepository
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.data.repo.PromptRepository
+import dev.zun.flux.data.repo.SettingsManager
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3AdaptiveApi::class)
@@ -26,13 +27,14 @@ fun GalleryScaffold(
     repositoryVersion: Long,
     onUseInput: (Uri) -> Unit,
     onBack: () -> Unit,
+    settings: SettingsManager? = null,
 ) {
     val viewModel: GalleryViewModel =
         viewModel(
             key = "gallery-$repositoryVersion",
             factory =
             viewModelFactory {
-                initializer { GalleryViewModel(jobs, prompts, images) }
+                initializer { GalleryViewModel(jobs, prompts, images, settings) }
             },
         )
     val navigator = rememberListDetailPaneScaffoldNavigator<String>()

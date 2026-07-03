@@ -47,6 +47,10 @@ class SettingsManager(context: Context) {
         get() = prefs.getLong(KEY_LAST_AUTH_TIMESTAMP, 0L)
         set(value) = prefs.edit { putLong(KEY_LAST_AUTH_TIMESTAMP, value) }
 
+    var gallerySortNewestFirst: Boolean
+        get() = prefs.getBoolean(KEY_GALLERY_SORT_NEWEST_FIRST, true)
+        set(value) = prefs.edit { putBoolean(KEY_GALLERY_SORT_NEWEST_FIRST, value) }
+
     val isConfigured: Boolean
         get() = !serverUrl.isNullOrBlank() && !apiToken.isNullOrBlank()
 
@@ -55,5 +59,6 @@ class SettingsManager(context: Context) {
         private const val KEY_SERVER_URL = "server_url"
         private const val KEY_API_TOKEN = "api_token"
         private const val KEY_LAST_AUTH_TIMESTAMP = "last_auth_timestamp"
+        private const val KEY_GALLERY_SORT_NEWEST_FIRST = "gallery_sort_newest_first"
     }
 }

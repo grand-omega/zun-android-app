@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.ImageNotSupported
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
@@ -131,6 +132,7 @@ fun GalleryScreen(
     val latestSelectedIds by rememberUpdatedState(selectedIds)
     val isSelectionMode by viewModel.isSelectionMode.collectAsStateWithLifecycle()
     val tagFilter by viewModel.tagFilter.collectAsStateWithLifecycle()
+    val sortNewestFirst by viewModel.sortNewestFirst.collectAsStateWithLifecycle()
     val availableTags by viewModel.availableTags.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -139,6 +141,7 @@ fun GalleryScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showFilterMenu by remember { mutableStateOf(false) }
+    var showSortMenu by remember { mutableStateOf(false) }
     var showImageMetadata by remember { mutableStateOf(false) }
     var searchActive by rememberSaveable { mutableStateOf(false) }
 
@@ -250,6 +253,40 @@ fun GalleryScreen(
                                     MaterialTheme.colorScheme.onSurfaceVariant
                                 },
                             )
+                        }
+                        Box {
+                            IconButton(onClick = { showSortMenu = true }) {
+                                Icon(Icons.Default.SwapVert, contentDescription = stringResource(R.string.gallery_sort))
+                            }
+                            DropdownMenu(
+                                expanded = showSortMenu,
+                                onDismissRequest = { showSortMenu = false },
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.gallery_sort_newest_first)) },
+                                    leadingIcon = if (sortNewestFirst) {
+                                        { Icon(Icons.Default.Check, contentDescription = null) }
+                                    } else {
+                                        null
+                                    },
+                                    onClick = {
+                                        viewModel.setSortNewestFirst(true)
+                                        showSortMenu = false
+                                    },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.gallery_sort_oldest_first)) },
+                                    leadingIcon = if (!sortNewestFirst) {
+                                        { Icon(Icons.Default.Check, contentDescription = null) }
+                                    } else {
+                                        null
+                                    },
+                                    onClick = {
+                                        viewModel.setSortNewestFirst(false)
+                                        showSortMenu = false
+                                    },
+                                )
+                            }
                         }
                         Box {
                             IconButton(onClick = { showFilterMenu = true }) {

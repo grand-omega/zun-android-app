@@ -63,6 +63,9 @@
     <string name="gallery_show_image_labels">Show image labels</string>
     <string name="gallery_hide_image_labels">Hide image labels</string>
     <string name="gallery_filter_by_tag">Filter by tag</string>
+    <string name="gallery_sort">Sort</string>
+    <string name="gallery_sort_newest_first">Newest first</string>
+    <string name="gallery_sort_oldest_first">Oldest first</string>
     <string name="gallery_search">Search</string>
     <string name="gallery_search_placeholder">Search prompt text</string>
     <string name="gallery_close_search">Close search</string>

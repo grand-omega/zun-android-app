@@ -15,6 +15,7 @@ import dev.zun.flux.data.api.effectivePromptId
 import dev.zun.flux.data.repo.ImageSourceRepository
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.data.repo.PromptRepository
+import dev.zun.flux.data.repo.SettingsManager
 import dev.zun.flux.util.formatTimestamp
 import dev.zun.flux.util.saveToPictures
 import dev.zun.flux.util.shareImages
@@ -55,9 +56,18 @@ class GalleryViewModel(
     private val jobRepo: JobRepository,
     private val promptRepo: PromptRepository,
     private val imageRepo: ImageSourceRepository,
+    private val settings: SettingsManager? = null,
 ) : ViewModel() {
     private val _selectedIds = MutableStateFlow<Set<String>>(emptySet())
     val selectedIds: StateFlow<Set<String>> = _selectedIds.asStateFlow()
+
+    private val _sortNewestFirst = MutableStateFlow(settings?.gallerySortNewestFirst ?: true)
+    val sortNewestFirst: StateFlow<Boolean> = _sortNewestFirst.asStateFlow()
+
+    fun setSortNewestFirst(value: Boolean) {
+        _sortNewestFirst.value = value
+        settings?.gallerySortNewestFirst = value
+    }
 
     private val allJobs: StateFlow<List<JobSummaryDto>> =
         jobRepo.getJobsFlow()
@@ -85,30 +95,42 @@ class GalleryViewModel(
      * (HorizontalPager). Grid uses [pagedGridItems] instead.
      */
     val jobs: StateFlow<List<JobSummaryDto>> =
-        combine(allJobs, _tagFilter, _searchQuery, prompts) { all, filter, query, ps ->
+        combine(allJobs, _tagFilter, _searchQuery, prompts, _sortNewestFirst) { all, filter, query, ps, newestFirst ->
             val tagFiltered = when (filter) {
                 TagFilter.All -> all
                 is TagFilter.ByPromptId -> all.filter { it.effectivePromptId == filter.promptId }
                 TagFilter.Custom -> all.filter { it.effectivePromptId == null && it.prompt_text != null }
             }
             val trimmed = query.trim()
-            if (trimmed.isBlank()) tagFiltered else tagFiltered.filter { it.matchesQuery(trimmed, ps) }
+            val filtered = if (trimmed.isBlank()) tagFiltered else tagFiltered.filter { it.matchesQuery(trimmed, ps) }
+            // getJobsFlow is createdAt DESC, id DESC; reversing yields the exact
+            // ascending mirror, keeping viewer order in lockstep with the grid.
+            if (newestFirst) filtered else filtered.asReversed()
         }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     /**
      * Paged stream for the gallery grid, with date-separator rows inserted
      * between groups. Reacts to [tagFilter] and [searchQuery] changes.
      */
+    private data class GridQuery(
+        val filter: TagFilter,
+        val query: String,
+        val prompts: List<PromptDto>,
+        val newestFirst: Boolean,
+    )
+
     @OptIn(ExperimentalCoroutinesApi::class)
     val pagedGridItems: Flow<PagingData<GalleryGridItem>> =
-        combine(_tagFilter, _searchQuery, prompts) { filter, query, ps -> Triple(filter, query.trim(), ps) }
-            .flatMapLatest { (filter, query, ps) ->
+        combine(_tagFilter, _searchQuery, prompts, _sortNewestFirst) { filter, query, ps, newestFirst ->
+            GridQuery(filter, query.trim(), ps, newestFirst)
+        }
+            .flatMapLatest { (filter, query, ps, newestFirst) ->
                 val (promptId, customOnly) = when (filter) {
                     TagFilter.All -> null to false
                     is TagFilter.ByPromptId -> filter.promptId to false
                     TagFilter.Custom -> null to true
                 }
-                jobRepo.pagedJobs(promptId, customOnly, newestFirst = true).map { pagingData ->
+                jobRepo.pagedJobs(promptId, customOnly, newestFirst).map { pagingData ->
                     if (query.isBlank()) {
                         pagingData
                     } else {

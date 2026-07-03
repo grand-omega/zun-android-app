@@ -120,6 +120,7 @@ fun AppNavHost(
                 prompts = repositories.prompts,
                 images = repositories.images,
                 repositoryVersion = repositoryVersion,
+                settings = settingsManager,
                 onUseInput = { uri ->
                     nav.getBackStackEntry(Routes.HOME).savedStateHandle["capturedUri"] = uri
                     nav.popBackStack(Routes.HOME, inclusive = false)
