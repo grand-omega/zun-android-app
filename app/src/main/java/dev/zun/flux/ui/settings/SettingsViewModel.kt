@@ -3,6 +3,7 @@ package dev.zun.flux.ui.settings
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.zun.flux.BuildConfig
 import dev.zun.flux.FluxApp
 import dev.zun.flux.data.api.HealthResponse
 import dev.zun.flux.data.repo.OfflineCacheStats
@@ -71,7 +72,7 @@ class SettingsViewModel(
     fun connect() {
         val draft = _connectionDraft.value
         try {
-            val url = requireNotNull(normalizeOptionalServerUrl(draft.serverUrl, allowHttp = true)) {
+            val url = requireNotNull(normalizeOptionalServerUrl(draft.serverUrl, allowHttp = BuildConfig.DEBUG)) {
                 "Enter a server URL"
             }
             require(draft.token.isNotBlank()) {

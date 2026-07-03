@@ -35,6 +35,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import dev.zun.flux.BuildConfig
 import dev.zun.flux.FluxApp
 import dev.zun.flux.R
 import dev.zun.flux.ui.common.ScreenPadding
@@ -144,7 +145,7 @@ fun SetupScreen(
                     error = null
                     scope.launch {
                         try {
-                            val url = requireNotNull(normalizeOptionalServerUrl(serverUrl, allowHttp = true)) {
+                            val url = requireNotNull(normalizeOptionalServerUrl(serverUrl, allowHttp = BuildConfig.DEBUG)) {
                                 "Enter a server URL"
                             }
                             val oldServerUrl = settings.serverUrl
