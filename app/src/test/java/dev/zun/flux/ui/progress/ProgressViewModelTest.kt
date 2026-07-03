@@ -29,7 +29,7 @@ class ProgressViewModelTest {
     ) : JobRepository by RecordingRepository() {
         @Volatile var getJobCalls = 0
 
-        override suspend fun getJob(jobId: String): JobStatusDto {
+        override suspend fun getJob(jobId: String, waitSeconds: Int?): JobStatusDto {
             getJobCalls++
             return JobStatusDto(id = jobId, status = status, created_at = 1L)
         }

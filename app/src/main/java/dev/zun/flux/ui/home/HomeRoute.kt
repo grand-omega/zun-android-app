@@ -1,5 +1,6 @@
 package dev.zun.flux.ui.home
 
+import android.Manifest
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -69,6 +70,8 @@ import dev.zun.flux.data.repo.ImageSourceRepository
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.data.repo.PromptRepository
 import dev.zun.flux.data.repo.UploadRepository
+import dev.zun.flux.data.worker.JobWatchWorker
+import dev.zun.flux.util.JobNotifications
 import dev.zun.flux.util.cacheInputLocally
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -211,15 +214,29 @@ fun HomeRoute(
         }
     }
 
+    // Completion notifications: ask once on first submit, then watch each
+    // submitted job in the background via JobWatchWorker.
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { /* declining just means no notifications; watchers still no-op safely */ }
+
     LaunchedEffect(state) {
         when (val s = state) {
             is SubmitState.Done -> {
                 viewModel.acknowledgeDone()
+                if (!JobNotifications.canNotify(context)) {
+                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+                JobWatchWorker.enqueue(context, s.jobId)
                 onJobSubmitted(s.jobId)
             }
 
             is SubmitState.DoneBatch -> {
                 viewModel.acknowledgeDone()
+                if (!JobNotifications.canNotify(context)) {
+                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+                s.submittedIds.forEach { JobWatchWorker.enqueue(context, it) }
                 val message = submittedFailedMessage
                 if (message != null) {
                     snackbarHostState.showOne(

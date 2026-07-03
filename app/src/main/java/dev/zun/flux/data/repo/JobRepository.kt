@@ -19,7 +19,12 @@ data class JobTagStats(
  * resolution live on their own narrower interfaces.
  */
 interface JobRepository {
-    suspend fun getJob(jobId: String): JobStatusDto
+    /**
+     * Fetch a job's status. [waitSeconds] > 0 long-polls: the server holds
+     * the response (≤30s) until status/progress changes, so callers can loop
+     * on this instead of sleeping between short GETs.
+     */
+    suspend fun getJob(jobId: String, waitSeconds: Int? = null): JobStatusDto
 
     /**
      * Lists jobs with cursor pagination. Treat [cursor] as an opaque token.

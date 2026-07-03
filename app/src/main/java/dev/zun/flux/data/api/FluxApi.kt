@@ -72,9 +72,11 @@ interface FluxApi {
         @Part("workflow") workflow: RequestBody? = null,
     ): JobCreatedResponse
 
+    /** [wait] long-polls: the server holds the response (≤30s) until status/progress changes. */
     @GET("api/v1/jobs/{id}")
     suspend fun getJob(
         @Path("id") id: String,
+        @Query("wait") wait: Int? = null,
     ): JobStatusDto
 
     @GET("api/v1/jobs")

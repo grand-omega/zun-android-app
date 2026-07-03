@@ -177,7 +177,7 @@ class FakeJobRepository(
         onUploadProgress = onUploadProgress,
     )
 
-    override suspend fun getJob(jobId: String): JobStatusDto {
+    override suspend fun getJob(jobId: String, waitSeconds: Int?): JobStatusDto {
         if (deletedIds.contains(jobId)) error("Job was deleted")
         val entry = entries[jobId] ?: error("Unknown fake job: $jobId")
         val isCancelled = cancelledIds.contains(jobId)

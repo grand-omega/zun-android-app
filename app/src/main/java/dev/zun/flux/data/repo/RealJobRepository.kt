@@ -206,11 +206,11 @@ class RealJobRepository(
         onUploadProgress = onUploadProgress,
     )
 
-    override suspend fun getJob(jobId: String): JobStatusDto {
+    override suspend fun getJob(jobId: String, waitSeconds: Int?): JobStatusDto {
         if (jobId in localDeletedIds.value || dao.isPendingDelete(jobId)) {
             error("Job was deleted")
         }
-        val job = api.getJob(jobId)
+        val job = api.getJob(jobId, waitSeconds)
         if (jobId !in localDeletedIds.value && !dao.isPendingDelete(jobId)) {
             dao.insertJob(job.toEntity())
             prefetchIfDone(job)

@@ -132,7 +132,7 @@ class RecordingRepository :
         onUploadProgress = onUploadProgress,
     )
 
-    override suspend fun getJob(jobId: String): JobStatusDto = JobStatusDto(
+    override suspend fun getJob(jobId: String, waitSeconds: Int?): JobStatusDto = JobStatusDto(
         id = jobId,
         status = "done",
         created_at = 1L,
