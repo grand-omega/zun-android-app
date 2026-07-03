@@ -146,6 +146,7 @@ class RecordingRepository :
     override fun pagedJobs(
         promptId: Long?,
         customOnly: Boolean,
+        newestFirst: Boolean,
     ): Flow<PagingData<JobSummaryDto>> = MutableStateFlow(PagingData.empty())
 
     override fun jobTagStats(): Flow<JobTagStats> = MutableStateFlow(

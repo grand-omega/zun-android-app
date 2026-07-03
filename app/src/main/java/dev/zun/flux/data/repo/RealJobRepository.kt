@@ -274,16 +274,16 @@ class RealJobRepository(
         entities.filter { it.status == "done" }.map { it.toSummaryDto() }
     }
 
-    override fun pagedJobs(promptId: Long?, customOnly: Boolean): Flow<PagingData<JobSummaryDto>> = Pager(
+    override fun pagedJobs(promptId: Long?, customOnly: Boolean, newestFirst: Boolean): Flow<PagingData<JobSummaryDto>> = Pager(
         config = PagingConfig(
             pageSize = Tuning.GALLERY_PAGE_SIZE,
             enablePlaceholders = false,
         ),
         pagingSourceFactory = {
             when {
-                customOnly -> dao.pagedDoneJobsCustom()
-                promptId != null -> dao.pagedDoneJobsByPromptId(promptId)
-                else -> dao.pagedDoneJobsAll()
+                customOnly -> dao.pagedDoneJobsCustom(newestFirst)
+                promptId != null -> dao.pagedDoneJobsByPromptId(promptId, newestFirst)
+                else -> dao.pagedDoneJobsAll(newestFirst)
             }
         },
     ).flow.map { pagingData ->

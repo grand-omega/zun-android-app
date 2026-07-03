@@ -58,8 +58,8 @@ class JobDaoOrderingTest {
         height = null,
     )
 
-    private suspend fun pagedAllIds(): List<String> {
-        val page = dao.pagedDoneJobsAll().load(
+    private suspend fun pagedAllIds(newestFirst: Boolean = true): List<String> {
+        val page = dao.pagedDoneJobsAll(newestFirst).load(
             PagingSource.LoadParams.Refresh(key = null, loadSize = 100, placeholdersEnabled = false),
         ) as PagingSource.LoadResult.Page
         return page.data.map { it.id }
@@ -91,5 +91,19 @@ class JobDaoOrderingTest {
         val expected = listOf("c", "a", "d", "b") // 200s first (id DESC), then 100s (id DESC)
         assertEquals(expected, dao.getVisibleJobs().first().map { it.id })
         assertEquals(expected, pagedAllIds())
+    }
+
+    @Test
+    fun `ascending order is the exact mirror of descending, ties included`() = runBlocking {
+        dao.insertJob(job("a", createdAt = 200))
+        dao.insertJob(job("b", createdAt = 100))
+        dao.insertJob(job("c", createdAt = 200)) // tie with a
+        dao.insertJob(job("d", createdAt = 100)) // tie with b
+
+        val descending = pagedAllIds(newestFirst = true)
+        val ascending = pagedAllIds(newestFirst = false)
+
+        assertEquals(listOf("b", "d", "a", "c"), ascending)
+        assertEquals(descending.asReversed(), ascending)
     }
 }

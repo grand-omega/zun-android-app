@@ -45,9 +45,10 @@ interface JobRepository {
 
     /**
      * Paged stream of done jobs, optionally narrowed by [promptId] or
-     * [customOnly]. Pass `(null, false)` for no filter.
+     * [customOnly]. Pass `(null, false)` for no filter. [newestFirst]
+     * controls sort direction (createdAt with id tiebreak).
      */
-    fun pagedJobs(promptId: Long?, customOnly: Boolean): Flow<PagingData<JobSummaryDto>>
+    fun pagedJobs(promptId: Long?, customOnly: Boolean, newestFirst: Boolean): Flow<PagingData<JobSummaryDto>>
 
     /** Aggregate counts used by the gallery tag-filter dropdown. */
     fun jobTagStats(): Flow<JobTagStats>

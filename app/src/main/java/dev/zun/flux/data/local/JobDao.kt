@@ -30,10 +30,14 @@ interface JobDao {
         SELECT * FROM jobs
         WHERE status = 'done'
         AND id NOT IN (SELECT jobId FROM pending_deletes)
-        ORDER BY createdAt DESC, id DESC
+        ORDER BY
+            CASE WHEN :newestFirst THEN createdAt END DESC,
+            CASE WHEN :newestFirst THEN id END DESC,
+            CASE WHEN NOT :newestFirst THEN createdAt END ASC,
+            CASE WHEN NOT :newestFirst THEN id END ASC
         """,
     )
-    fun pagedDoneJobsAll(): PagingSource<Int, JobEntity>
+    fun pagedDoneJobsAll(newestFirst: Boolean): PagingSource<Int, JobEntity>
 
     @Query(
         """
@@ -41,10 +45,14 @@ interface JobDao {
         WHERE status = 'done'
         AND promptId = :promptId
         AND id NOT IN (SELECT jobId FROM pending_deletes)
-        ORDER BY createdAt DESC, id DESC
+        ORDER BY
+            CASE WHEN :newestFirst THEN createdAt END DESC,
+            CASE WHEN :newestFirst THEN id END DESC,
+            CASE WHEN NOT :newestFirst THEN createdAt END ASC,
+            CASE WHEN NOT :newestFirst THEN id END ASC
         """,
     )
-    fun pagedDoneJobsByPromptId(promptId: Long): PagingSource<Int, JobEntity>
+    fun pagedDoneJobsByPromptId(promptId: Long, newestFirst: Boolean): PagingSource<Int, JobEntity>
 
     @Query(
         """
@@ -53,10 +61,14 @@ interface JobDao {
         AND promptId IS NULL
         AND promptText IS NOT NULL
         AND id NOT IN (SELECT jobId FROM pending_deletes)
-        ORDER BY createdAt DESC, id DESC
+        ORDER BY
+            CASE WHEN :newestFirst THEN createdAt END DESC,
+            CASE WHEN :newestFirst THEN id END DESC,
+            CASE WHEN NOT :newestFirst THEN createdAt END ASC,
+            CASE WHEN NOT :newestFirst THEN id END ASC
         """,
     )
-    fun pagedDoneJobsCustom(): PagingSource<Int, JobEntity>
+    fun pagedDoneJobsCustom(newestFirst: Boolean): PagingSource<Int, JobEntity>
 
     @Query(
         """

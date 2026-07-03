@@ -108,7 +108,7 @@ class GalleryViewModel(
                     is TagFilter.ByPromptId -> filter.promptId to false
                     TagFilter.Custom -> null to true
                 }
-                jobRepo.pagedJobs(promptId, customOnly).map { pagingData ->
+                jobRepo.pagedJobs(promptId, customOnly, newestFirst = true).map { pagingData ->
                     if (query.isBlank()) {
                         pagingData
                     } else {

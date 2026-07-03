@@ -292,14 +292,15 @@ class FakeJobRepository(
         listJobs(status = "done", limit = 100, cursor = null, inputId = null).items
     }
 
-    override fun pagedJobs(promptId: Long?, customOnly: Boolean): Flow<PagingData<JobSummaryDto>> = updates.map {
+    override fun pagedJobs(promptId: Long?, customOnly: Boolean, newestFirst: Boolean): Flow<PagingData<JobSummaryDto>> = updates.map {
         val all = listJobs(status = "done", limit = 100, cursor = null, inputId = null).items
         val filtered = when {
             customOnly -> all.filter { it.effectivePromptId == null && it.prompt_text != null }
             promptId != null -> all.filter { it.effectivePromptId == promptId }
             else -> all
         }
-        PagingData.from(filtered)
+        // listJobs returns newest-first; mirror the DAO's ascending order otherwise.
+        PagingData.from(if (newestFirst) filtered else filtered.asReversed())
     }
 
     override fun jobTagStats(): Flow<JobTagStats> = updates.map {
