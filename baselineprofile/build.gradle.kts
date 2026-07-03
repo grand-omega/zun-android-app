@@ -8,8 +8,7 @@ plugins {
 
 android {
     namespace = "dev.zun.flux.baselineprofile"
-    compileSdk = 36
-    compileSdkMinor = 1
+    compileSdk = 37
 
     defaultConfig {
         minSdk = 36

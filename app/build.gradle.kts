@@ -87,8 +87,7 @@ val resolvedVersionName: String = (
 
 android {
     namespace = "dev.zun.flux"
-    compileSdk = 36
-    compileSdkMinor = 1
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "dev.zun.flux"
