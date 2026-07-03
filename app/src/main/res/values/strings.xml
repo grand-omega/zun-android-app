@@ -218,6 +218,10 @@
     <string name="progress_deleted">Deleted</string>
     <string name="progress_cancelled">Cancelled</string>
     <string name="progress_pct_format">%1$d%%</string>
+    <plurals name="progress_queue_ahead_format">
+        <item quantity="one">%1$d job ahead of you</item>
+        <item quantity="other">%1$d jobs ahead of you</item>
+    </plurals>
     <string name="progress_prompt_label">Prompt</string>
     <string name="progress_pull_refresh_hint">You can go back and pull-refresh Gallery later to pick up completed generations.</string>
     <string name="progress_source_image_being_generated">Source image being generated</string>

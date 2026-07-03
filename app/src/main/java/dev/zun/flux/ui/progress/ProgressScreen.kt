@@ -41,6 +41,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -178,6 +179,14 @@ fun ProgressScreen(
                                 label = s.dto.status.replaceFirstChar { it.uppercase() },
                                 tone = StatusTone.Success,
                             )
+                            val ahead = s.dto.queue_position?.takeIf { s.dto.status == "queued" && it > 0 }
+                            if (ahead != null) {
+                                Text(
+                                    text = pluralStringResource(R.plurals.progress_queue_ahead_format, ahead, ahead),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.secondary,
+                                )
+                            }
                             val pct = s.dto.progress?.let { (it * 100).toInt() }
                             if (pct != null) {
                                 Text(
