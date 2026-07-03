@@ -4,9 +4,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -52,9 +56,8 @@ import androidx.work.WorkManager
 import dev.zun.flux.BuildConfig
 import dev.zun.flux.FluxApp
 import dev.zun.flux.R
+import dev.zun.flux.Tuning
 import dev.zun.flux.data.net.captureCertificatePin
-import dev.zun.flux.data.repo.ActiveRoute
-import dev.zun.flux.data.repo.ConnectionMode
 import dev.zun.flux.data.worker.JobUploadWorker
 import dev.zun.flux.ui.common.ScreenPadding
 import dev.zun.flux.ui.common.SettingsGroup
@@ -82,6 +85,7 @@ fun SettingsScreen(
     var lockoutDuration by remember { mutableLongStateOf(settingsManager.lockoutDurationMs) }
     val connectionDraft by viewModel.connectionDraft.collectAsStateWithLifecycle()
     val offlineCache by viewModel.offlineCache.collectAsStateWithLifecycle()
+    val serverHealth by viewModel.serverHealth.collectAsStateWithLifecycle()
     val diagnostics by app.diagnostics.state.collectAsStateWithLifecycle()
     val certPins by app.certPinStore.pins.collectAsStateWithLifecycle()
     val uploadQueueFlow = remember(app) {
@@ -115,254 +119,266 @@ fun SettingsScreen(
                 },
             )
         },
+        contentWindowInsets = WindowInsets.safeDrawing,
     ) { inner ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(inner)
+                .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(ScreenPadding),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            SettingsGroup(
-                title = stringResource(R.string.settings_security_title),
-                detail = stringResource(R.string.settings_security_detail),
+            Column(
+                modifier = Modifier.widthIn(max = Tuning.MAX_CONTENT_WIDTH),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                OptionDropdown(
-                    options = lockoutOptions,
-                    selected = lockoutDuration,
-                    onSelected = {
-                        lockoutDuration = it
-                        settingsManager.lockoutDurationMs = it
-                    },
-                )
-            }
-
-            SettingsGroup(
-                title = stringResource(R.string.settings_connection_title),
-                detail = stringResource(R.string.settings_connection_detail),
-            ) {
-                Text(stringResource(R.string.settings_connection_mode_label), style = MaterialTheme.typography.bodyMedium)
-                OptionDropdown(
-                    options = connectionModeOptions(),
-                    selected = connectionDraft.connectionMode,
-                    onSelected = viewModel::updateConnectionMode,
-                )
-
-                OutlinedTextField(
-                    value = connectionDraft.lanUrl,
-                    onValueChange = viewModel::updateLanUrl,
-                    label = { Text(stringResource(R.string.settings_lan_url_label)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    isError = connectionDraft.error?.startsWith("Primary server:") == true,
-                )
-
-                OutlinedTextField(
-                    value = connectionDraft.tailscaleUrl,
-                    onValueChange = viewModel::updateTailscaleUrl,
-                    label = { Text(stringResource(R.string.settings_tailscale_url_label)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    isError = connectionDraft.error?.startsWith("Fallback server:") == true,
-                )
-
-                val connectionError = connectionDraft.error
-                if (connectionError != null) {
-                    StatusPill(label = connectionError, tone = StatusTone.Error)
-                }
-
-                OutlinedTextField(
-                    value = connectionDraft.token,
-                    onValueChange = viewModel::updateToken,
-                    label = { Text(stringResource(R.string.settings_token_label)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    visualTransformation = if (tokenVisible) {
-                        VisualTransformation.None
-                    } else {
-                        PasswordVisualTransformation()
-                    },
-                    trailingIcon = {
-                        IconButton(onClick = { tokenVisible = !tokenVisible }) {
-                            Icon(
-                                imageVector = if (tokenVisible) {
-                                    Icons.Default.VisibilityOff
-                                } else {
-                                    Icons.Default.Visibility
-                                },
-                                contentDescription = stringResource(if (tokenVisible) R.string.settings_token_hide else R.string.settings_token_show),
-                            )
-                        }
-                    },
-                )
-
-                Button(
-                    onClick = viewModel::connect,
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !connectionDraft.isConnecting,
+                SettingsGroup(
+                    title = stringResource(R.string.settings_security_title),
+                    detail = stringResource(R.string.settings_security_detail),
                 ) {
-                    if (connectionDraft.isConnecting) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.padding(end = 8.dp),
-                            color = MaterialTheme.colorScheme.onPrimary,
-                        )
-                        Text(stringResource(R.string.settings_testing_connection))
-                    } else {
-                        Text(stringResource(R.string.common_connect))
-                    }
+                    OptionDropdown(
+                        options = lockoutOptions,
+                        selected = lockoutDuration,
+                        onSelected = {
+                            lockoutDuration = it
+                            settingsManager.lockoutDurationMs = it
+                        },
+                    )
                 }
 
-                StatusPill(label = connectionDraft.status, tone = StatusTone.Neutral)
-            }
+                SettingsGroup(
+                    title = stringResource(R.string.settings_connection_title),
+                    detail = stringResource(R.string.settings_connection_detail),
+                ) {
+                    OutlinedTextField(
+                        value = connectionDraft.serverUrl,
+                        onValueChange = viewModel::updateServerUrl,
+                        label = { Text(stringResource(R.string.settings_server_url_label)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        isError = connectionDraft.error != null,
+                    )
 
-            SettingsGroup(
-                title = stringResource(R.string.settings_offline_cache_title),
-                detail = stringResource(R.string.settings_offline_cache_detail),
-            ) {
-                InfoRow(
-                    stringResource(R.string.settings_cached_images),
-                    pluralStringResource(R.plurals.settings_cached_files_format, offlineCache.stats.fileCount, offlineCache.stats.fileCount),
-                )
-                InfoRow(stringResource(R.string.settings_cache_size), formatBytes(offlineCache.stats.bytes))
-                StatusPill(label = offlineCache.status, tone = StatusTone.Neutral)
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                    Button(
-                        onClick = viewModel::refreshOfflineCache,
-                        enabled = !offlineCache.isRefreshing,
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        if (offlineCache.isRefreshing) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.padding(end = 8.dp),
-                                color = MaterialTheme.colorScheme.onPrimary,
-                            )
-                            Text(stringResource(R.string.settings_caching))
+                    val connectionError = connectionDraft.error
+                    if (connectionError != null) {
+                        StatusPill(label = connectionError, tone = StatusTone.Error)
+                    }
+
+                    OutlinedTextField(
+                        value = connectionDraft.token,
+                        onValueChange = viewModel::updateToken,
+                        label = { Text(stringResource(R.string.settings_token_label)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        visualTransformation = if (tokenVisible) {
+                            VisualTransformation.None
                         } else {
-                            Text(stringResource(R.string.settings_refresh_cache))
-                        }
-                    }
-                    OutlinedButton(
-                        onClick = { showClearCacheConfirm = true },
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text(stringResource(R.string.common_clear))
-                    }
-                }
-            }
-
-            SettingsGroup(
-                title = stringResource(R.string.settings_cert_pinning_title),
-                detail = stringResource(R.string.settings_cert_pinning_detail),
-            ) {
-                if (certPins.isEmpty()) {
-                    StatusPill(label = stringResource(R.string.settings_no_pins_active), tone = StatusTone.Warning)
-                } else {
-                    certPins.forEach { (host, pin) ->
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text(
-                                text = host,
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
-                            Text(
-                                text = pin,
-                                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                    Button(
-                        onClick = {
-                            pinningInProgress = true
-                            pinResult = null
-                            scope.launch {
-                                val urls = listOfNotNull(
-                                    settingsManager.lanUrl?.takeUnless { it.isBlank() },
-                                    settingsManager.tailscaleUrl?.takeUnless { it.isBlank() },
+                            PasswordVisualTransformation()
+                        },
+                        trailingIcon = {
+                            IconButton(onClick = { tokenVisible = !tokenVisible }) {
+                                Icon(
+                                    imageVector = if (tokenVisible) {
+                                        Icons.Default.VisibilityOff
+                                    } else {
+                                        Icons.Default.Visibility
+                                    },
+                                    contentDescription = stringResource(if (tokenVisible) R.string.settings_token_hide else R.string.settings_token_show),
                                 )
-                                val captured = withContext(Dispatchers.IO) {
-                                    urls.mapNotNull { captureCertificatePin(app.okHttpClient, it) }
-                                }
-                                if (captured.isEmpty()) {
-                                    pinResult = app.getString(R.string.settings_no_https_certificates)
-                                } else {
-                                    captured.forEach { (host, pin) -> app.certPinStore.setPin(host, pin) }
-                                    app.rebuildOkHttp()
-                                    app.rebuildRepository()
-                                    pinResult = app.resources.getQuantityString(R.plurals.settings_pinned_format, captured.size, captured.size)
-                                }
-                                pinningInProgress = false
                             }
                         },
-                        enabled = !pinningInProgress,
-                        modifier = Modifier.weight(1f),
+                    )
+
+                    Button(
+                        onClick = viewModel::connect,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !connectionDraft.isConnecting,
                     ) {
-                        if (pinningInProgress) {
+                        if (connectionDraft.isConnecting) {
                             CircularProgressIndicator(
                                 modifier = Modifier.padding(end = 8.dp),
                                 color = MaterialTheme.colorScheme.onPrimary,
                             )
-                            Text(stringResource(R.string.settings_pinning))
+                            Text(stringResource(R.string.settings_testing_connection))
                         } else {
-                            Text(stringResource(R.string.settings_pin_current))
+                            Text(stringResource(R.string.common_connect))
                         }
                     }
-                    OutlinedButton(
-                        onClick = {
-                            app.certPinStore.clearAll()
-                            app.rebuildOkHttp()
-                            app.rebuildRepository()
-                            pinResult = app.getString(R.string.settings_all_pins_cleared)
-                        },
-                        enabled = !pinningInProgress && certPins.isNotEmpty(),
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text(stringResource(R.string.common_clear))
-                    }
-                }
-                pinResult?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-            }
 
-            SettingsGroup(
-                title = stringResource(R.string.settings_diagnostics_title),
-                detail = stringResource(R.string.settings_diagnostics_detail),
-            ) {
-                InfoRow(stringResource(R.string.settings_active_route), activeRouteLabel(settingsManager.activeRoute))
-                InfoRow(stringResource(R.string.settings_last_successful_request), relativeTimeOrDash(diagnostics.lastSuccessAtMs))
-                val pendingUploads = uploadQueue.count {
-                    it.state == WorkInfo.State.ENQUEUED || it.state == WorkInfo.State.RUNNING
+                    StatusPill(label = connectionDraft.status, tone = StatusTone.Neutral)
                 }
-                InfoRow(stringResource(R.string.settings_upload_queue), pluralStringResource(R.plurals.settings_pending_format, pendingUploads, pendingUploads))
-                if (diagnostics.recentErrors.isNotEmpty()) {
-                    Text(
-                        text = stringResource(R.string.settings_recent_errors),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.secondary,
+
+                SettingsGroup(
+                    title = stringResource(R.string.settings_offline_cache_title),
+                    detail = stringResource(R.string.settings_offline_cache_detail),
+                ) {
+                    InfoRow(
+                        stringResource(R.string.settings_cached_images),
+                        pluralStringResource(R.plurals.settings_cached_files_format, offlineCache.stats.fileCount, offlineCache.stats.fileCount),
                     )
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        diagnostics.recentErrors.forEach { err ->
-                            Text(
-                                text = "${formatClock(err.timestampMs)}  ${err.path}  —  ${err.message}",
-                                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                    InfoRow(stringResource(R.string.settings_cache_size), formatBytes(offlineCache.stats.bytes))
+                    StatusPill(label = offlineCache.status, tone = StatusTone.Neutral)
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                        Button(
+                            onClick = viewModel::refreshOfflineCache,
+                            enabled = !offlineCache.isRefreshing,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            if (offlineCache.isRefreshing) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.padding(end = 8.dp),
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                )
+                                Text(stringResource(R.string.settings_caching))
+                            } else {
+                                Text(stringResource(R.string.settings_refresh_cache))
+                            }
+                        }
+                        OutlinedButton(
+                            onClick = { showClearCacheConfirm = true },
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text(stringResource(R.string.common_clear))
                         }
                     }
-                } else {
-                    StatusPill(label = stringResource(R.string.settings_no_errors_recorded), tone = StatusTone.Success)
                 }
-            }
 
-            SettingsGroup(title = stringResource(R.string.settings_app_info_title)) {
-                InfoRow(stringResource(R.string.settings_version), BuildConfig.VERSION_NAME)
-                InfoRow(stringResource(R.string.settings_build), BuildConfig.VERSION_CODE.toString())
-                InfoRow(stringResource(R.string.settings_package), BuildConfig.APPLICATION_ID)
-                InfoRow(stringResource(R.string.settings_mode), connectionModeLabel(settingsManager.connectionMode))
-                InfoRow(stringResource(R.string.settings_active_url), settingsManager.serverUrl ?: stringResource(R.string.settings_value_none), isMonospace = true)
-                InfoRow(stringResource(R.string.settings_lan_url), settingsManager.lanUrl ?: stringResource(R.string.settings_value_not_set), isMonospace = true)
-                InfoRow(stringResource(R.string.settings_tailscale_url), settingsManager.tailscaleUrl ?: stringResource(R.string.settings_value_not_set), isMonospace = true)
+                SettingsGroup(
+                    title = stringResource(R.string.settings_cert_pinning_title),
+                    detail = stringResource(R.string.settings_cert_pinning_detail),
+                ) {
+                    if (certPins.isEmpty()) {
+                        StatusPill(label = stringResource(R.string.settings_no_pins_active), tone = StatusTone.Warning)
+                    } else {
+                        certPins.forEach { (host, pin) ->
+                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(
+                                    text = host,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                                Text(
+                                    text = pin,
+                                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                        Button(
+                            onClick = {
+                                pinningInProgress = true
+                                pinResult = null
+                                scope.launch {
+                                    val urls = listOfNotNull(
+                                        settingsManager.serverUrl?.takeUnless { it.isBlank() },
+                                    )
+                                    val captured = withContext(Dispatchers.IO) {
+                                        urls.mapNotNull { captureCertificatePin(app.okHttpClient, it) }
+                                    }
+                                    if (captured.isEmpty()) {
+                                        pinResult = app.getString(R.string.settings_no_https_certificates)
+                                    } else {
+                                        captured.forEach { (host, pin) -> app.certPinStore.setPin(host, pin) }
+                                        app.rebuildOkHttp()
+                                        app.rebuildRepository()
+                                        pinResult = app.resources.getQuantityString(R.plurals.settings_pinned_format, captured.size, captured.size)
+                                    }
+                                    pinningInProgress = false
+                                }
+                            },
+                            enabled = !pinningInProgress,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            if (pinningInProgress) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.padding(end = 8.dp),
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                )
+                                Text(stringResource(R.string.settings_pinning))
+                            } else {
+                                Text(stringResource(R.string.settings_pin_current))
+                            }
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                app.certPinStore.clearAll()
+                                app.rebuildOkHttp()
+                                app.rebuildRepository()
+                                pinResult = app.getString(R.string.settings_all_pins_cleared)
+                            },
+                            enabled = !pinningInProgress && certPins.isNotEmpty(),
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text(stringResource(R.string.common_clear))
+                        }
+                    }
+                    pinResult?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                }
+
+                SettingsGroup(
+                    title = stringResource(R.string.settings_diagnostics_title),
+                    detail = stringResource(R.string.settings_diagnostics_detail),
+                ) {
+                    InfoRow(stringResource(R.string.settings_last_successful_request), relativeTimeOrDash(diagnostics.lastSuccessAtMs))
+                    serverHealth?.version?.let { version ->
+                        InfoRow(stringResource(R.string.settings_server_version), version)
+                    }
+                    serverHealth?.disk?.data_bytes?.let { bytes ->
+                        InfoRow(stringResource(R.string.settings_server_storage), formatBytes(bytes))
+                    }
+                    val pendingUploads = uploadQueue.count {
+                        it.state == WorkInfo.State.ENQUEUED || it.state == WorkInfo.State.RUNNING
+                    }
+                    InfoRow(stringResource(R.string.settings_upload_queue), pluralStringResource(R.plurals.settings_pending_format, pendingUploads, pendingUploads))
+                    if (diagnostics.recentErrors.isNotEmpty()) {
+                        val context = androidx.compose.ui.platform.LocalContext.current
+                        val copiedMessage = stringResource(R.string.settings_errors_copied)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = stringResource(R.string.settings_recent_errors),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.secondary,
+                                modifier = Modifier.weight(1f),
+                            )
+                            TextButton(
+                                onClick = {
+                                    val text = diagnostics.recentErrors.joinToString("\n") { err ->
+                                        "${formatClock(err.timestampMs)}  ${err.path}  —  ${err.message}"
+                                    }
+                                    val clipboard = context.getSystemService(android.content.ClipboardManager::class.java)
+                                    clipboard?.setPrimaryClip(android.content.ClipData.newPlainText("FluxEdit errors", text))
+                                    android.widget.Toast.makeText(context, copiedMessage, android.widget.Toast.LENGTH_SHORT).show()
+                                },
+                            ) {
+                                Text(stringResource(R.string.settings_copy_errors))
+                            }
+                        }
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            diagnostics.recentErrors.forEach { err ->
+                                Text(
+                                    text = "${formatClock(err.timestampMs)}  ${err.path}  —  ${err.message}",
+                                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    } else {
+                        StatusPill(label = stringResource(R.string.settings_no_errors_recorded), tone = StatusTone.Success)
+                    }
+                }
+
+                SettingsGroup(title = stringResource(R.string.settings_app_info_title)) {
+                    InfoRow(stringResource(R.string.settings_version), BuildConfig.VERSION_NAME)
+                    InfoRow(stringResource(R.string.settings_build), BuildConfig.VERSION_CODE.toString())
+                    InfoRow(stringResource(R.string.settings_package), BuildConfig.APPLICATION_ID)
+                    InfoRow(stringResource(R.string.settings_server_url_label), settingsManager.serverUrl ?: stringResource(R.string.settings_value_none), isMonospace = true)
+                }
             }
         }
     }
@@ -389,27 +405,6 @@ fun SettingsScreen(
             },
         )
     }
-}
-
-@Composable
-private fun connectionModeOptions(): List<Pair<ConnectionMode, String>> = listOf(
-    ConnectionMode.AUTO to stringResource(R.string.settings_connection_mode_auto),
-    ConnectionMode.LAN_ONLY to stringResource(R.string.settings_connection_mode_lan_only),
-    ConnectionMode.TAILSCALE_ONLY to stringResource(R.string.settings_connection_mode_tailscale_only),
-)
-
-@Composable
-private fun connectionModeLabel(mode: ConnectionMode): String = when (mode) {
-    ConnectionMode.AUTO -> stringResource(R.string.settings_connection_mode_auto_short)
-    ConnectionMode.LAN_ONLY -> stringResource(R.string.settings_connection_mode_lan_only)
-    ConnectionMode.TAILSCALE_ONLY -> stringResource(R.string.settings_connection_mode_tailscale_only)
-}
-
-@Composable
-private fun activeRouteLabel(route: ActiveRoute): String = when (route) {
-    ActiveRoute.NONE -> stringResource(R.string.settings_value_none)
-    ActiveRoute.LAN -> stringResource(R.string.settings_active_route_lan)
-    ActiveRoute.TAILSCALE -> stringResource(R.string.settings_active_route_tailscale)
 }
 
 @Composable

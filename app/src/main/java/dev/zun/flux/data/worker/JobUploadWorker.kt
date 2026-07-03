@@ -7,6 +7,7 @@ import androidx.work.workDataOf
 import dev.zun.flux.FluxApp
 import dev.zun.flux.Tuning
 import dev.zun.flux.data.repo.PromptSelection
+import retrofit2.HttpException
 import java.io.File
 import java.io.IOException
 
@@ -66,6 +67,17 @@ class JobUploadWorker(
                     workDataOf(
                         KEY_ERROR to "Upload failed after ${Tuning.MAX_UPLOAD_RETRIES + 1} attempts",
                     ),
+                )
+            }
+        } catch (e: HttpException) {
+            // 429/5xx are worth another WorkManager attempt; other HTTP errors
+            // (bad token, rejected input) won't fix themselves by resending.
+            if ((e.code() == 429 || e.code() >= 500) && runAttemptCount < Tuning.MAX_UPLOAD_RETRIES) {
+                Result.retry()
+            } else {
+                file.delete()
+                Result.failure(
+                    workDataOf(KEY_ERROR to "Server rejected upload (HTTP ${e.code()})"),
                 )
             }
         } catch (e: Exception) {

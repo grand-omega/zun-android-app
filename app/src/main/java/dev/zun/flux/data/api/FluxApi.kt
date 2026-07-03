@@ -22,6 +22,10 @@ interface FluxApi {
     @GET("api/v1/health")
     suspend fun health(): HealthResponse
 
+    /** Server feature/workflow catalog; gates UI affordances like Try harder. */
+    @GET("api/v1/capabilities")
+    suspend fun capabilities(): CapabilitiesResponse
+
     // --- Prompts (per-user CRUD) ---
 
     @GET("api/v1/prompts")
@@ -68,9 +72,11 @@ interface FluxApi {
         @Part("workflow") workflow: RequestBody? = null,
     ): JobCreatedResponse
 
+    /** [wait] long-polls: the server holds the response (≤30s) until status/progress changes. */
     @GET("api/v1/jobs/{id}")
     suspend fun getJob(
         @Path("id") id: String,
+        @Query("wait") wait: Int? = null,
     ): JobStatusDto
 
     @GET("api/v1/jobs")

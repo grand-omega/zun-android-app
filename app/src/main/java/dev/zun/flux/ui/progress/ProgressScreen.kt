@@ -6,10 +6,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
@@ -39,11 +41,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
@@ -60,6 +66,27 @@ import dev.zun.flux.ui.common.StatusPill
 import dev.zun.flux.ui.common.StatusTone
 import dev.zun.flux.ui.theme.tabular
 import dev.zun.flux.util.resolvePromptLabel
+import kotlinx.coroutines.awaitCancellation
+
+/**
+ * Keeps [ProgressViewModel] polling the network only while the host screen is
+ * STARTED. Requests are refcounted on the ViewModel, so overlapping callers
+ * (e.g. a batch tile and its focused page) don't cancel each other.
+ */
+@Composable
+fun PollWhileStarted(viewModel: ProgressViewModel, jobId: String) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(viewModel, jobId, lifecycleOwner) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            viewModel.resumePolling(jobId)
+            try {
+                awaitCancellation()
+            } finally {
+                viewModel.pausePolling()
+            }
+        }
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -89,7 +116,7 @@ fun ProgressScreen(
     val inputModel = remember(currentDto?.input_id) { images.inputModel(currentDto?.input_id) }
     val haptic = LocalHapticFeedback.current
 
-    LaunchedEffect(jobId) { viewModel.start(jobId) }
+    PollWhileStarted(viewModel, jobId)
 
     LaunchedEffect(state) {
         if (state is PollState.Done) {
@@ -109,6 +136,7 @@ fun ProgressScreen(
                 },
             )
         },
+        contentWindowInsets = WindowInsets.safeDrawing,
     ) { inner ->
         Column(
             modifier =
@@ -151,6 +179,14 @@ fun ProgressScreen(
                                 label = s.dto.status.replaceFirstChar { it.uppercase() },
                                 tone = StatusTone.Success,
                             )
+                            val ahead = s.dto.queue_position?.takeIf { s.dto.status == "queued" && it > 0 }
+                            if (ahead != null) {
+                                Text(
+                                    text = pluralStringResource(R.plurals.progress_queue_ahead_format, ahead, ahead),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.secondary,
+                                )
+                            }
                             val pct = s.dto.progress?.let { (it * 100).toInt() }
                             if (pct != null) {
                                 Text(

@@ -1,14 +1,17 @@
 package dev.zun.flux.ui.result
 
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -29,6 +32,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -56,6 +61,7 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.zun.flux.R
 import dev.zun.flux.data.api.JobStatusDto
+import dev.zun.flux.data.api.Workflows
 import dev.zun.flux.data.api.effectivePromptId
 import dev.zun.flux.data.repo.ImageSourceRepository
 import dev.zun.flux.data.repo.JobRepository
@@ -77,8 +83,8 @@ import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 
-private const val DEFAULT_CUSTOM_WORKFLOW = "flux2_klein_edit"
-private const val TRY_HARDER_WORKFLOW = "flux2_klein_9b_kv_experimental"
+private const val DEFAULT_CUSTOM_WORKFLOW = Workflows.DEFAULT_EDIT
+private const val TRY_HARDER_WORKFLOW = Workflows.TRY_HARDER_EDIT
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -90,6 +96,7 @@ fun ResultScreen(
     images: ImageSourceRepository,
     onRegenerated: (String) -> Unit,
     onNewImage: () -> Unit,
+    onUseAsSource: (Uri) -> Unit,
     onDeleted: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -111,6 +118,13 @@ fun ResultScreen(
     var showPromptManageSheet by remember { mutableStateOf(false) }
     var showSavePromptDialog by remember { mutableStateOf(false) }
     var savePromptLabel by remember { mutableStateOf("") }
+    val snackbarHostState = remember { SnackbarHostState() }
+    var notice by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(notice) {
+        val msg = notice ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(msg)
+        notice = null
+    }
     val savedToPicturesMessage = stringResource(R.string.result_saved_to_pictures)
     val promptSavedMessage = stringResource(R.string.result_prompt_saved)
     var selectedPromptId by remember(jobId) { mutableStateOf<Long?>(null) }
@@ -119,6 +133,14 @@ fun ResultScreen(
     val prompts by promptRepo.promptsState.collectAsState()
     val app = context.applicationContext as dev.zun.flux.FluxApp
     val pinnedIds by app.pinnedPrompts.ids.collectAsState()
+    // Server-supported workflows gate the Try-harder toggle (see /capabilities).
+    val tryHarderAvailable by produceState(false) {
+        value = runCatching { app.repositories.health.capabilities() }
+            .getOrNull()
+            ?.workflows
+            ?.any { it.name == Workflows.TRY_HARDER_EDIT && it.supported }
+            ?: false
+    }
     val isWide = currentWindowAdaptiveInfo().windowSizeClass
         .isWidthAtLeastBreakpoint(androidx.window.core.layout.WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)
 
@@ -175,11 +197,7 @@ fun ResultScreen(
                     )
                     onRegenerated(resp.job_id)
                 } catch (t: Throwable) {
-                    Toast.makeText(
-                        context,
-                        t.toUserMessage("regenerate"),
-                        Toast.LENGTH_SHORT,
-                    ).show()
+                    notice = t.toUserMessage("regenerate")
                 } finally {
                     regenerating = false
                 }
@@ -193,11 +211,7 @@ fun ResultScreen(
                 jobs.deleteJob(jobId)
                 onDeleted()
             } catch (t: Throwable) {
-                Toast.makeText(
-                    context,
-                    t.toUserMessage("delete"),
-                    Toast.LENGTH_SHORT,
-                ).show()
+                notice = t.toUserMessage("delete")
             }
         }
     }
@@ -224,6 +238,23 @@ fun ResultScreen(
                             },
                         )
                         DropdownMenuItem(
+                            text = { Text(stringResource(R.string.result_use_as_source)) },
+                            enabled = jobDto?.status == "done",
+                            onClick = {
+                                showMenu = false
+                                scope.launch {
+                                    try {
+                                        val uri = withContext(Dispatchers.IO) {
+                                            images.downloadResultToCache(jobId)
+                                        }
+                                        onUseAsSource(uri)
+                                    } catch (t: Throwable) {
+                                        notice = t.toUserMessage("use the result as a new source")
+                                    }
+                                }
+                            },
+                        )
+                        DropdownMenuItem(
                             text = { Text(stringResource(R.string.result_view_details)) },
                             onClick = {
                                 showMenu = false
@@ -241,6 +272,8 @@ fun ResultScreen(
                 },
             )
         },
+        contentWindowInsets = WindowInsets.safeDrawing,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { inner ->
         Column(
             modifier =
@@ -336,7 +369,7 @@ fun ResultScreen(
                                     t.toUserMessage("save")
                                 }
                             saving = false
-                            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                            notice = msg
                         }
                     },
                     enabled = resultModel != null && !saving,
@@ -352,11 +385,7 @@ fun ResultScreen(
                             try {
                                 shareImage(context, src)
                             } catch (t: Throwable) {
-                                Toast.makeText(
-                                    context,
-                                    t.toUserMessage("share"),
-                                    Toast.LENGTH_SHORT,
-                                ).show()
+                                notice = t.toUserMessage("share")
                             }
                         }
                     },
@@ -385,6 +414,7 @@ fun ResultScreen(
             },
             tryHarder = tryHarder,
             onTryHarderChange = { tryHarder = it },
+            showTryHarder = tryHarderAvailable,
             onSavePromptClick = {
                 savePromptLabel = ""
                 showSavePromptDialog = true
@@ -423,9 +453,24 @@ fun ResultScreen(
                         promptRepo.deletePrompt(promptId)
                         if (selectedPromptId == promptId) selectedPromptId = null
                     } catch (t: Throwable) {
+                        // Toast, not snackbar: the manage sheet stays open and
+                        // would cover a Scaffold-hosted snackbar.
                         Toast.makeText(
                             context,
                             t.toUserMessage("delete prompt"),
+                            Toast.LENGTH_SHORT,
+                        ).show()
+                    }
+                }
+            },
+            onUpdatePrompt = { promptId, label, text ->
+                scope.launch {
+                    try {
+                        promptRepo.updatePrompt(promptId, label.trim(), text.trim())
+                    } catch (t: Throwable) {
+                        Toast.makeText(
+                            context,
+                            t.toUserMessage("update prompt"),
                             Toast.LENGTH_SHORT,
                         ).show()
                     }
@@ -454,7 +499,7 @@ fun ResultScreen(
                         customPromptText = ""
                         showSavePromptDialog = false
                         showPromptSheet = false
-                        Toast.makeText(context, promptSavedMessage, Toast.LENGTH_SHORT).show()
+                        notice = promptSavedMessage
                     } catch (t: Throwable) {
                         Toast.makeText(
                             context,

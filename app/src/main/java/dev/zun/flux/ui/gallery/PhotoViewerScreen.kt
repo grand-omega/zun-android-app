@@ -1,7 +1,7 @@
 package dev.zun.flux.ui.gallery
 
 import android.net.Uri
-import android.widget.Toast
+import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.fadeIn
@@ -13,10 +13,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -42,14 +44,17 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -57,6 +62,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLocale
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -64,7 +70,12 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import coil3.SingletonImageLoader
 import coil3.request.ImageRequest
+import coil3.request.SuccessResult
 import dev.zun.flux.R
 import dev.zun.flux.data.api.JobSummaryDto
 import dev.zun.flux.data.api.PromptDto
@@ -104,17 +115,36 @@ fun PhotoViewerScreen(
             pageCount = { jobs.size },
         )
 
-    // jobs may still be loading on first entry, so the index isn't resolvable
-    // at composition time. Scroll once it is — but only once, so user swipes
-    // aren't yanked back.
-    var didInitialScroll by rememberSaveable(initialJobId) { mutableStateOf(false) }
-    LaunchedEffect(jobs, initialJobId) {
-        if (didInitialScroll) return@LaunchedEffect
-        val idx = jobs.indexOfFirst { it.id == initialJobId }
+    // The viewer is anchored to a *job*, not a list index. The gallery list can
+    // grow or reorder while the viewer is open (a new generation finishes, a
+    // sync runs) — every new job is prepended, shifting indices. Pinning the
+    // pager to a fixed index then slides a different photo under it (the "shows
+    // the next image" / "stuck between two pages" bug). Instead we track the
+    // anchored job's id and keep the pager snapped to wherever that job sits.
+    var anchorJobId by rememberSaveable(initialJobId) { mutableStateOf(initialJobId) }
+    var aligned by remember(initialJobId) { mutableStateOf(false) }
+    val latestJobs by rememberUpdatedState(jobs)
+
+    // Keep the anchored job under the pager when the list changes (or finishes
+    // loading on first entry). Snap to it; don't fight an in-progress swipe.
+    LaunchedEffect(jobs) {
+        val idx = jobs.indexOfFirst { it.id == anchorJobId }
         if (idx >= 0) {
-            pagerState.scrollToPage(idx)
-            didInitialScroll = true
+            if (idx != pagerState.currentPage && !pagerState.isScrollInProgress) {
+                pagerState.scrollToPage(idx)
+            }
+            aligned = true
         }
+    }
+
+    // Once aligned, follow user swipes: a settled page becomes the new anchor.
+    // snapshotFlow only emits on settledPage *changes*, so a list re-emission
+    // that leaves the page number unchanged can't clobber the anchor, and the
+    // gate keeps the initial settle (page 0) from overriding the tapped photo.
+    LaunchedEffect(pagerState, aligned) {
+        if (!aligned) return@LaunchedEffect
+        snapshotFlow { pagerState.settledPage }
+            .collect { page -> latestJobs.getOrNull(page)?.id?.let { anchorJobId = it } }
     }
 
     var showDetails by remember { mutableStateOf(false) }
@@ -130,8 +160,34 @@ fun PhotoViewerScreen(
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
+    // Hide the system bars together with the viewer chrome so tap-to-hide
+    // yields a true edge-to-edge image. Restored when leaving the screen.
+    val window = LocalActivity.current?.window
+    val view = LocalView.current
+    if (window != null) {
+        val insetsController = remember(window, view) {
+            WindowCompat.getInsetsController(window, view).apply {
+                systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            }
+        }
+        LaunchedEffect(showUI) {
+            if (showUI) {
+                insetsController.show(WindowInsetsCompat.Type.systemBars())
+            } else {
+                insetsController.hide(WindowInsetsCompat.Type.systemBars())
+            }
+        }
+        DisposableEffect(insetsController) {
+            onDispose { insetsController.show(WindowInsetsCompat.Type.systemBars()) }
+        }
+    }
+
     val currentJob = jobs.getOrNull(pagerState.currentPage)
     val hasInput = currentJob?.input_id != null
+
+    LaunchedEffect(currentJob?.id) {
+        viewModel.setViewerJob(currentJob?.id)
+    }
 
     val undoCount = pendingUndo?.size ?: 0
     val undoDeletedMessage = pluralStringResource(R.plurals.gallery_undo_deleted, undoCount, undoCount)
@@ -160,6 +216,7 @@ fun PhotoViewerScreen(
     val saveFailedMessage = stringResource(R.string.viewer_save_failed)
     Scaffold(
         containerColor = Color.Black,
+        contentWindowInsets = WindowInsets.safeDrawing,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             AnimatedVisibility(
@@ -198,11 +255,7 @@ fun PhotoViewerScreen(
                                 }
                                 onUseInput(uri)
                             } catch (t: Throwable) {
-                                Toast.makeText(
-                                    context,
-                                    t.toUserMessage("load the original input"),
-                                    Toast.LENGTH_SHORT,
-                                ).show()
+                                viewerNotice = t.toUserMessage("load the original input")
                             } finally {
                                 selectingInput = false
                             }
@@ -210,11 +263,14 @@ fun PhotoViewerScreen(
                     },
                     onSave = {
                         val job = currentJob ?: return@ViewerActionBar
-                        val src = images.resultModel(job.id) ?: return@ViewerActionBar
+                        val src = images.resultModel(job.id) ?: run {
+                            viewerNotice = saveFailedMessage
+                            return@ViewerActionBar
+                        }
                         scope.launch {
                             try {
                                 saveToPictures(context, src, "flux-${job.id}.jpg")
-                                Toast.makeText(context, savedToGalleryMessage, Toast.LENGTH_SHORT).show()
+                                viewerNotice = savedToGalleryMessage
                             } catch (e: Exception) {
                                 viewerNotice = saveFailedMessage
                             }
@@ -248,6 +304,23 @@ fun PhotoViewerScreen(
             ) { page ->
                 val job = jobs.getOrNull(page) ?: return@HorizontalPager
                 val previewModel = images.previewModel(job.id)
+                // While this page is zoomed, upgrade from the ~1280px preview to
+                // the full-res original. The swap waits until the original has
+                // fully loaded (into Coil's memory cache) so the preview never
+                // blanks out, and it sticks while the page stays alive so
+                // unzooming doesn't downgrade. If the load fails (offline,
+                // uncached), the preview stays and the next zoom gesture retries.
+                var fullResModel by remember(job.id) { mutableStateOf<Any?>(null) }
+                if (fullResModel == null && zoomedPage == job.id) {
+                    LaunchedEffect(job.id) {
+                        val result = images.resultModel(job.id) ?: return@LaunchedEffect
+                        val request = ImageRequest.Builder(context).data(result).build()
+                        if (SingletonImageLoader.get(context).execute(request) is SuccessResult) {
+                            fullResModel = result
+                        }
+                    }
+                }
+                val viewerModel = fullResModel ?: previewModel
 
                 val pageDescription = stringResource(
                     R.string.viewer_page_description,
@@ -261,7 +334,7 @@ fun PhotoViewerScreen(
                         .semantics { contentDescription = pageDescription },
                 ) {
                     ZoomableImage(
-                        model = previewModel,
+                        model = viewerModel,
                         onClick = { showUI = !showUI },
                         onZoomedChange = { isZoomed ->
                             if (pagerState.currentPage == page) {

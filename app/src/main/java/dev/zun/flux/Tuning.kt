@@ -11,23 +11,19 @@ object Tuning {
 
     // --- Networking -----------------------------------------------------------
 
-    /** OkHttp connect timeout. Long enough to traverse Tailscale wakeup latency. */
+    /** OkHttp connect timeout. Long enough to traverse slow remote links. */
     const val HTTP_CONNECT_TIMEOUT_SECONDS = 30L
 
     /** OkHttp read timeout. Generation jobs themselves use polling, not long-poll. */
     const val HTTP_READ_TIMEOUT_SECONDS = 60L
 
-    /** TCP probe timeout used by [data.net.NetworkResolver] when picking LAN vs Tailscale.
-     *  Too low → LAN false-negatives on slow home routers; too high → user waits on every
-     *  network change. 400ms is the empirical sweet spot. */
-    const val NETWORK_PROBE_TIMEOUT_MS = 400
-
-    /** How long a NetworkResolver result is considered fresh. Avoids re-probing on every
-     *  ConnectivityManager callback when WiFi flaps. */
-    const val NETWORK_RESOLVE_CACHE_MS = 30_000L
-
     /** Max IOException retries before [data.worker.JobUploadWorker] gives up. */
     const val MAX_UPLOAD_RETRIES = 4
+
+    /** Age after which orphaned staged-upload files in cacheDir are swept at app
+     *  start. Active uploads are awaited at most ~60s before being cancelled, so
+     *  anything this old was leaked by a crash or failed cancellation cleanup. */
+    const val STAGED_UPLOAD_MAX_AGE_MS = 24L * 60L * 60L * 1000L
 
     // --- Caching --------------------------------------------------------------
 
@@ -49,6 +45,11 @@ object Tuning {
     /** Page size for the gallery grid. Larger = fewer round trips, smaller = faster initial
      *  paint and lower memory churn during fast scrolls. */
     const val GALLERY_PAGE_SIZE = 50
+
+    /** How far ahead of the viewport Paging loads. Two pages absorbs fast
+     *  flings without blank cells; the source is local Room, so the extra
+     *  reads are cheap. */
+    const val GALLERY_PREFETCH_DISTANCE = 100
 
     // --- UI -------------------------------------------------------------------
 

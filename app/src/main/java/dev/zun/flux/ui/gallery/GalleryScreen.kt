@@ -10,10 +10,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -32,7 +34,9 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.ImageNotSupported
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
@@ -45,6 +49,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -57,8 +62,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -90,10 +97,18 @@ import dev.zun.flux.data.repo.OfflineImageAvailability
 import dev.zun.flux.ui.common.EmptyState
 import dev.zun.flux.ui.common.MissingImageState
 import dev.zun.flux.util.resolvePromptLabel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /** Whether a drag-select session is adding tiles to or removing them from the
  *  base selection. Determined by the state of the anchor tile at long-press. */
 private enum class DragMode { Add, Remove }
+
+/** Per-tile Coil model + offline badge state, resolved off the main thread. */
+private data class TileMedia(
+    val model: Any?,
+    val availability: OfflineImageAvailability?,
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -105,6 +120,7 @@ fun GalleryScreen(
     showUndoSnackbars: Boolean = true,
 ) {
     val pagedItems = viewModel.pagedGridItems.collectAsLazyPagingItems()
+    val cacheVersion by images.offlineCacheVersion.collectAsStateWithLifecycle()
     val prompts by viewModel.prompts.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val isSaving by viewModel.isSaving.collectAsStateWithLifecycle()
@@ -116,14 +132,18 @@ fun GalleryScreen(
     val latestSelectedIds by rememberUpdatedState(selectedIds)
     val isSelectionMode by viewModel.isSelectionMode.collectAsStateWithLifecycle()
     val tagFilter by viewModel.tagFilter.collectAsStateWithLifecycle()
+    val sortNewestFirst by viewModel.sortNewestFirst.collectAsStateWithLifecycle()
     val availableTags by viewModel.availableTags.collectAsStateWithLifecycle()
+    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
 
     val snackbarHostState = remember { SnackbarHostState() }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showFilterMenu by remember { mutableStateOf(false) }
+    var showSortMenu by remember { mutableStateOf(false) }
     var showImageMetadata by remember { mutableStateOf(false) }
+    var searchActive by rememberSaveable { mutableStateOf(false) }
 
     BackHandler(isSelectionMode) {
         viewModel.clearSelection()
@@ -155,6 +175,7 @@ fun GalleryScreen(
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets.safeDrawing,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             if (isSelectionMode) {
@@ -200,6 +221,22 @@ fun GalleryScreen(
                         }
                     },
                     actions = {
+                        IconButton(
+                            onClick = {
+                                if (searchActive) viewModel.setSearchQuery("")
+                                searchActive = !searchActive
+                            },
+                        ) {
+                            Icon(
+                                Icons.Default.Search,
+                                contentDescription = stringResource(R.string.gallery_search),
+                                tint = if (searchActive) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                            )
+                        }
                         IconButton(onClick = { showImageMetadata = !showImageMetadata }) {
                             Icon(
                                 Icons.AutoMirrored.Filled.Label,
@@ -216,6 +253,40 @@ fun GalleryScreen(
                                     MaterialTheme.colorScheme.onSurfaceVariant
                                 },
                             )
+                        }
+                        Box {
+                            IconButton(onClick = { showSortMenu = true }) {
+                                Icon(Icons.Default.SwapVert, contentDescription = stringResource(R.string.gallery_sort))
+                            }
+                            DropdownMenu(
+                                expanded = showSortMenu,
+                                onDismissRequest = { showSortMenu = false },
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.gallery_sort_newest_first)) },
+                                    leadingIcon = if (sortNewestFirst) {
+                                        { Icon(Icons.Default.Check, contentDescription = null) }
+                                    } else {
+                                        null
+                                    },
+                                    onClick = {
+                                        viewModel.setSortNewestFirst(true)
+                                        showSortMenu = false
+                                    },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.gallery_sort_oldest_first)) },
+                                    leadingIcon = if (!sortNewestFirst) {
+                                        { Icon(Icons.Default.Check, contentDescription = null) }
+                                    } else {
+                                        null
+                                    },
+                                    onClick = {
+                                        viewModel.setSortNewestFirst(false)
+                                        showSortMenu = false
+                                    },
+                                )
+                            }
                         }
                         Box {
                             IconButton(onClick = { showFilterMenu = true }) {
@@ -256,6 +327,28 @@ fun GalleryScreen(
         },
     ) { inner ->
         Column(modifier = Modifier.padding(inner)) {
+            if (searchActive && !isSelectionMode) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = viewModel::setSearchQuery,
+                    placeholder = { Text(stringResource(R.string.gallery_search_placeholder)) },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    trailingIcon = {
+                        IconButton(
+                            onClick = {
+                                viewModel.setSearchQuery("")
+                                searchActive = false
+                            },
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.gallery_close_search))
+                        }
+                    },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                )
+            }
             if (tagFilter != TagFilter.All && !isSelectionMode) {
                 val activeLabel = availableTags.firstOrNull { it.filter == tagFilter }?.label
                     ?: stringResource(R.string.gallery_filtered)
@@ -302,20 +395,21 @@ fun GalleryScreen(
                     }
                 } else if (isEmpty) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        val isFiltered = tagFilter != TagFilter.All || searchQuery.isNotBlank()
                         if (isLoading || isInitialLoading) {
                             CircularProgressIndicator()
                         } else {
                             EmptyState(
                                 icon = Icons.Default.ImageNotSupported,
                                 title = stringResource(
-                                    if (tagFilter != TagFilter.All) {
+                                    if (isFiltered) {
                                         R.string.gallery_empty_filtered_title
                                     } else {
                                         R.string.gallery_empty_title
                                     },
                                 ),
                                 message = stringResource(
-                                    if (tagFilter != TagFilter.All) {
+                                    if (isFiltered) {
                                         R.string.gallery_empty_filtered_message
                                     } else {
                                         R.string.gallery_empty_message
@@ -324,8 +418,10 @@ fun GalleryScreen(
                                 action = {
                                     TextButton(
                                         onClick = {
-                                            if (tagFilter != TagFilter.All) {
+                                            if (isFiltered) {
                                                 viewModel.setTagFilter(TagFilter.All)
+                                                viewModel.setSearchQuery("")
+                                                searchActive = false
                                             } else {
                                                 onBack()
                                             }
@@ -333,7 +429,7 @@ fun GalleryScreen(
                                     ) {
                                         Text(
                                             stringResource(
-                                                if (tagFilter != TagFilter.All) {
+                                                if (isFiltered) {
                                                     R.string.gallery_clear_filter
                                                 } else {
                                                     R.string.gallery_create_an_edit
@@ -347,6 +443,20 @@ fun GalleryScreen(
                     }
                 } else {
                     val gridState = rememberLazyGridState()
+
+                    // Keep the viewed photo's tile in view so the shared-element
+                    // return transition has a visible target even after the user
+                    // paged away in the viewer.
+                    val viewerJobId by viewModel.viewerJobId.collectAsStateWithLifecycle()
+                    LaunchedEffect(viewerJobId) {
+                        val target = viewerJobId ?: return@LaunchedEffect
+                        val idx = pagedItems.itemSnapshotList.items.indexOfFirst {
+                            it is GalleryGridItem.JobItem && it.job.id == target
+                        }
+                        if (idx >= 0 && gridState.layoutInfo.visibleItemsInfo.none { it.index == idx }) {
+                            gridState.requestScrollToItem(idx)
+                        }
+                    }
                     // Tile bounds keyed by jobId, in root coords. Updated on
                     // every layout pass (so scroll keeps them fresh).
                     val tileBounds = remember { mutableStateMapOf<String, Rect>() }
@@ -362,13 +472,17 @@ fun GalleryScreen(
                         val rangeIds = (lo..hi).asSequence()
                             .mapNotNull { (snapshot.getOrNull(it) as? GalleryGridItem.JobItem)?.job?.id }
                             .toSet()
-                        viewModel.setSelection(
-                            if (dragMode == DragMode.Add) {
-                                baseSelection + rangeIds
-                            } else {
-                                baseSelection - rangeIds
-                            },
-                        )
+                        val newSelection = if (dragMode == DragMode.Add) {
+                            baseSelection + rangeIds
+                        } else {
+                            baseSelection - rangeIds
+                        }
+                        // Tick as the drag sweeps over tiles; the initial
+                        // long-press already gave LongPress feedback.
+                        if (cursorIdx != anchor && newSelection != latestSelectedIds) {
+                            haptic.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
+                        }
+                        viewModel.setSelection(newSelection)
                     }
 
                     fun hitTest(rootPos: Offset): Int {
@@ -420,6 +534,16 @@ fun GalleryScreen(
                                         val job = item.job
                                         val isSelected = selectedIds.contains(job.id)
                                         val jobIndex = idx
+                                        // File-existence checks are stat syscalls; keep them off
+                                        // the main thread and re-read only when the cache changes.
+                                        val media by produceState<TileMedia?>(null, job.id, cacheVersion) {
+                                            value = withContext(Dispatchers.IO) {
+                                                TileMedia(
+                                                    model = images.thumbModel(job.id),
+                                                    availability = images.offlineAvailability(job.id),
+                                                )
+                                            }
+                                        }
                                         JobThumbnail(
                                             modifier = Modifier
                                                 .onGloballyPositioned { coords ->
@@ -456,8 +580,8 @@ fun GalleryScreen(
                                                 },
                                             job = job,
                                             prompts = prompts,
-                                            model = images.thumbModel(job.id),
-                                            availability = images.offlineAvailability(job.id),
+                                            model = media?.model,
+                                            availability = media?.availability,
                                             showMetadata = showImageMetadata,
                                             isSelected = isSelected,
                                             isSelectionMode = isSelectionMode,

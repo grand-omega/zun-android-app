@@ -16,7 +16,7 @@ Repositories (data/repo)
 │ (Retrofit)   │ (Room)       │ (upload, delete)    │
 └──────────────┴──────────────┴─────────────────────┘
         ↑
-NetworkResolver picks LAN or Tailscale; CertPinStore enforces pinning;
+CertPinStore enforces pinning;
 Diagnostics interceptor records errors and timings.
 ```
 
@@ -31,7 +31,7 @@ All paths relative to `app/src/main/java/dev/zun/flux/`.
 | `data/api` | Retrofit interface for the server contract | `FluxApi.kt` |
 | `data/local` | Room database, DAOs, entities | `AppDatabase.kt`, `JobDao.kt`, `JobEntity.kt`, `PendingDeleteEntity.kt` |
 | `data/repo` | Narrow repository interfaces + the unified implementation + persistence helpers | `RealJobRepository.kt`, `SettingsManager.kt`, `KeystoreSecureStore.kt`, `OfflineImageCache.kt` |
-| `data/net` | Discovery, route selection, cert pinning | `ServerDiscovery.kt`, `NetworkResolver.kt`, `CertPinStore.kt`, `CertCapturer.kt` |
+| `data/net` | Cert pinning | `CertPinStore.kt`, `CertCapturer.kt` |
 | `data/worker` | Background WorkManager jobs | `JobUploadWorker.kt`, `DeleteSyncWorker.kt` |
 | `data/diag` | OkHttp interceptor that records errors / timings for the Settings → Diagnostics panel | `Diagnostics.kt` |
 
@@ -56,7 +56,7 @@ Small helpers: `ImageUtils`, `ErrorMessages`, `ServerUrls`, `ShareUtils`, `Media
 
 ### Entry points
 
-- `FluxApp.kt` — `Application` subclass. Constructs the `OkHttpClient`, `NetworkResolver`, `OfflineImageCache`, `AuthStateHolder`, `SettingsManager`, and the `Repositories` bundle.
+- `FluxApp.kt` — `Application` subclass. Constructs the `OkHttpClient`, `OfflineImageCache`, `AuthStateHolder`, `SettingsManager`, and the `Repositories` bundle.
 - `MainActivity.kt` — single activity hosting `AppNavHost`.
 - `ui/nav/AppNavHost.kt` — Compose `NavHost`; routes screens, wires per-feature ViewModels with the right repository interfaces.
 
@@ -65,10 +65,8 @@ Small helpers: `ImageUtils`, `ErrorMessages`, `ServerUrls`, `ShareUtils`, `Media
 ### 1. First-time setup
 
 1. `AppNavHost` checks `SettingsManager.isConfigured`. If false, the start destination is `SetupScreen`.
-2. The user enters an IP/hostname. `ServerDiscovery.scan(host)` tries `http`/`https` × `{5000, 5001, 7860, 8000, 8188}` against `/api/v1/health` with short timeouts, off the main thread.
-3. Each responding host returns its server version and ComfyUI status; the user picks one (or taps **Enter URL manually**).
-4. The user pastes their token. The screen calls `HealthRepository.check(url, token)` to verify.
-5. On success, URLs/routing preferences are written to app-private preferences and the API token is written to `KeystoreSecureStore` via `SettingsManager`. `NetworkResolver.refresh()` rebuilds the OkHttp/Retrofit stack with the new credentials.
+2. The user enters the server URL (bare hostnames default to `https://`) and pastes their token. The screen verifies both with an authenticated request before saving.
+3. On success, the URL is written to app-private preferences and the API token is written to `KeystoreSecureStore` via `SettingsManager`. `FluxApp.rebuildRepository()` rebuilds the Retrofit stack with the new credentials.
 
 ### 2. Submitting a job
 
@@ -95,20 +93,19 @@ Small helpers: `ImageUtils`, `ErrorMessages`, `ServerUrls`, `ShareUtils`, `Media
 `FluxApp.onCreate()` builds:
 
 - `OkHttpClient` (with `Diagnostics` interceptor and the optional `CertPinStore`)
-- `NetworkResolver` (holds active route, exposes a `refresh()` callback)
 - `AppDatabase` (plain SQLite; SQLCipher was removed in commit `8f05e6b`)
 - `OfflineImageCache` (rooted at `context.filesDir/offline_images`)
 - `RealJobRepository` (the single concrete implementation), exposed through five narrow interfaces
 - `Repositories` — a small bundle that's threaded through `AppNavHost` so each screen receives only the interfaces it needs
 
-When the user changes the server URL, token, or pinning state, `NetworkResolver.refresh()` swaps the `OkHttpClient` and the Retrofit-backed `FluxApi` is rebuilt. Compose state holders observe the new instances on next composition.
+When the user changes the server URL, token, or pinning state, `FluxApp.rebuildOkHttp()`/`rebuildRepository()` swap the `OkHttpClient` and the Retrofit-backed `FluxApi`. Compose state holders observe the new instances on next composition.
 
 ## Persistence summary
 
 | Where | What |
 |---|---|
 | Room (`AppDatabase`, plain SQLite) | `jobs` and `pending_deletes` tables. Schema version 4. Schemas exported under `app/schemas/`. |
-| Plain SharedPreferences (`settings`) | Server URLs, active route, connection mode, biometric lockout duration, last successful unlock timestamp |
+| Plain SharedPreferences (`settings`) | Server URL, biometric lockout duration, last successful unlock timestamp |
 | `KeystoreSecureStore` (`secure_v2`) | API token encrypted as AES/GCM ciphertext with the key held in Android Keystore |
 | `files/offline_images/` | JPEG cache for thumb / preview / result variants, LRU-evicted |
 | WorkManager | Upload and delete-sync work, persists across process death |

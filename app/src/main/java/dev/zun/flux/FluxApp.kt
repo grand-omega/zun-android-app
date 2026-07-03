@@ -1,8 +1,6 @@
 package dev.zun.flux
 
 import android.app.Application
-import android.net.ConnectivityManager
-import android.net.Network
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
 import coil3.memory.MemoryCache
@@ -10,7 +8,6 @@ import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import dev.zun.flux.data.api.FluxApi
 import dev.zun.flux.data.diag.Diagnostics
 import dev.zun.flux.data.net.CertPinStore
-import dev.zun.flux.data.net.NetworkResolver
 import dev.zun.flux.data.repo.HealthRepository
 import dev.zun.flux.data.repo.ImageSourceRepository
 import dev.zun.flux.data.repo.JobRepository
@@ -68,9 +65,6 @@ class FluxApp : Application() {
     lateinit var authStateHolder: AuthStateHolder
         private set
 
-    lateinit var networkResolver: NetworkResolver
-        private set
-
     lateinit var pinnedPrompts: PinnedPromptsStore
         private set
 
@@ -85,13 +79,15 @@ class FluxApp : Application() {
     override fun onCreate() {
         super.onCreate()
 
-        initSentry()
+        // Off the critical path: Sentry only needs to be up before the first
+        // crash report, not before the first frame. The brief uncovered window
+        // is an accepted trade-off for faster cold start.
+        Thread { initSentry() }.start()
 
         settingsManager = SettingsManager(this)
         authStateHolder = AuthStateHolder(settingsManager)
         pinnedPrompts = PinnedPromptsStore(this)
         certPinStore = CertPinStore(this)
-        networkResolver = NetworkResolver(settingsManager) { rebuildRepository() }
 
         rebuildOkHttp()
         // Resolves the client at call time so cert-pin / interceptor changes
@@ -118,22 +114,7 @@ class FluxApp : Application() {
 
         rebuildRepository()
 
-        // Re-pick LAN vs Tailscale on every default-network change. Network changes
-        // must bypass the resolver's debounce cache — otherwise a Wi-Fi → cellular
-        // transition shortly after a successful probe keeps the stale URL until the
-        // window expires, and LAN↔Tailscale failover stops working.
-        val cm = getSystemService(ConnectivityManager::class.java)
-        cm?.registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: Network) {
-                networkResolver.invalidateCache()
-                networkResolver.refresh()
-            }
-            override fun onLost(network: Network) {
-                networkResolver.invalidateCache()
-                networkResolver.refresh()
-            }
-        })
-        networkResolver.refresh()
+        sweepStagedUploadFiles()
     }
 
     /**
@@ -158,6 +139,21 @@ class FluxApp : Application() {
         }
     }
 
+    /**
+     * Delete staged upload files orphaned by a crash or a cancellation whose
+     * cleanup failed (see RealJobRepository.cancelJobUpload — the staged path
+     * is recovered from a WorkManager tag, which can miss). Without this they
+     * sit in cacheDir until Android trims it.
+     */
+    private fun sweepStagedUploadFiles() {
+        Thread {
+            val cutoff = System.currentTimeMillis() - Tuning.STAGED_UPLOAD_MAX_AGE_MS
+            cacheDir.listFiles()
+                ?.filter { it.name.startsWith("upload_preprocessed_") && it.lastModified() < cutoff }
+                ?.forEach { it.delete() }
+        }.start()
+    }
+
     /** Rebuild OkHttpClient — called when cert pins change so the new pinner takes effect. */
     fun rebuildOkHttp() {
         okHttpClient = OkHttpClient.Builder()
@@ -165,18 +161,24 @@ class FluxApp : Application() {
             .readTimeout(Tuning.HTTP_READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .addInterceptor { chain ->
                 val token = settingsManager.apiToken ?: ""
-                chain.proceed(
-                    chain.request().newBuilder()
-                        .header("Authorization", "Bearer $token")
-                        .build(),
-                )
+                val request = chain.request().newBuilder()
+                    .header("Authorization", "Bearer $token")
+                // The server content-negotiates derived images (AVIF is
+                // ~30-50% smaller than JPEG); Android decodes AVIF natively.
+                val path = chain.request().url.encodedPath
+                if (path.endsWith("/thumb") || path.endsWith("/preview") ||
+                    path.endsWith("/result") || path.endsWith("/file")
+                ) {
+                    request.header("Accept", "image/avif, image/jpeg;q=0.9, */*;q=0.8")
+                }
+                chain.proceed(request.build())
             }
             .addInterceptor(diagnostics.okHttpInterceptor())
             .certificatePinner(certPinStore.toCertificatePinner())
             .build()
     }
 
-    /** Rebuild Retrofit when the active base URL changes. */
+    /** Rebuild Retrofit when the server URL changes. */
     fun rebuildRepository() {
         val baseUrl = settingsManager.serverUrl.takeIf { !it.isNullOrBlank() } ?: "https://example.invalid"
 

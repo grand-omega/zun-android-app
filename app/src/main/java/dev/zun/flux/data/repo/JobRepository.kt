@@ -19,7 +19,12 @@ data class JobTagStats(
  * resolution live on their own narrower interfaces.
  */
 interface JobRepository {
-    suspend fun getJob(jobId: String): JobStatusDto
+    /**
+     * Fetch a job's status. [waitSeconds] > 0 long-polls: the server holds
+     * the response (≤30s) until status/progress changes, so callers can loop
+     * on this instead of sleeping between short GETs.
+     */
+    suspend fun getJob(jobId: String, waitSeconds: Int? = null): JobStatusDto
 
     /**
      * Lists jobs with cursor pagination. Treat [cursor] as an opaque token.
@@ -45,9 +50,10 @@ interface JobRepository {
 
     /**
      * Paged stream of done jobs, optionally narrowed by [promptId] or
-     * [customOnly]. Pass `(null, false)` for no filter.
+     * [customOnly]. Pass `(null, false)` for no filter. [newestFirst]
+     * controls sort direction (createdAt with id tiebreak).
      */
-    fun pagedJobs(promptId: Long?, customOnly: Boolean): Flow<PagingData<JobSummaryDto>>
+    fun pagedJobs(promptId: Long?, customOnly: Boolean, newestFirst: Boolean): Flow<PagingData<JobSummaryDto>>
 
     /** Aggregate counts used by the gallery tag-filter dropdown. */
     fun jobTagStats(): Flow<JobTagStats>

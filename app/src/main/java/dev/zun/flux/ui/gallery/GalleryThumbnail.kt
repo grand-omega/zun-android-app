@@ -25,10 +25,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import coil3.compose.SubcomposeAsyncImage
 import coil3.compose.SubcomposeAsyncImageContent
+import coil3.request.ImageRequest
+import coil3.request.crossfade
 import dev.zun.flux.R
 import dev.zun.flux.data.api.JobSummaryDto
 import dev.zun.flux.data.api.PromptDto
@@ -43,7 +46,7 @@ internal fun JobThumbnail(
     job: JobSummaryDto,
     prompts: List<PromptDto>,
     model: Any?,
-    availability: OfflineImageAvailability,
+    availability: OfflineImageAvailability?,
     showMetadata: Boolean,
     isSelected: Boolean,
     isSelectionMode: Boolean,
@@ -79,7 +82,10 @@ internal fun JobThumbnail(
         val tileDescription = stringResource(R.string.gallery_thumbnail_description, promptLabel)
         Box(modifier = Modifier.fillMaxSize()) {
             SubcomposeAsyncImage(
-                model = model,
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(model)
+                    .crossfade(true)
+                    .build(),
                 contentDescription = tileDescription,
                 contentScale = ContentScale.Crop,
                 modifier =
@@ -103,7 +109,7 @@ internal fun JobThumbnail(
                 },
             )
 
-            if (!isSelectionMode && !availability.resultCached) {
+            if (!isSelectionMode && availability?.resultCached == false) {
                 NeedsNetworkIcon(
                     modifier = Modifier
                         .align(Alignment.TopStart)

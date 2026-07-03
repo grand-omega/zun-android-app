@@ -3,8 +3,8 @@
 ## Toolchain
 
 - **JDK 21** for Gradle (the compiled bytecode still targets Java 17 via `sourceCompatibility`, `targetCompatibility`, and `jvmTarget`)
-- **Android SDK** with `compileSdk = 36` (compileSdkMinor `1`), `minSdk = 36`, `targetSdk = 36`
-- **Gradle** via the wrapper (`./gradlew`); AGP `9.2.1`, Kotlin `2.3.21`, KSP for Room
+- **Android SDK** with `compileSdk = 37`, `minSdk = 36`, `targetSdk = 36`
+- **Gradle** via the wrapper (`./gradlew`); AGP `9.2.1`, Kotlin `2.4.0`, KSP for Room
 - **Git** — recommended; `versionCode` and `versionName` are derived from git history (see [Versioning](#versioning))
 
 ## One-time setup
@@ -76,6 +76,21 @@ Schemas are exported by KSP to `app/schemas/dev.zun.flux.data.local.AppDatabase/
 
 - Baseline: `app/lint-baseline.xml` (regenerate with `./gradlew :app:updateLintBaseline` after intentional fixes).
 - Project rules: `app/lint.xml`.
+
+## Baseline profile
+
+The startup profile lives at `app/src/main/baseline-prof.txt` and is compiled
+by ProfileInstaller on first install of a release build. Regenerate it when the
+cold-start path changes materially. The standard `:app:generateBaselineProfile`
+task is broken on Samsung devices via UTP (works on emulators); the manual
+fallback is:
+
+1. Assemble both `nonMinifiedRelease` APKs (`:app:` and `:baselineprofile:`) and `adb install -r` them.
+2. Run the generator with `adb shell am instrument -w -e class dev.zun.flux.baselineprofile.BaselineProfileGenerator dev.zun.flux.baselineprofile/androidx.test.runner.AndroidJUnitRunner`.
+3. `adb pull` the generated `BaselineProfileGenerator_generate-baseline-prof.txt` into `app/src/main/baseline-prof.txt`.
+
+The full command block (with exact paths) is in the KDoc of
+`baselineprofile/src/main/java/dev/zun/flux/baselineprofile/BaselineProfileGenerator.kt`.
 
 ## Release notes
 

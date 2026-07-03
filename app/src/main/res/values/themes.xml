@@ -3,4 +3,13 @@
     <!-- Base Material3 theme. Full Compose theming is applied at runtime; this
          exists so the manifest has a valid android:theme reference. -->
     <style name="Theme.ZunFlux" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <!-- Branded launch splash (Android 12+ SplashScreen API). MainActivity
+         installs this via installSplashScreen() and hands off to Theme.ZunFlux
+         once Compose draws the first frame. -->
+    <style name="Theme.ZunFlux.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/ic_launcher_background_end</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.ZunFlux</item>
+    </style>
 </resources>

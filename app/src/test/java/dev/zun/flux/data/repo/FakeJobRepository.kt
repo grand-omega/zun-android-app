@@ -2,12 +2,15 @@ package dev.zun.flux.data.repo
 
 import android.net.Uri
 import androidx.paging.PagingData
+import dev.zun.flux.data.api.CapabilitiesResponse
 import dev.zun.flux.data.api.HealthResponse
 import dev.zun.flux.data.api.JobCreatedResponse
 import dev.zun.flux.data.api.JobListResponse
 import dev.zun.flux.data.api.JobStatusDto
 import dev.zun.flux.data.api.JobSummaryDto
 import dev.zun.flux.data.api.PromptDto
+import dev.zun.flux.data.api.WorkflowSupportDto
+import dev.zun.flux.data.api.Workflows
 import dev.zun.flux.data.api.effectivePromptId
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -64,6 +67,13 @@ class FakeJobRepository(
         return HealthResponse(status = "ok (fake)")
     }
 
+    override suspend fun capabilities(): CapabilitiesResponse = CapabilitiesResponse(
+        workflows = listOf(
+            WorkflowSupportDto(name = Workflows.DEFAULT_EDIT, default = true),
+            WorkflowSupportDto(name = Workflows.TRY_HARDER_EDIT, experimental = true),
+        ),
+    )
+
     override suspend fun diagnoseConnection(): ConnectionDiagnosis = ConnectionDiagnosis.Reachable
 
     private val extraPrompts = MutableStateFlow<List<PromptDto>>(emptyList())
@@ -82,6 +92,14 @@ class FakeJobRepository(
         extraPrompts.value = extraPrompts.value + created
         listPrompts()
         return created
+    }
+
+    override suspend fun updatePrompt(promptId: Long, label: String, text: String): PromptDto {
+        val updated = (fakePrompts + extraPrompts.value).first { it.id == promptId }
+            .copy(label = label, text = text)
+        extraPrompts.value = extraPrompts.value.map { if (it.id == promptId) updated else it }
+        listPrompts()
+        return updated
     }
 
     override suspend fun deletePrompt(promptId: Long) {
@@ -159,7 +177,7 @@ class FakeJobRepository(
         onUploadProgress = onUploadProgress,
     )
 
-    override suspend fun getJob(jobId: String): JobStatusDto {
+    override suspend fun getJob(jobId: String, waitSeconds: Int?): JobStatusDto {
         if (deletedIds.contains(jobId)) error("Job was deleted")
         val entry = entries[jobId] ?: error("Unknown fake job: $jobId")
         val isCancelled = cancelledIds.contains(jobId)
@@ -186,7 +204,6 @@ class FakeJobRepository(
             status = status,
             input_id = entry.inputId,
             source_prompt_id = entry.promptId,
-            prompt_id = entry.promptId,
             prompt_text = entry.promptText,
             workflow = entry.workflow,
             seed = null,
@@ -225,7 +242,6 @@ class FakeJobRepository(
                     status = "done",
                     input_id = entry.inputId,
                     source_prompt_id = entry.promptId,
-                    prompt_id = entry.promptId,
                     prompt_text = entry.promptText,
                     workflow = entry.workflow,
                     seed = null,
@@ -284,14 +300,15 @@ class FakeJobRepository(
         listJobs(status = "done", limit = 100, cursor = null, inputId = null).items
     }
 
-    override fun pagedJobs(promptId: Long?, customOnly: Boolean): Flow<PagingData<JobSummaryDto>> = updates.map {
+    override fun pagedJobs(promptId: Long?, customOnly: Boolean, newestFirst: Boolean): Flow<PagingData<JobSummaryDto>> = updates.map {
         val all = listJobs(status = "done", limit = 100, cursor = null, inputId = null).items
         val filtered = when {
             customOnly -> all.filter { it.effectivePromptId == null && it.prompt_text != null }
             promptId != null -> all.filter { it.effectivePromptId == promptId }
             else -> all
         }
-        PagingData.from(filtered)
+        // listJobs returns newest-first; mirror the DAO's ascending order otherwise.
+        PagingData.from(if (newestFirst) filtered else filtered.asReversed())
     }
 
     override fun jobTagStats(): Flow<JobTagStats> = updates.map {
@@ -338,6 +355,11 @@ class FakeJobRepository(
         return recentInputUri(inputId)
     }
 
+    override suspend fun downloadResultToCache(jobId: String): Uri {
+        delay(200)
+        return entries[jobId]?.inputUri ?: error("Unknown fake job: $jobId")
+    }
+
     override fun recentInputUri(inputId: Int): Uri = entries.values.firstOrNull { it.inputId == inputId }?.inputUri
         ?: error("Unknown fake input: $inputId")
 
@@ -356,6 +378,8 @@ class FakeJobRepository(
         previewCached = entries.containsKey(jobId),
         resultCached = entries.containsKey(jobId),
     )
+
+    override val offlineCacheVersion = MutableStateFlow(0L)
 
     override fun offlineCacheStats(): OfflineCacheStats = OfflineCacheStats(bytes = 0L, fileCount = 0)
 

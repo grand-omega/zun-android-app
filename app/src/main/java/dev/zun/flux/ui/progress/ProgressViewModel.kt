@@ -31,8 +31,24 @@ class ProgressViewModel(
     private var observeJob: Job? = null
     private var observeDeletes: Job? = null
     private var pollJob: Job? = null
+    private var pollRequests = 0
 
-    fun start(jobId: String) {
+    /**
+     * Balanced with [pausePolling]; network polling runs while any STARTED
+     * screen needs it. Refcounted because BatchProgressScreen can compose the
+     * same ViewModel from both the grid tile and the focused page at once.
+     */
+    fun resumePolling(jobId: String) {
+        pollRequests++
+        start(jobId)
+    }
+
+    fun pausePolling() {
+        pollRequests = (pollRequests - 1).coerceAtLeast(0)
+        if (pollRequests == 0) pollJob?.cancel()
+    }
+
+    private fun start(jobId: String) {
         if (observeJob?.isActive == true && pollJob?.isActive == true) return
 
         if (observeJob?.isActive != true) {
@@ -62,8 +78,8 @@ class ProgressViewModel(
             }
         }
 
-        // Poll only while this ViewModel is alive. No background worker is kept
-        // running after the progress UI leaves composition.
+        // Poll only while a STARTED screen holds a resumePolling request. No
+        // background worker keeps running after the progress UI stops.
         pollJob = viewModelScope.launch {
             var iteration = 0
             while (true) {

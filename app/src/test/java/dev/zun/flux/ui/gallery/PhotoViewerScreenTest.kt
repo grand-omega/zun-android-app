@@ -50,6 +50,42 @@ class PhotoViewerScreenTest {
     }
 
     @Test
+    fun `viewer stays on the tapped photo when newer jobs are prepended`() {
+        val repo = FakeJobRepository().apply {
+            seedDoneJobs(listOf("j1", "j2", "j3", "j4", "j5"))
+        }
+        val viewModel = GalleryViewModel(repo, repo, repo)
+
+        rule.setContent {
+            PhotoViewerScreen(
+                initialJobId = "j3",
+                viewModel = viewModel,
+                images = repo,
+                onUseInput = {},
+                onBack = {},
+            )
+        }
+
+        rule.waitUntil(timeoutMillis = 3_000) {
+            rule.onAllNodesWithTagSafe("viewer_page_j3").isNotEmpty()
+        }
+        rule.onNodeWithTag("viewer_page_j3").assertIsDisplayed()
+
+        // A new generation finishes while the viewer is open: it is prepended,
+        // shifting j3 from index 2 to index 3 (and the count 5 -> 6). The pager
+        // must follow the *job*, not the old index — so j3's page becomes
+        // "Image 4 of 6". The old fixed-index code stayed on index 2 (j2,
+        // "Image 3 of 6") and this condition would never become true.
+        repo.seedDoneJobs(listOf("newer"))
+
+        rule.waitUntil(timeoutMillis = 3_000) {
+            rule.onAllNodes(hasContentDescription("Image 4 of 6"))
+                .fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty()
+        }
+        rule.onNodeWithTag("viewer_page_j3").assertIsDisplayed()
+    }
+
+    @Test
     fun `viewer renders loading state when jobs flow is initially empty`() {
         val repo = FakeJobRepository()
         val viewModel = GalleryViewModel(repo, repo, repo)

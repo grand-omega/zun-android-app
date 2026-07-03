@@ -1,23 +1,23 @@
 package dev.zun.flux.ui.settings
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.zun.flux.BuildConfig
 import dev.zun.flux.FluxApp
-import dev.zun.flux.data.repo.ConnectionMode
+import dev.zun.flux.data.api.HealthResponse
 import dev.zun.flux.data.repo.OfflineCacheStats
-import dev.zun.flux.util.normalizeOptionalLanServerUrl
-import dev.zun.flux.util.normalizeOptionalTailscaleServerUrl
+import dev.zun.flux.util.normalizeOptionalServerUrl
 import dev.zun.flux.util.toUserMessage
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class ConnectionDraftState(
-    val lanUrl: String = "",
-    val tailscaleUrl: String = "",
-    val connectionMode: ConnectionMode = ConnectionMode.AUTO,
+    val serverUrl: String = "",
     val token: String = "",
     val error: String? = null,
     val status: String = "Current settings are active.",
@@ -37,73 +37,63 @@ class SettingsViewModel(
 
     private val _connectionDraft = MutableStateFlow(
         ConnectionDraftState(
-            lanUrl = settings.lanUrl ?: "",
-            tailscaleUrl = settings.tailscaleUrl ?: "",
-            connectionMode = settings.connectionMode,
+            serverUrl = settings.serverUrl ?: "",
             token = settings.apiToken ?: "",
         ),
     )
     val connectionDraft: StateFlow<ConnectionDraftState> = _connectionDraft.asStateFlow()
 
     private val _offlineCache = MutableStateFlow(
-        OfflineCacheState(stats = app.repositories.images.offlineCacheStats()),
+        OfflineCacheState(status = "Calculating cache size..."),
     )
     val offlineCache: StateFlow<OfflineCacheState> = _offlineCache.asStateFlow()
 
-    fun updateLanUrl(value: String) = updateDraft { copy(lanUrl = value, error = null, status = "Unsaved changes") }
+    /** Best-effort snapshot of /health for the Diagnostics panel; null until fetched or on failure. */
+    private val _serverHealth = MutableStateFlow<HealthResponse?>(null)
+    val serverHealth: StateFlow<HealthResponse?> = _serverHealth.asStateFlow()
 
-    fun updateTailscaleUrl(value: String) = updateDraft { copy(tailscaleUrl = value, error = null, status = "Unsaved changes") }
+    init {
+        viewModelScope.launch {
+            // stats() walks the whole cache dir — keep it off the main thread.
+            val stats = withContext(Dispatchers.IO) { app.repositories.images.offlineCacheStats() }
+            _offlineCache.value = _offlineCache.value.copy(stats = stats, status = "Offline cache ready.")
+        }
+        viewModelScope.launch {
+            _serverHealth.value = runCatching { app.repositories.health.health() }
+                .onFailure { Log.w(TAG, "Diagnostics health fetch failed", it) }
+                .getOrNull()
+        }
+    }
 
-    fun updateConnectionMode(value: ConnectionMode) = updateDraft { copy(connectionMode = value, error = null, status = "Unsaved changes") }
+    fun updateServerUrl(value: String) = updateDraft { copy(serverUrl = value, error = null, status = "Unsaved changes") }
 
     fun updateToken(value: String) = updateDraft { copy(token = value, error = null, status = "Unsaved changes") }
 
     fun connect() {
         val draft = _connectionDraft.value
         try {
-            val lan = runCatching {
-                normalizeOptionalLanServerUrl(draft.lanUrl, allowHttp = true)
-            }.getOrElse {
-                throw IllegalArgumentException("Primary server: ${it.message}")
-            }
-            val tailscale = runCatching {
-                normalizeOptionalTailscaleServerUrl(draft.tailscaleUrl, allowHttp = true)
-            }.getOrElse {
-                throw IllegalArgumentException("Fallback server: ${it.message}")
-            }
-            require(lan != null || tailscale != null) {
-                "Enter at least one server URL"
+            val url = requireNotNull(normalizeOptionalServerUrl(draft.serverUrl, allowHttp = BuildConfig.DEBUG)) {
+                "Enter a server URL"
             }
             require(draft.token.isNotBlank()) {
                 "Enter an API token"
             }
 
-            val oldLan = settings.lanUrl
-            val oldTailscale = settings.tailscaleUrl
-            val oldMode = settings.connectionMode
-            val oldToken = settings.apiToken
             val oldServerUrl = settings.serverUrl
-            val oldActiveRoute = settings.activeRoute
+            val oldToken = settings.apiToken
 
             updateDraft { copy(error = null, status = "Connecting...", isConnecting = true) }
 
             viewModelScope.launch {
                 try {
-                    settings.lanUrl = lan
-                    settings.tailscaleUrl = tailscale
-                    settings.connectionMode = draft.connectionMode
+                    settings.serverUrl = url
                     settings.apiToken = draft.token.trim()
-                    app.networkResolver.invalidateCache()
-                    app.networkResolver.refreshNow()
+                    app.rebuildRepository()
                     app.repositories.prompts.listPrompts()
                     updateDraft { copy(status = "Connection settings active.", isConnecting = false) }
                 } catch (t: Throwable) {
-                    settings.lanUrl = oldLan
-                    settings.tailscaleUrl = oldTailscale
-                    settings.connectionMode = oldMode
-                    settings.apiToken = oldToken
                     settings.serverUrl = oldServerUrl
-                    settings.activeRoute = oldActiveRoute
+                    settings.apiToken = oldToken
                     app.rebuildRepository()
                     updateDraft {
                         copy(
@@ -131,7 +121,7 @@ class SettingsViewModel(
             try {
                 app.repositories.jobs.syncHistory()
                 _offlineCache.value = OfflineCacheState(
-                    stats = app.repositories.images.offlineCacheStats(),
+                    stats = withContext(Dispatchers.IO) { app.repositories.images.offlineCacheStats() },
                     status = "Offline cache refresh started. Images continue caching in the background.",
                 )
             } catch (t: Throwable) {
@@ -144,14 +134,23 @@ class SettingsViewModel(
     }
 
     fun clearOfflineCache() {
-        app.repositories.images.clearOfflineImageCache()
-        _offlineCache.value = OfflineCacheState(
-            stats = app.repositories.images.offlineCacheStats(),
-            status = "Offline image cache cleared.",
-        )
+        viewModelScope.launch {
+            val stats = withContext(Dispatchers.IO) {
+                app.repositories.images.clearOfflineImageCache()
+                app.repositories.images.offlineCacheStats()
+            }
+            _offlineCache.value = OfflineCacheState(
+                stats = stats,
+                status = "Offline image cache cleared.",
+            )
+        }
     }
 
     private fun updateDraft(block: ConnectionDraftState.() -> ConnectionDraftState) {
         _connectionDraft.value = _connectionDraft.value.block()
+    }
+
+    private companion object {
+        const val TAG = "SettingsViewModel"
     }
 }

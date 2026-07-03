@@ -126,7 +126,7 @@ class HomeViewModelTest {
 
         assertNull(repository.lastPromptId)
         assertEquals("make it sharper", repository.lastPromptText)
-        assertEquals("flux2_klein_9b_kv_experimental", repository.lastWorkflow)
+        assertEquals("flux2_klein_9b_kv_edit", repository.lastWorkflow)
     }
 
     @Test

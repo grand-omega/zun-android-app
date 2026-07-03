@@ -14,6 +14,7 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.workDataOf
 import dev.zun.flux.Tuning
+import dev.zun.flux.data.api.CapabilitiesResponse
 import dev.zun.flux.data.api.FluxApi
 import dev.zun.flux.data.api.HealthResponse
 import dev.zun.flux.data.api.JobCreatedResponse
@@ -21,6 +22,8 @@ import dev.zun.flux.data.api.JobListResponse
 import dev.zun.flux.data.api.JobStatusDto
 import dev.zun.flux.data.api.JobSummaryDto
 import dev.zun.flux.data.api.PromptDto
+import dev.zun.flux.data.api.WorkflowSupportDto
+import dev.zun.flux.data.api.Workflows
 import dev.zun.flux.data.local.AppDatabase
 import dev.zun.flux.data.local.PendingDeleteEntity
 import dev.zun.flux.data.local.toEntity
@@ -42,6 +45,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import retrofit2.HttpException
+import java.io.IOException
 
 class RealJobRepository(
     private val context: Context,
@@ -59,18 +63,37 @@ class RealJobRepository(
     private val jobUploader = JobUploader(context, api)
     private val recentInputCache = RecentInputCache(context, api)
     private val cacheScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val cachedPromptsStore = CachedPromptsStore(context)
 
     private val _promptsState = MutableStateFlow<List<PromptDto>>(emptyList())
     override val promptsState: StateFlow<List<PromptDto>> = _promptsState.asStateFlow()
     private val localDeletedIds = MutableStateFlow<Set<String>>(emptySet())
 
+    init {
+        // Seed from the persisted copy so the prompt picker isn't empty after
+        // process death while the server is unreachable. Loaded off the main
+        // thread (first SharedPreferences read does disk I/O); only applied if
+        // a server fetch hasn't already populated the list.
+        cacheScope.launch {
+            val cached = cachedPromptsStore.load()
+            if (cached.isNotEmpty()) {
+                _promptsState.compareAndSet(emptyList(), cached)
+            }
+        }
+    }
+
     override suspend fun health(): HealthResponse = api.health()
+
+    override suspend fun capabilities(): CapabilitiesResponse = api.capabilities()
 
     override suspend fun diagnoseConnection(): ConnectionDiagnosis = connectionDiagnoser.diagnose()
 
     override suspend fun listPrompts(): List<PromptDto> {
         val fetched = api.listPrompts().items
         _promptsState.value = fetched
+        // Persisting is JSON encode + prefs write; keep it off the caller
+        // (often viewModelScope on Main).
+        cacheScope.launch { cachedPromptsStore.save(fetched) }
         return fetched
     }
 
@@ -80,6 +103,15 @@ class RealJobRepository(
         )
         refreshPromptsQuietly()
         return created
+    }
+
+    override suspend fun updatePrompt(promptId: Long, label: String, text: String): PromptDto {
+        val updated = api.updatePrompt(
+            promptId,
+            PromptDto(id = promptId, label = label, text = text),
+        )
+        refreshPromptsQuietly()
+        return updated
     }
 
     override suspend fun deletePrompt(promptId: Long) {
@@ -176,11 +208,11 @@ class RealJobRepository(
         onUploadProgress = onUploadProgress,
     )
 
-    override suspend fun getJob(jobId: String): JobStatusDto {
+    override suspend fun getJob(jobId: String, waitSeconds: Int?): JobStatusDto {
         if (jobId in localDeletedIds.value || dao.isPendingDelete(jobId)) {
             error("Job was deleted")
         }
-        val job = api.getJob(jobId)
+        val job = api.getJob(jobId, waitSeconds)
         if (jobId !in localDeletedIds.value && !dao.isPendingDelete(jobId)) {
             dao.insertJob(job.toEntity())
             prefetchIfDone(job)
@@ -249,16 +281,20 @@ class RealJobRepository(
         entities.filter { it.status == "done" }.map { it.toSummaryDto() }
     }
 
-    override fun pagedJobs(promptId: Long?, customOnly: Boolean): Flow<PagingData<JobSummaryDto>> = Pager(
+    override fun pagedJobs(promptId: Long?, customOnly: Boolean, newestFirst: Boolean): Flow<PagingData<JobSummaryDto>> = Pager(
         config = PagingConfig(
             pageSize = Tuning.GALLERY_PAGE_SIZE,
+            // One page up front (default is 3x) for a faster first paint;
+            // prefetch keeps fast flings fed from Room.
+            initialLoadSize = Tuning.GALLERY_PAGE_SIZE,
+            prefetchDistance = Tuning.GALLERY_PREFETCH_DISTANCE,
             enablePlaceholders = false,
         ),
         pagingSourceFactory = {
             when {
-                customOnly -> dao.pagedDoneJobsCustom()
-                promptId != null -> dao.pagedDoneJobsByPromptId(promptId)
-                else -> dao.pagedDoneJobsAll()
+                customOnly -> dao.pagedDoneJobsCustom(newestFirst)
+                promptId != null -> dao.pagedDoneJobsByPromptId(promptId, newestFirst)
+                else -> dao.pagedDoneJobsAll(newestFirst)
             }
         },
     ).flow.map { pagingData ->
@@ -294,6 +330,16 @@ class RealJobRepository(
     }
 
     override suspend fun downloadInputToCache(inputId: Int): Uri = recentInputCache.downloadInputToCache(inputId)
+
+    override suspend fun downloadResultToCache(jobId: String): Uri {
+        offlineImageCache.localUri(jobId, OfflineImageCache.Kind.Result)?.let { return it }
+        val url = buildUrlOrNull("/api/v1/jobs/$jobId/result")
+            ?: throw IOException("No server URL configured")
+        offlineImageCache.prefetch(jobId, OfflineImageCache.Kind.Result, url)
+        // prefetch() swallows failures internally, so re-check the cache.
+        return offlineImageCache.localUri(jobId, OfflineImageCache.Kind.Result)
+            ?: throw IOException("Result download failed")
+    }
 
     override fun recentInputUri(inputId: Int): Uri = recentInputCache.uri(inputId)
 
@@ -345,6 +391,8 @@ class RealJobRepository(
         ?: buildUrlOrNull("/api/v1/jobs/$jobId/result")
 
     override fun offlineAvailability(jobId: String): OfflineImageAvailability = offlineImageCache.availability(jobId)
+
+    override val offlineCacheVersion get() = offlineImageCache.version
 
     override fun offlineCacheStats(): OfflineCacheStats = offlineImageCache.stats()
 

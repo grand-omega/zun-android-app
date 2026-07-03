@@ -41,6 +41,12 @@ private const val KEY_DELETED_JOB_ID = "deletedJobId"
 fun AppNavHost(
     repositories: Repositories,
     repositoryVersion: Long,
+    sharedUris: List<android.net.Uri> = emptyList(),
+    onSharedUrisConsumed: () -> Unit = {},
+    navigateToGallery: Boolean = false,
+    onGalleryNavConsumed: () -> Unit = {},
+    navigateToResultJobId: String? = null,
+    onResultNavConsumed: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val app = context.applicationContext as FluxApp
@@ -48,6 +54,23 @@ fun AppNavHost(
     val startDestination = if (settingsManager.isConfigured) Routes.HOME else Routes.SETUP
 
     val nav = rememberNavController()
+
+    // Launcher-shortcut navigation. Unconfigured installs stay on SETUP.
+    LaunchedEffect(navigateToGallery) {
+        if (navigateToGallery) {
+            if (settingsManager.isConfigured) nav.navigate(Routes.GALLERY)
+            onGalleryNavConsumed()
+        }
+    }
+
+    // Completion-notification tap → the finished job's result screen.
+    LaunchedEffect(navigateToResultJobId) {
+        val jobId = navigateToResultJobId
+        if (jobId != null) {
+            if (settingsManager.isConfigured) nav.navigate(Routes.result(jobId))
+            onResultNavConsumed()
+        }
+    }
     val slideSpec = tween<IntOffset>(durationMillis = 300)
     val fadeSpec = tween<Float>(durationMillis = 300)
     NavHost(
@@ -80,6 +103,8 @@ fun AppNavHost(
                 images = repositories.images,
                 repositoryVersion = repositoryVersion,
                 capturedUri = capturedUri,
+                sharedUris = sharedUris,
+                onSharedUrisConsumed = onSharedUrisConsumed,
                 onTakePhoto = { nav.navigate(Routes.CAMERA) },
                 onGalleryClick = { nav.navigate(Routes.GALLERY) },
                 onSettingsClick = { nav.navigate(Routes.SETTINGS) },
@@ -116,6 +141,7 @@ fun AppNavHost(
                 prompts = repositories.prompts,
                 images = repositories.images,
                 repositoryVersion = repositoryVersion,
+                settings = settingsManager,
                 onUseInput = { uri ->
                     nav.getBackStackEntry(Routes.HOME).savedStateHandle["capturedUri"] = uri
                     nav.popBackStack(Routes.HOME, inclusive = false)
@@ -158,6 +184,10 @@ fun AppNavHost(
                     }
                 },
                 onNewImage = { nav.popBackStack(Routes.HOME, inclusive = false) },
+                onUseAsSource = { uri ->
+                    nav.getBackStackEntry(Routes.HOME).savedStateHandle["capturedUri"] = uri
+                    nav.popBackStack(Routes.HOME, inclusive = false)
+                },
                 onDeleted = {
                     nav.previousBackStackEntry
                         ?.savedStateHandle

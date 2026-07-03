@@ -8,11 +8,13 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -166,6 +168,7 @@ private fun BatchGrid(
                 },
             )
         },
+        contentWindowInsets = WindowInsets.safeDrawing,
     ) { inner ->
         LazyVerticalGrid(
             columns = GridCells.Adaptive(minSize = 130.dp),
@@ -206,7 +209,7 @@ private fun BatchTile(
         },
     )
     val state by viewModel.state.collectAsStateWithLifecycle()
-    LaunchedEffect(jobId) { viewModel.start(jobId) }
+    PollWhileStarted(viewModel, jobId)
 
     val currentDto = (state as? PollState.Running)?.dto ?: (state as? PollState.Done)?.dto
     val inputModel = remember(currentDto?.input_id) { images.inputModel(currentDto?.input_id) }
@@ -351,6 +354,7 @@ private fun BatchFocused(
                 },
             )
         },
+        contentWindowInsets = WindowInsets.safeDrawing,
     ) { inner ->
         HorizontalPager(
             state = pagerState,
@@ -394,7 +398,7 @@ private fun BatchPage(
     }
     val haptic = LocalHapticFeedback.current
 
-    LaunchedEffect(jobId) { viewModel.start(jobId) }
+    PollWhileStarted(viewModel, jobId)
     LaunchedEffect(isDone) {
         if (isDone) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
     }

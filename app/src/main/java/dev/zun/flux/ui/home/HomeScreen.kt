@@ -35,7 +35,9 @@ fun HomeScreen(
     onCustomPromptChange: (String) -> Unit,
     tryHarder: Boolean,
     onTryHarderChange: (Boolean) -> Unit,
+    tryHarderAvailable: Boolean,
     onDeletePrompt: (Long) -> Unit,
+    onUpdatePrompt: (Long, String, String) -> Unit,
     onSavePromptClick: () -> Unit,
     state: SubmitState,
     uploadProgress: Float?,
@@ -50,9 +52,11 @@ fun HomeScreen(
     onPickRecent: (Int) -> Unit,
     pinnedIds: Set<Long>,
     onTogglePin: (Long) -> Unit,
+    onImagesDropped: (List<Uri>) -> Unit = {},
 ) {
     var showPromptSheet by rememberSaveable { mutableStateOf(false) }
     var showPromptManageSheet by rememberSaveable { mutableStateOf(false) }
+    val dropTargetModifier = rememberImageDropTarget(onImagesDropped)
 
     val canSubmit = imageUris.isNotEmpty() &&
         selectedPromptId != null &&
@@ -71,7 +75,7 @@ fun HomeScreen(
         }
     }
 
-    val composer: @Composable () -> Unit = {
+    val composer: @Composable (Boolean) -> Unit = { showPromptStrip ->
         Composer(
             selectedLabel = selectedLabel,
             tryHarder = tryHarder,
@@ -88,6 +92,7 @@ fun HomeScreen(
             isFetchingRecent = isFetchingRecent,
             onPickRecent = onPickRecent,
             showSourceRow = imageUris.isNotEmpty(),
+            showPromptStrip = showPromptStrip,
         )
     }
 
@@ -98,7 +103,7 @@ fun HomeScreen(
                 .padding(24.dp),
             horizontalArrangement = Arrangement.spacedBy(24.dp),
         ) {
-            Box(modifier = Modifier.weight(1f).fillMaxSize()) {
+            Box(modifier = Modifier.weight(1f).fillMaxSize().then(dropTargetModifier)) {
                 ImageHero(
                     imageUris = imageUris,
                     recents = recents,
@@ -113,7 +118,25 @@ fun HomeScreen(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                composer()
+                // Prompt selection lives inline on wide screens, so the
+                // composer drops its prompt strip (no duplicate affordance).
+                PromptLibraryContent(
+                    prompts = prompts,
+                    selectedPromptId = selectedPromptId,
+                    customPromptText = customPromptText,
+                    onCustomPromptChange = onCustomPromptChange,
+                    tryHarder = tryHarder,
+                    onTryHarderChange = onTryHarderChange,
+                    onSavePromptClick = onSavePromptClick,
+                    onManagePrompts = { showPromptManageSheet = true },
+                    onSelectPrompt = onSelectPrompt,
+                    pinnedIds = pinnedIds,
+                    onTogglePin = onTogglePin,
+                    modifier = Modifier.weight(1f),
+                    fillHeight = true,
+                    showTryHarder = tryHarderAvailable,
+                )
+                composer(false)
             }
         }
     } else {
@@ -123,7 +146,7 @@ fun HomeScreen(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            Box(modifier = Modifier.weight(1f).fillMaxWidth().then(dropTargetModifier)) {
                 ImageHero(
                     imageUris = imageUris,
                     recents = recents,
@@ -134,11 +157,13 @@ fun HomeScreen(
                     onRemove = onRemoveImage,
                 )
             }
-            composer()
+            composer(true)
         }
     }
 
-    if (showPromptSheet) {
+    // On wide screens the library is an inline pane; the modal collapses into
+    // it if the user unfolds with the sheet open.
+    if (showPromptSheet && !isWide) {
         PromptLibrarySheet(
             prompts = prompts,
             selectedPromptId = selectedPromptId,
@@ -158,6 +183,7 @@ fun HomeScreen(
             onDismiss = { showPromptSheet = false },
             pinnedIds = pinnedIds,
             onTogglePin = onTogglePin,
+            showTryHarder = tryHarderAvailable,
         )
     }
 
@@ -166,6 +192,7 @@ fun HomeScreen(
             prompts = prompts,
             selectedPromptId = selectedPromptId,
             onDeletePrompt = onDeletePrompt,
+            onUpdatePrompt = onUpdatePrompt,
             onDismiss = { showPromptManageSheet = false },
         )
     }

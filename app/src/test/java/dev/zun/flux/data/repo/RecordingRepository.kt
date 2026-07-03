@@ -2,12 +2,15 @@ package dev.zun.flux.data.repo
 
 import android.net.Uri
 import androidx.paging.PagingData
+import dev.zun.flux.data.api.CapabilitiesResponse
 import dev.zun.flux.data.api.HealthResponse
 import dev.zun.flux.data.api.JobCreatedResponse
 import dev.zun.flux.data.api.JobListResponse
 import dev.zun.flux.data.api.JobStatusDto
 import dev.zun.flux.data.api.JobSummaryDto
 import dev.zun.flux.data.api.PromptDto
+import dev.zun.flux.data.api.WorkflowSupportDto
+import dev.zun.flux.data.api.Workflows
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -51,6 +54,13 @@ class RecordingRepository :
 
     override suspend fun health(): HealthResponse = HealthResponse(status = "ok")
 
+    override suspend fun capabilities(): CapabilitiesResponse = CapabilitiesResponse(
+        workflows = listOf(
+            WorkflowSupportDto(name = Workflows.DEFAULT_EDIT, default = true),
+            WorkflowSupportDto(name = Workflows.TRY_HARDER_EDIT, experimental = true),
+        ),
+    )
+
     override suspend fun diagnoseConnection(): ConnectionDiagnosis = ConnectionDiagnosis.Reachable
 
     override suspend fun listPrompts(): List<PromptDto> = promptsState.value
@@ -59,6 +69,12 @@ class RecordingRepository :
         val prompt = PromptDto(id = 100L, label = label, text = text, workflow = workflow)
         _promptsState.value = _promptsState.value + prompt
         return prompt
+    }
+
+    override suspend fun updatePrompt(promptId: Long, label: String, text: String): PromptDto {
+        val updated = _promptsState.value.first { it.id == promptId }.copy(label = label, text = text)
+        _promptsState.value = _promptsState.value.map { if (it.id == promptId) updated else it }
+        return updated
     }
 
     override suspend fun deletePrompt(promptId: Long) {
@@ -116,7 +132,7 @@ class RecordingRepository :
         onUploadProgress = onUploadProgress,
     )
 
-    override suspend fun getJob(jobId: String): JobStatusDto = JobStatusDto(
+    override suspend fun getJob(jobId: String, waitSeconds: Int?): JobStatusDto = JobStatusDto(
         id = jobId,
         status = "done",
         created_at = 1L,
@@ -140,6 +156,7 @@ class RecordingRepository :
     override fun pagedJobs(
         promptId: Long?,
         customOnly: Boolean,
+        newestFirst: Boolean,
     ): Flow<PagingData<JobSummaryDto>> = MutableStateFlow(PagingData.empty())
 
     override fun jobTagStats(): Flow<JobTagStats> = MutableStateFlow(
@@ -153,6 +170,8 @@ class RecordingRepository :
     override fun recentInputIds(limit: Int): Flow<List<Int>> = MutableStateFlow(emptyList())
 
     override suspend fun downloadInputToCache(inputId: Int): Uri = Uri.EMPTY
+
+    override suspend fun downloadResultToCache(jobId: String): Uri = Uri.EMPTY
 
     override fun recentInputUri(inputId: Int): Uri = Uri.EMPTY
 
@@ -173,6 +192,8 @@ class RecordingRepository :
         previewCached = false,
         resultCached = false,
     )
+
+    override val offlineCacheVersion = MutableStateFlow(0L)
 
     override fun offlineCacheStats(): OfflineCacheStats = OfflineCacheStats(bytes = 0L, fileCount = 0)
 

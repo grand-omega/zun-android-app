@@ -1,5 +1,6 @@
 package dev.zun.flux.data.repo
 
+import dev.zun.flux.data.api.CapabilitiesResponse
 import dev.zun.flux.data.api.HealthResponse
 
 sealed interface ConnectionDiagnosis {
@@ -18,6 +19,9 @@ sealed interface ConnectionDiagnosis {
 
 interface HealthRepository {
     suspend fun health(): HealthResponse
+
+    /** Server feature/workflow catalog; gates UI affordances like Try harder. */
+    suspend fun capabilities(): CapabilitiesResponse
 
     /** Best-effort TCP diagnosis for the currently active server URL. */
     suspend fun diagnoseConnection(): ConnectionDiagnosis

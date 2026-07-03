@@ -1,5 +1,6 @@
 package dev.zun.flux.ui.home
 
+import android.Manifest
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -69,6 +70,8 @@ import dev.zun.flux.data.repo.ImageSourceRepository
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.data.repo.PromptRepository
 import dev.zun.flux.data.repo.UploadRepository
+import dev.zun.flux.data.worker.JobWatchWorker
+import dev.zun.flux.util.JobNotifications
 import dev.zun.flux.util.cacheInputLocally
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -84,6 +87,8 @@ fun HomeRoute(
     images: ImageSourceRepository,
     repositoryVersion: Long,
     capturedUri: Uri? = null,
+    sharedUris: List<Uri> = emptyList(),
+    onSharedUrisConsumed: () -> Unit = {},
     onTakePhoto: () -> Unit,
     onGalleryClick: () -> Unit,
     onSettingsClick: () -> Unit,
@@ -104,6 +109,7 @@ fun HomeRoute(
     val health by viewModel.health.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val uploadProgress by viewModel.uploadProgress.collectAsStateWithLifecycle()
+    val tryHarderAvailable by viewModel.tryHarderAvailable.collectAsStateWithLifecycle()
     val batchProgress by viewModel.batchProgress.collectAsStateWithLifecycle()
     val recentInputIds by remember { images.recentInputIds(3) }
         .collectAsStateWithLifecycle(initialValue = emptyList())
@@ -150,6 +156,15 @@ fun HomeRoute(
     LaunchedEffect(capturedUri) {
         val src = capturedUri ?: return@LaunchedEffect
         appendUris(listOf(src))
+    }
+
+    // Images arriving via the system share sheet. Consume immediately so a
+    // recomposition doesn't re-add them.
+    LaunchedEffect(sharedUris) {
+        if (sharedUris.isNotEmpty()) {
+            appendUris(sharedUris)
+            onSharedUrisConsumed()
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -199,15 +214,29 @@ fun HomeRoute(
         }
     }
 
+    // Completion notifications: ask once on first submit, then watch each
+    // submitted job in the background via JobWatchWorker.
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { /* declining just means no notifications; watchers still no-op safely */ }
+
     LaunchedEffect(state) {
         when (val s = state) {
             is SubmitState.Done -> {
                 viewModel.acknowledgeDone()
+                if (!JobNotifications.canNotify(context)) {
+                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+                JobWatchWorker.enqueue(context, s.jobId)
                 onJobSubmitted(s.jobId)
             }
 
             is SubmitState.DoneBatch -> {
                 viewModel.acknowledgeDone()
+                if (!JobNotifications.canNotify(context)) {
+                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+                s.submittedIds.forEach { JobWatchWorker.enqueue(context, it) }
                 val message = submittedFailedMessage
                 if (message != null) {
                     snackbarHostState.showOne(
@@ -235,11 +264,7 @@ fun HomeRoute(
                         HealthDot(health = health)
                         Spacer(Modifier.width(6.dp))
                         Text(
-                            text = stringResource(
-                                R.string.home_status_format,
-                                activeRouteLabel(app.settingsManager.activeRoute),
-                                healthShortLabel(health),
-                            ),
+                            text = healthShortLabel(health),
                             style = MaterialTheme.typography.labelSmall,
                             color = healthColor(health),
                         )
@@ -327,7 +352,9 @@ fun HomeRoute(
                 onCustomPromptChange = viewModel::updateCustomPrompt,
                 tryHarder = composer.tryHarder,
                 onTryHarderChange = viewModel::setTryHarder,
+                tryHarderAvailable = tryHarderAvailable,
                 onDeletePrompt = viewModel::deletePrompt,
+                onUpdatePrompt = viewModel::updatePrompt,
                 onSavePromptClick = {
                     saveDialogLabel = ""
                     showSaveDialog = true
@@ -345,6 +372,7 @@ fun HomeRoute(
                 onPickRecent = onPickRecent,
                 pinnedIds = pinnedIds,
                 onTogglePin = { app.pinnedPrompts.toggle(it) },
+                onImagesDropped = appendUris,
             )
             if (isRefreshing || pullDistancePx > 0f) {
                 Surface(

@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
+import androidx.paging.filter
 import androidx.paging.insertSeparators
 import androidx.paging.map
 import dev.zun.flux.data.api.JobSummaryDto
@@ -14,6 +15,7 @@ import dev.zun.flux.data.api.effectivePromptId
 import dev.zun.flux.data.repo.ImageSourceRepository
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.data.repo.PromptRepository
+import dev.zun.flux.data.repo.SettingsManager
 import dev.zun.flux.util.formatTimestamp
 import dev.zun.flux.util.saveToPictures
 import dev.zun.flux.util.shareImages
@@ -54,9 +56,18 @@ class GalleryViewModel(
     private val jobRepo: JobRepository,
     private val promptRepo: PromptRepository,
     private val imageRepo: ImageSourceRepository,
+    private val settings: SettingsManager? = null,
 ) : ViewModel() {
     private val _selectedIds = MutableStateFlow<Set<String>>(emptySet())
     val selectedIds: StateFlow<Set<String>> = _selectedIds.asStateFlow()
+
+    private val _sortNewestFirst = MutableStateFlow(settings?.gallerySortNewestFirst ?: true)
+    val sortNewestFirst: StateFlow<Boolean> = _sortNewestFirst.asStateFlow()
+
+    fun setSortNewestFirst(value: Boolean) {
+        _sortNewestFirst.value = value
+        settings?.gallerySortNewestFirst = value
+    }
 
     private val allJobs: StateFlow<List<JobSummaryDto>> =
         jobRepo.getJobsFlow()
@@ -69,46 +80,79 @@ class GalleryViewModel(
     private val _tagFilter = MutableStateFlow<TagFilter>(TagFilter.All)
     val tagFilter: StateFlow<TagFilter> = _tagFilter.asStateFlow()
 
+    /** Free-text search over prompt labels and custom prompt text. */
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+
+    private fun JobSummaryDto.matchesQuery(query: String, prompts: List<PromptDto>): Boolean {
+        val label = effectivePromptId?.let { id -> prompts.firstOrNull { it.id == id }?.label }
+        return label?.contains(query, ignoreCase = true) == true ||
+            prompt_text?.contains(query, ignoreCase = true) == true
+    }
+
     /**
      * Filtered list view of all done jobs. Used by PhotoViewerScreen
      * (HorizontalPager). Grid uses [pagedGridItems] instead.
      */
     val jobs: StateFlow<List<JobSummaryDto>> =
-        combine(allJobs, _tagFilter) { all, filter ->
-            when (filter) {
+        combine(allJobs, _tagFilter, _searchQuery, prompts, _sortNewestFirst) { all, filter, query, ps, newestFirst ->
+            val tagFiltered = when (filter) {
                 TagFilter.All -> all
                 is TagFilter.ByPromptId -> all.filter { it.effectivePromptId == filter.promptId }
                 TagFilter.Custom -> all.filter { it.effectivePromptId == null && it.prompt_text != null }
             }
+            val trimmed = query.trim()
+            val filtered = if (trimmed.isBlank()) tagFiltered else tagFiltered.filter { it.matchesQuery(trimmed, ps) }
+            // getJobsFlow is createdAt DESC, id DESC; reversing yields the exact
+            // ascending mirror, keeping viewer order in lockstep with the grid.
+            if (newestFirst) filtered else filtered.asReversed()
         }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     /**
      * Paged stream for the gallery grid, with date-separator rows inserted
-     * between groups. Reacts to [tagFilter] changes.
+     * between groups. Reacts to [tagFilter] and [searchQuery] changes.
      */
+    private data class GridQuery(
+        val filter: TagFilter,
+        val query: String,
+        val prompts: List<PromptDto>,
+        val newestFirst: Boolean,
+    )
+
     @OptIn(ExperimentalCoroutinesApi::class)
     val pagedGridItems: Flow<PagingData<GalleryGridItem>> =
-        _tagFilter.flatMapLatest { filter ->
-            val (promptId, customOnly) = when (filter) {
-                TagFilter.All -> null to false
-                is TagFilter.ByPromptId -> filter.promptId to false
-                TagFilter.Custom -> null to true
-            }
-            jobRepo.pagedJobs(promptId, customOnly)
-        }.map { pagingData ->
-            pagingData
-                .map<JobSummaryDto, GalleryGridItem> { GalleryGridItem.JobItem(it) }
-                .insertSeparators { before, after ->
-                    val afterJob = (after as? GalleryGridItem.JobItem)?.job ?: return@insertSeparators null
-                    val afterDate = formatTimestamp(afterJob.created_at)
-                    val beforeJob = (before as? GalleryGridItem.JobItem)?.job
-                    if (beforeJob == null || formatTimestamp(beforeJob.created_at) != afterDate) {
-                        GalleryGridItem.DateSeparator(afterDate)
+        combine(_tagFilter, _searchQuery, prompts, _sortNewestFirst) { filter, query, ps, newestFirst ->
+            GridQuery(filter, query.trim(), ps, newestFirst)
+        }
+            .flatMapLatest { (filter, query, ps, newestFirst) ->
+                val (promptId, customOnly) = when (filter) {
+                    TagFilter.All -> null to false
+                    is TagFilter.ByPromptId -> filter.promptId to false
+                    TagFilter.Custom -> null to true
+                }
+                jobRepo.pagedJobs(promptId, customOnly, newestFirst).map { pagingData ->
+                    if (query.isBlank()) {
+                        pagingData
                     } else {
-                        null
+                        // Prompt list is small and already in memory; filtering the
+                        // Room-backed pages here avoids duplicating labels into SQL.
+                        pagingData.filter { it.matchesQuery(query, ps) }
                     }
                 }
-        }.cachedIn(viewModelScope)
+            }.map { pagingData ->
+                pagingData
+                    .map<JobSummaryDto, GalleryGridItem> { GalleryGridItem.JobItem(it) }
+                    .insertSeparators { before, after ->
+                        val afterJob = (after as? GalleryGridItem.JobItem)?.job ?: return@insertSeparators null
+                        val afterDate = formatTimestamp(afterJob.created_at)
+                        val beforeJob = (before as? GalleryGridItem.JobItem)?.job
+                        if (beforeJob == null || formatTimestamp(beforeJob.created_at) != afterDate) {
+                            GalleryGridItem.DateSeparator(afterDate)
+                        } else {
+                            null
+                        }
+                    }
+            }.cachedIn(viewModelScope)
 
     /** Tag choices to show in the filter dropdown. Counts come from SQL aggregates. */
     val availableTags: StateFlow<List<TagOption>> =
@@ -131,6 +175,10 @@ class GalleryViewModel(
         _tagFilter.value = filter
     }
 
+    fun setSearchQuery(query: String) {
+        _searchQuery.value = query
+    }
+
     val isSelectionMode: StateFlow<Boolean> =
         _selectedIds.map { it.isNotEmpty() }
             .stateIn(viewModelScope, SharingStarted.Eagerly, false)
@@ -150,6 +198,18 @@ class GalleryViewModel(
     /** Non-empty while a soft-delete snackbar is showing. */
     private val _pendingUndo = MutableStateFlow<Set<String>?>(null)
     val pendingUndo: StateFlow<Set<String>?> = _pendingUndo.asStateFlow()
+
+    /**
+     * Job the photo viewer is currently showing. The grid scrolls its tile
+     * into view so the viewed image stays visible even after the user paged
+     * away from the tile they opened.
+     */
+    private val _viewerJobId = MutableStateFlow<String?>(null)
+    val viewerJobId: StateFlow<String?> = _viewerJobId.asStateFlow()
+
+    fun setViewerJob(jobId: String?) {
+        _viewerJobId.value = jobId
+    }
 
     /** Non-null when a "remove from app after save?" dialog should show. */
     private val _postSaveDelete = MutableStateFlow<Set<String>?>(null)

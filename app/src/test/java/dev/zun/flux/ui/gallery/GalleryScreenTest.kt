@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import dev.zun.flux.data.repo.FakeJobRepository
@@ -42,6 +43,29 @@ class GalleryScreenTest {
             rule.onAllNodesWithTextSafe("Gallery").isNotEmpty()
         }
         rule.onNodeWithText("Gallery").assertIsDisplayed()
+    }
+
+    @Test
+    fun `sort menu opens and defaults to newest first`() {
+        val repo = FakeJobRepository()
+        val viewModel = GalleryViewModel(repo, repo, repo)
+
+        rule.setContent {
+            GalleryScreen(
+                images = repo,
+                viewModel = viewModel,
+                onJobClick = {},
+                onBack = {},
+            )
+        }
+
+        rule.onNodeWithContentDescription("Sort").performClick()
+        rule.onNodeWithText("Newest first").assertIsDisplayed()
+        rule.onNodeWithText("Oldest first").assertIsDisplayed()
+        org.junit.Assert.assertTrue(viewModel.sortNewestFirst.value)
+
+        rule.onNodeWithText("Oldest first").performClick()
+        org.junit.Assert.assertFalse(viewModel.sortNewestFirst.value)
     }
 
     @Test
