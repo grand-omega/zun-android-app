@@ -1,5 +1,6 @@
 package dev.zun.flux.ui.result
 
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -94,6 +95,7 @@ fun ResultScreen(
     images: ImageSourceRepository,
     onRegenerated: (String) -> Unit,
     onNewImage: () -> Unit,
+    onUseAsSource: (Uri) -> Unit,
     onDeleted: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -224,6 +226,23 @@ fun ResultScreen(
                             onClick = {
                                 showMenu = false
                                 onNewImage()
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.result_use_as_source)) },
+                            enabled = jobDto?.status == "done",
+                            onClick = {
+                                showMenu = false
+                                scope.launch {
+                                    try {
+                                        val uri = withContext(Dispatchers.IO) {
+                                            images.downloadResultToCache(jobId)
+                                        }
+                                        onUseAsSource(uri)
+                                    } catch (t: Throwable) {
+                                        notice = t.toUserMessage("use the result as a new source")
+                                    }
+                                }
                             },
                         )
                         DropdownMenuItem(

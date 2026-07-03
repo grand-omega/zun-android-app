@@ -42,6 +42,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import retrofit2.HttpException
+import java.io.IOException
 
 class RealJobRepository(
     private val context: Context,
@@ -318,6 +319,16 @@ class RealJobRepository(
     }
 
     override suspend fun downloadInputToCache(inputId: Int): Uri = recentInputCache.downloadInputToCache(inputId)
+
+    override suspend fun downloadResultToCache(jobId: String): Uri {
+        offlineImageCache.localUri(jobId, OfflineImageCache.Kind.Result)?.let { return it }
+        val url = buildUrlOrNull("/api/v1/jobs/$jobId/result")
+            ?: throw IOException("No server URL configured")
+        offlineImageCache.prefetch(jobId, OfflineImageCache.Kind.Result, url)
+        // prefetch() swallows failures internally, so re-check the cache.
+        return offlineImageCache.localUri(jobId, OfflineImageCache.Kind.Result)
+            ?: throw IOException("Result download failed")
+    }
 
     override fun recentInputUri(inputId: Int): Uri = recentInputCache.uri(inputId)
 

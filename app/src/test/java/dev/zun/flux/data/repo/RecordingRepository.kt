@@ -160,6 +160,8 @@ class RecordingRepository :
 
     override suspend fun downloadInputToCache(inputId: Int): Uri = Uri.EMPTY
 
+    override suspend fun downloadResultToCache(jobId: String): Uri = Uri.EMPTY
+
     override fun recentInputUri(inputId: Int): Uri = Uri.EMPTY
 
     override suspend fun syncHistory() = Unit

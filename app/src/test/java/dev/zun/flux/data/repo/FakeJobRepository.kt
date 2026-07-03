@@ -346,6 +346,11 @@ class FakeJobRepository(
         return recentInputUri(inputId)
     }
 
+    override suspend fun downloadResultToCache(jobId: String): Uri {
+        delay(200)
+        return entries[jobId]?.inputUri ?: error("Unknown fake job: $jobId")
+    }
+
     override fun recentInputUri(inputId: Int): Uri = entries.values.firstOrNull { it.inputId == inputId }?.inputUri
         ?: error("Unknown fake input: $inputId")
 

@@ -40,6 +40,9 @@ interface ImageSourceRepository {
      */
     fun recentInputUri(inputId: Int): Uri
 
+    /** Ensures the full-res result for [jobId] is offline-cached and returns its `file://` Uri. */
+    suspend fun downloadResultToCache(jobId: String): Uri
+
     /** Anything Coil can load. Null when [inputId] is null or we have no server URL. */
     fun inputModel(inputId: Int?): Any?
 

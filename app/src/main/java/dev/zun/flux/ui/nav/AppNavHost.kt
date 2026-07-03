@@ -162,6 +162,10 @@ fun AppNavHost(
                     }
                 },
                 onNewImage = { nav.popBackStack(Routes.HOME, inclusive = false) },
+                onUseAsSource = { uri ->
+                    nav.getBackStackEntry(Routes.HOME).savedStateHandle["capturedUri"] = uri
+                    nav.popBackStack(Routes.HOME, inclusive = false)
+                },
                 onDeleted = {
                     nav.previousBackStackEntry
                         ?.savedStateHandle

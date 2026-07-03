@@ -232,6 +232,7 @@
     <string name="result_write_your_own">Write your own…</string>
     <string name="result_choose_prompt">Choose a prompt</string>
     <string name="result_new_image">New image</string>
+    <string name="result_use_as_source">Use as new source</string>
     <string name="result_view_details">View details</string>
     <string name="result_delete">Delete</string>
     <string name="result_before">Before</string>
