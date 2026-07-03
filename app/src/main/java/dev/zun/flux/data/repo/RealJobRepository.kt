@@ -14,6 +14,7 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.workDataOf
 import dev.zun.flux.Tuning
+import dev.zun.flux.data.api.CapabilitiesResponse
 import dev.zun.flux.data.api.FluxApi
 import dev.zun.flux.data.api.HealthResponse
 import dev.zun.flux.data.api.JobCreatedResponse
@@ -21,6 +22,8 @@ import dev.zun.flux.data.api.JobListResponse
 import dev.zun.flux.data.api.JobStatusDto
 import dev.zun.flux.data.api.JobSummaryDto
 import dev.zun.flux.data.api.PromptDto
+import dev.zun.flux.data.api.WorkflowSupportDto
+import dev.zun.flux.data.api.Workflows
 import dev.zun.flux.data.local.AppDatabase
 import dev.zun.flux.data.local.PendingDeleteEntity
 import dev.zun.flux.data.local.toEntity
@@ -80,6 +83,8 @@ class RealJobRepository(
     }
 
     override suspend fun health(): HealthResponse = api.health()
+
+    override suspend fun capabilities(): CapabilitiesResponse = api.capabilities()
 
     override suspend fun diagnoseConnection(): ConnectionDiagnosis = connectionDiagnoser.diagnose()
 

@@ -2,12 +2,15 @@ package dev.zun.flux.data.repo
 
 import android.net.Uri
 import androidx.paging.PagingData
+import dev.zun.flux.data.api.CapabilitiesResponse
 import dev.zun.flux.data.api.HealthResponse
 import dev.zun.flux.data.api.JobCreatedResponse
 import dev.zun.flux.data.api.JobListResponse
 import dev.zun.flux.data.api.JobStatusDto
 import dev.zun.flux.data.api.JobSummaryDto
 import dev.zun.flux.data.api.PromptDto
+import dev.zun.flux.data.api.WorkflowSupportDto
+import dev.zun.flux.data.api.Workflows
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -50,6 +53,13 @@ class RecordingRepository :
     private var nextJobNumber = 1
 
     override suspend fun health(): HealthResponse = HealthResponse(status = "ok")
+
+    override suspend fun capabilities(): CapabilitiesResponse = CapabilitiesResponse(
+        workflows = listOf(
+            WorkflowSupportDto(name = Workflows.DEFAULT_EDIT, default = true),
+            WorkflowSupportDto(name = Workflows.TRY_HARDER_EDIT, experimental = true),
+        ),
+    )
 
     override suspend fun diagnoseConnection(): ConnectionDiagnosis = ConnectionDiagnosis.Reachable
 

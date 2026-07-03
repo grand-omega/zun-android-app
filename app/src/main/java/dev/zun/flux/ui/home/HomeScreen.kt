@@ -35,6 +35,7 @@ fun HomeScreen(
     onCustomPromptChange: (String) -> Unit,
     tryHarder: Boolean,
     onTryHarderChange: (Boolean) -> Unit,
+    tryHarderAvailable: Boolean,
     onDeletePrompt: (Long) -> Unit,
     onUpdatePrompt: (Long, String, String) -> Unit,
     onSavePromptClick: () -> Unit,
@@ -133,6 +134,7 @@ fun HomeScreen(
                     onTogglePin = onTogglePin,
                     modifier = Modifier.weight(1f),
                     fillHeight = true,
+                    showTryHarder = tryHarderAvailable,
                 )
                 composer(false)
             }
@@ -181,6 +183,7 @@ fun HomeScreen(
             onDismiss = { showPromptSheet = false },
             pinnedIds = pinnedIds,
             onTogglePin = onTogglePin,
+            showTryHarder = tryHarderAvailable,
         )
     }
 

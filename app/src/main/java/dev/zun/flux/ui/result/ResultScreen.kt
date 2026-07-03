@@ -61,6 +61,7 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.zun.flux.R
 import dev.zun.flux.data.api.JobStatusDto
+import dev.zun.flux.data.api.Workflows
 import dev.zun.flux.data.api.effectivePromptId
 import dev.zun.flux.data.repo.ImageSourceRepository
 import dev.zun.flux.data.repo.JobRepository
@@ -82,8 +83,8 @@ import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 
-private const val DEFAULT_CUSTOM_WORKFLOW = "flux2_klein_edit"
-private const val TRY_HARDER_WORKFLOW = "flux2_klein_9b_kv_experimental"
+private const val DEFAULT_CUSTOM_WORKFLOW = Workflows.DEFAULT_EDIT
+private const val TRY_HARDER_WORKFLOW = Workflows.TRY_HARDER_EDIT
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -132,6 +133,14 @@ fun ResultScreen(
     val prompts by promptRepo.promptsState.collectAsState()
     val app = context.applicationContext as dev.zun.flux.FluxApp
     val pinnedIds by app.pinnedPrompts.ids.collectAsState()
+    // Server-supported workflows gate the Try-harder toggle (see /capabilities).
+    val tryHarderAvailable by produceState(false) {
+        value = runCatching { app.repositories.health.capabilities() }
+            .getOrNull()
+            ?.workflows
+            ?.any { it.name == Workflows.TRY_HARDER_EDIT && it.supported }
+            ?: false
+    }
     val isWide = currentWindowAdaptiveInfo().windowSizeClass
         .isWidthAtLeastBreakpoint(androidx.window.core.layout.WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)
 
@@ -405,6 +414,7 @@ fun ResultScreen(
             },
             tryHarder = tryHarder,
             onTryHarderChange = { tryHarder = it },
+            showTryHarder = tryHarderAvailable,
             onSavePromptClick = {
                 savePromptLabel = ""
                 showSavePromptDialog = true

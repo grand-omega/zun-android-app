@@ -63,6 +63,7 @@ fun PromptLibrarySheet(
     onDismiss: () -> Unit,
     pinnedIds: Set<Long> = emptySet(),
     onTogglePin: (Long) -> Unit = {},
+    showTryHarder: Boolean = true,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -82,6 +83,7 @@ fun PromptLibrarySheet(
             onSelectPrompt = onSelectPrompt,
             pinnedIds = pinnedIds,
             onTogglePin = onTogglePin,
+            showTryHarder = showTryHarder,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp)
@@ -110,6 +112,7 @@ fun PromptLibraryContent(
     pinnedIds: Set<Long> = emptySet(),
     onTogglePin: (Long) -> Unit = {},
     fillHeight: Boolean = false,
+    showTryHarder: Boolean = true,
 ) {
     var query by rememberSaveable { mutableStateOf("") }
 
@@ -143,29 +146,33 @@ fun PromptLibraryContent(
             TextButton(onClick = onManagePrompts) { Text(stringResource(R.string.prompts_manage)) }
         }
 
-        Surface(
-            shape = RoundedCornerShape(8.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
+        // Only offered when /capabilities lists the try-harder workflow;
+        // submitting an unsupported workflow name is a server-side 400.
+        if (showTryHarder) {
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                modifier = Modifier.fillMaxWidth(),
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(R.string.prompts_high_quality),
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
-                    Text(
-                        text = stringResource(R.string.prompts_high_quality_detail),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.secondary,
-                    )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.prompts_high_quality),
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                        Text(
+                            text = stringResource(R.string.prompts_high_quality_detail),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.secondary,
+                        )
+                    }
+                    Switch(checked = tryHarder, onCheckedChange = onTryHarderChange)
                 }
-                Switch(checked = tryHarder, onCheckedChange = onTryHarderChange)
             }
         }
 

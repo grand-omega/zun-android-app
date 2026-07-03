@@ -161,11 +161,17 @@ class FluxApp : Application() {
             .readTimeout(Tuning.HTTP_READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .addInterceptor { chain ->
                 val token = settingsManager.apiToken ?: ""
-                chain.proceed(
-                    chain.request().newBuilder()
-                        .header("Authorization", "Bearer $token")
-                        .build(),
-                )
+                val request = chain.request().newBuilder()
+                    .header("Authorization", "Bearer $token")
+                // The server content-negotiates derived images (AVIF is
+                // ~30-50% smaller than JPEG); Android decodes AVIF natively.
+                val path = chain.request().url.encodedPath
+                if (path.endsWith("/thumb") || path.endsWith("/preview") ||
+                    path.endsWith("/result") || path.endsWith("/file")
+                ) {
+                    request.header("Accept", "image/avif, image/jpeg;q=0.9, */*;q=0.8")
+                }
+                chain.proceed(request.build())
             }
             .addInterceptor(diagnostics.okHttpInterceptor())
             .certificatePinner(certPinStore.toCertificatePinner())

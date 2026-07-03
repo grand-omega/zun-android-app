@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.zun.flux.data.api.JobCreatedResponse
 import dev.zun.flux.data.api.PromptDto
+import dev.zun.flux.data.api.Workflows
 import dev.zun.flux.data.repo.ConnectionDiagnosis
 import dev.zun.flux.data.repo.HealthRepository
 import dev.zun.flux.data.repo.JobRepository
@@ -36,8 +37,8 @@ import kotlinx.coroutines.withTimeout
 const val CUSTOM_PROMPT_ID: Long = -1L
 
 /** Default workflow for free-text submissions when the user writes a custom prompt. */
-private const val DEFAULT_CUSTOM_WORKFLOW = "flux2_klein_edit"
-private const val TRY_HARDER_WORKFLOW = "flux2_klein_9b_kv_experimental"
+private const val DEFAULT_CUSTOM_WORKFLOW = Workflows.DEFAULT_EDIT
+private const val TRY_HARDER_WORKFLOW = Workflows.TRY_HARDER_EDIT
 
 /**
  * Cap on how long [HomeViewModel.submitOne] will wait for a WorkManager
@@ -95,6 +96,14 @@ class HomeViewModel(
     private val _state = MutableStateFlow<SubmitState>(SubmitState.Idle)
     val state: StateFlow<SubmitState> = _state.asStateFlow()
 
+    /**
+     * Whether the server supports the Try-harder workflow, per /capabilities.
+     * Defaults to false until the catalog loads — hiding a toggle briefly is
+     * better than offering one the server will reject.
+     */
+    private val _tryHarderAvailable = MutableStateFlow(false)
+    val tryHarderAvailable: StateFlow<Boolean> = _tryHarderAvailable.asStateFlow()
+
     private val _composer = MutableStateFlow(HomeComposerState())
     val composer: StateFlow<HomeComposerState> = _composer.asStateFlow()
 
@@ -128,11 +137,21 @@ class HomeViewModel(
 
     init {
         viewModelScope.launch { fetchPrompts() }
+        viewModelScope.launch { fetchCapabilities() }
     }
 
     private suspend fun fetchPrompts() {
         runCatching { promptRepo.listPrompts() }
             .onFailure { Log.w(TAG, "Prompt fetch failed", it) }
+    }
+
+    private suspend fun fetchCapabilities() {
+        runCatching { healthRepo.capabilities() }
+            .onSuccess { caps ->
+                _tryHarderAvailable.value = caps.workflows
+                    .any { it.name == Workflows.TRY_HARDER_EDIT && it.supported }
+            }
+            .onFailure { Log.w(TAG, "Capabilities fetch failed", it) }
     }
 
     suspend fun runHealthChecks() {

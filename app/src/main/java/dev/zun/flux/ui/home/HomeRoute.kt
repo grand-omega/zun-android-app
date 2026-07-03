@@ -106,6 +106,7 @@ fun HomeRoute(
     val health by viewModel.health.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val uploadProgress by viewModel.uploadProgress.collectAsStateWithLifecycle()
+    val tryHarderAvailable by viewModel.tryHarderAvailable.collectAsStateWithLifecycle()
     val batchProgress by viewModel.batchProgress.collectAsStateWithLifecycle()
     val recentInputIds by remember { images.recentInputIds(3) }
         .collectAsStateWithLifecycle(initialValue = emptyList())
@@ -334,6 +335,7 @@ fun HomeRoute(
                 onCustomPromptChange = viewModel::updateCustomPrompt,
                 tryHarder = composer.tryHarder,
                 onTryHarderChange = viewModel::setTryHarder,
+                tryHarderAvailable = tryHarderAvailable,
                 onDeletePrompt = viewModel::deletePrompt,
                 onUpdatePrompt = viewModel::updatePrompt,
                 onSavePromptClick = {

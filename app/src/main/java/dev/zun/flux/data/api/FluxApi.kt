@@ -22,6 +22,10 @@ interface FluxApi {
     @GET("api/v1/health")
     suspend fun health(): HealthResponse
 
+    /** Server feature/workflow catalog; gates UI affordances like Try harder. */
+    @GET("api/v1/capabilities")
+    suspend fun capabilities(): CapabilitiesResponse
+
     // --- Prompts (per-user CRUD) ---
 
     @GET("api/v1/prompts")

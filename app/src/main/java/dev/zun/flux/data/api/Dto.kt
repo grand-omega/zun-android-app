@@ -15,6 +15,21 @@ data class DiskHealth(
 )
 
 @Serializable
+data class CapabilitiesResponse(
+    val version: String? = null,
+    val workflows: List<WorkflowSupportDto> = emptyList(),
+)
+
+@Serializable
+data class WorkflowSupportDto(
+    val name: String,
+    val display_name: String? = null,
+    val supported: Boolean = true,
+    val default: Boolean = false,
+    val experimental: Boolean = false,
+)
+
+@Serializable
 data class PromptDto(
     val id: Long,
     val label: String,
@@ -59,12 +74,12 @@ data class JobStatusDto(
     val status: String,
     val input_id: Int? = null,
     val source_prompt_id: Long? = null,
-    /** Legacy server field. Prefer [source_prompt_id]. */
-    val prompt_id: Long? = null,
     val prompt_text: String? = null,
     val workflow: String? = null,
     val seed: Long? = null,
     val progress: Float? = null,
+    /** Queued jobs the worker picks first; 0 = next up. Null unless queued. */
+    val queue_position: Int? = null,
     val error: String? = null,
     val created_at: Long,
     val started_at: Long? = null,
@@ -79,8 +94,6 @@ data class JobSummaryDto(
     val status: String = "done",
     val input_id: Int? = null,
     val source_prompt_id: Long? = null,
-    /** Legacy server field. Prefer [source_prompt_id]. */
-    val prompt_id: Long? = null,
     val prompt_text: String? = null,
     val workflow: String? = null,
     val seed: Long? = null,
@@ -96,12 +109,10 @@ data class JobListResponse(
 )
 
 val JobStatusDto.effectivePromptId: Long?
-    get() = effectivePromptId(source_prompt_id, prompt_id)
+    get() = source_prompt_id
 
 val JobSummaryDto.effectivePromptId: Long?
-    get() = effectivePromptId(source_prompt_id, prompt_id)
-
-private fun effectivePromptId(sourcePromptId: Long?, legacyPromptId: Long?): Long? = sourcePromptId ?: legacyPromptId
+    get() = source_prompt_id
 
 @Serializable
 data class InputMetadata(

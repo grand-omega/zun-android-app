@@ -2,12 +2,15 @@ package dev.zun.flux.data.repo
 
 import android.net.Uri
 import androidx.paging.PagingData
+import dev.zun.flux.data.api.CapabilitiesResponse
 import dev.zun.flux.data.api.HealthResponse
 import dev.zun.flux.data.api.JobCreatedResponse
 import dev.zun.flux.data.api.JobListResponse
 import dev.zun.flux.data.api.JobStatusDto
 import dev.zun.flux.data.api.JobSummaryDto
 import dev.zun.flux.data.api.PromptDto
+import dev.zun.flux.data.api.WorkflowSupportDto
+import dev.zun.flux.data.api.Workflows
 import dev.zun.flux.data.api.effectivePromptId
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -63,6 +66,13 @@ class FakeJobRepository(
         delay(300)
         return HealthResponse(status = "ok (fake)")
     }
+
+    override suspend fun capabilities(): CapabilitiesResponse = CapabilitiesResponse(
+        workflows = listOf(
+            WorkflowSupportDto(name = Workflows.DEFAULT_EDIT, default = true),
+            WorkflowSupportDto(name = Workflows.TRY_HARDER_EDIT, experimental = true),
+        ),
+    )
 
     override suspend fun diagnoseConnection(): ConnectionDiagnosis = ConnectionDiagnosis.Reachable
 
@@ -194,7 +204,6 @@ class FakeJobRepository(
             status = status,
             input_id = entry.inputId,
             source_prompt_id = entry.promptId,
-            prompt_id = entry.promptId,
             prompt_text = entry.promptText,
             workflow = entry.workflow,
             seed = null,
@@ -233,7 +242,6 @@ class FakeJobRepository(
                     status = "done",
                     input_id = entry.inputId,
                     source_prompt_id = entry.promptId,
-                    prompt_id = entry.promptId,
                     prompt_text = entry.promptText,
                     workflow = entry.workflow,
                     seed = null,
