@@ -46,6 +46,11 @@ object Tuning {
      *  paint and lower memory churn during fast scrolls. */
     const val GALLERY_PAGE_SIZE = 50
 
+    /** How far ahead of the viewport Paging loads. Two pages absorbs fast
+     *  flings without blank cells; the source is local Room, so the extra
+     *  reads are cheap. */
+    const val GALLERY_PREFETCH_DISTANCE = 100
+
     // --- UI -------------------------------------------------------------------
 
     /** Max content width for primary single-column screens (progress, settings).

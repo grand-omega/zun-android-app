@@ -79,7 +79,10 @@ class FluxApp : Application() {
     override fun onCreate() {
         super.onCreate()
 
-        initSentry()
+        // Off the critical path: Sentry only needs to be up before the first
+        // crash report, not before the first frame. The brief uncovered window
+        // is an accepted trade-off for faster cold start.
+        Thread { initSentry() }.start()
 
         settingsManager = SettingsManager(this)
         authStateHolder = AuthStateHolder(settingsManager)

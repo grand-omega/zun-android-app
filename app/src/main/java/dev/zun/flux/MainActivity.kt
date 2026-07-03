@@ -5,6 +5,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.WindowManager
+import androidx.activity.compose.ReportDrawn
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
@@ -57,6 +58,9 @@ class MainActivity : FragmentActivity() {
             ZunFluxTheme {
                 val current = repoState
                 if (auth.isAuthed && current != null) {
+                    // Marks TTFD for startup metrics and baseline-profile capture:
+                    // "fully drawn" = past the lock screen with repositories ready.
+                    ReportDrawn()
                     AppNavHost(
                         repositories = current.repositories,
                         repositoryVersion = current.version,

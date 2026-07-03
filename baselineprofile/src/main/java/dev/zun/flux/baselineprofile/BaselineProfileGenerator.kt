@@ -2,6 +2,8 @@ package dev.zun.flux.baselineprofile
 
 import androidx.benchmark.macro.junit4.BaselineProfileRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.uiautomator.By
+import androidx.test.uiautomator.Until
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -41,6 +43,24 @@ class BaselineProfileGenerator {
         // path that dominates cold-start time.
         pressHome()
         startActivityAndWait()
+
+        // Best-effort journey: the app is biometric-locked, so the gallery is
+        // only reachable when a run happens inside the unlock grace window
+        // (unlock the .bp app manually right before running). When locked,
+        // the icon isn't found and the profile still covers cold start.
+        val gallery = device.wait(Until.findObject(By.desc("Gallery")), 3_000)
+        if (gallery != null) {
+            gallery.click()
+            device.wait(Until.hasObject(By.text("Gallery")), 5_000)
+            // Fling the grid a few times to profile paging + tile composition.
+            val center = device.displayWidth / 2
+            repeat(3) {
+                device.swipe(center, device.displayHeight * 3 / 4, center, device.displayHeight / 4, 10)
+                device.waitForIdle()
+            }
+            device.pressBack()
+            device.waitForIdle()
+        }
     }
 }
 

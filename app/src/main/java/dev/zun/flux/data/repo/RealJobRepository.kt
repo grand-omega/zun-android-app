@@ -277,6 +277,10 @@ class RealJobRepository(
     override fun pagedJobs(promptId: Long?, customOnly: Boolean, newestFirst: Boolean): Flow<PagingData<JobSummaryDto>> = Pager(
         config = PagingConfig(
             pageSize = Tuning.GALLERY_PAGE_SIZE,
+            // One page up front (default is 3x) for a faster first paint;
+            // prefetch keeps fast flings fed from Room.
+            initialLoadSize = Tuning.GALLERY_PAGE_SIZE,
+            prefetchDistance = Tuning.GALLERY_PREFETCH_DISTANCE,
             enablePlaceholders = false,
         ),
         pagingSourceFactory = {

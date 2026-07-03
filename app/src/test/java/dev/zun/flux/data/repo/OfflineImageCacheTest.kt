@@ -91,6 +91,7 @@ class OfflineImageCacheTest {
             rootDir = temp.newFolder("offline_images"),
             okHttpClientProvider = { client },
             maxBytes = 12,
+            pruneEvery = 1,
         )
 
         cache.prefetch("old", OfflineImageCache.Kind.Thumb, "https://example.test/old")

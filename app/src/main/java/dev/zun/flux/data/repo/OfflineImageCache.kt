@@ -12,6 +12,7 @@ import kotlinx.coroutines.sync.withPermit
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Offline cache for server-served job images. Files are stored as plain JPEG
@@ -23,6 +24,7 @@ class OfflineImageCache internal constructor(
     val rootDir: File,
     private val okHttpClientProvider: () -> OkHttpClient,
     private val maxBytes: Long = Tuning.OFFLINE_IMAGE_CACHE_MAX_BYTES,
+    private val pruneEvery: Int = PRUNE_EVERY,
 ) {
     /**
      * Resolves the OkHttpClient at call time so that cert-pin / interceptor
@@ -50,6 +52,11 @@ class OfflineImageCache internal constructor(
     /** Bumps whenever cache contents change; UI keys availability re-reads off it. */
     private val _version = MutableStateFlow(0L)
     val version: StateFlow<Long> = _version.asStateFlow()
+
+    /** Prefetches since the last prune; pruning walks the whole cache dir,
+     *  so batch it rather than paying the walk per file. The budget can
+     *  overshoot by at most [pruneEvery] files between prunes. */
+    private val prefetchesSincePrune = AtomicInteger(0)
 
     fun availability(jobId: String): OfflineImageAvailability = OfflineImageAvailability(
         thumbCached = isCached(jobId, Kind.Thumb),
@@ -97,7 +104,10 @@ class OfflineImageCache internal constructor(
                         tempFile.delete()
                     }
                     outFile.setLastModified(System.currentTimeMillis())
-                    prune()
+                    if (prefetchesSincePrune.incrementAndGet() >= pruneEvery) {
+                        prefetchesSincePrune.set(0)
+                        prune()
+                    }
                     _version.value++
                 } else {
                     tempFile.delete()
@@ -145,5 +155,6 @@ class OfflineImageCache internal constructor(
 
     companion object {
         private const val TAG = "OfflineImageCache"
+        private const val PRUNE_EVERY = 16
     }
 }
