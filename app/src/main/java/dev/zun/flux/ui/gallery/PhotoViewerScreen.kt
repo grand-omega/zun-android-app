@@ -327,17 +327,9 @@ fun PhotoViewerScreen(
                     page + 1,
                     jobs.size,
                 )
-                // Only the settled page takes part in the shared-element
-                // transition back to its grid thumbnail.
-                val sharedModifier = if (pagerState.currentPage == page) {
-                    Modifier.sharedImageBounds(job.id)
-                } else {
-                    Modifier
-                }
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .then(sharedModifier)
                         .testTag("viewer_page_${job.id}")
                         .semantics { contentDescription = pageDescription },
                 ) {

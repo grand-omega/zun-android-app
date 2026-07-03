@@ -179,8 +179,8 @@ class GalleryViewModel(
 
     /**
      * Job the photo viewer is currently showing. The grid scrolls its tile
-     * into view so the shared-element return transition has a target even
-     * after the user paged away from the tile they opened.
+     * into view so the viewed image stays visible even after the user paged
+     * away from the tile they opened.
      */
     private val _viewerJobId = MutableStateFlow<String?>(null)
     val viewerJobId: StateFlow<String?> = _viewerJobId.asStateFlow()

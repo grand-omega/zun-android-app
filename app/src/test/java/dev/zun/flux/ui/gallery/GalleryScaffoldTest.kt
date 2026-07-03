@@ -13,8 +13,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * Smoke coverage for the scaffold wiring: SharedTransitionLayout + the
- * list/detail panes + the shared-transition CompositionLocals must compose
+ * Smoke coverage for the scaffold wiring: the list/detail panes must compose
  * without blowing up and render the gallery list pane.
  */
 @RunWith(RobolectricTestRunner::class)

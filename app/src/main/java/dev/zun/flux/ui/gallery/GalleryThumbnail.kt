@@ -91,7 +91,6 @@ internal fun JobThumbnail(
                 modifier =
                 Modifier
                     .fillMaxSize()
-                    .sharedImageBounds(job.id)
                     .then(
                         if (isSelected) Modifier.padding(8.dp).clip(RoundedCornerShape(4.dp)) else Modifier,
                     ),

@@ -49,43 +49,6 @@ class PhotoViewerScreenTest {
         rule.onNodeWithTag("viewer_page_j3").assertIsDisplayed()
     }
 
-    @OptIn(
-        androidx.compose.animation.ExperimentalSharedTransitionApi::class,
-        androidx.compose.animation.ExperimentalAnimationApi::class,
-    )
-    @Test
-    fun `viewer renders when shared transition scopes are provided`() {
-        val repo = FakeJobRepository().apply { seedDoneJobs(listOf("j1", "j2")) }
-        val viewModel = GalleryViewModel(repo, repo, repo)
-
-        rule.setContent {
-            androidx.compose.animation.SharedTransitionLayout {
-                androidx.compose.runtime.CompositionLocalProvider(
-                    LocalSharedTransitionScope provides this,
-                ) {
-                    androidx.compose.animation.AnimatedVisibility(visible = true) {
-                        androidx.compose.runtime.CompositionLocalProvider(
-                            LocalPaneAnimatedVisibilityScope provides this,
-                        ) {
-                            PhotoViewerScreen(
-                                initialJobId = "j1",
-                                viewModel = viewModel,
-                                images = repo,
-                                onUseInput = {},
-                                onBack = {},
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        rule.waitUntil(timeoutMillis = 3_000) {
-            rule.onAllNodesWithTagSafe("viewer_page_j1").isNotEmpty()
-        }
-        rule.onNodeWithTag("viewer_page_j1").assertIsDisplayed()
-    }
-
     @Test
     fun `viewer stays on the tapped photo when newer jobs are prepended`() {
         val repo = FakeJobRepository().apply {
