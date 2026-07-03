@@ -48,6 +48,11 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="image/*" />
             </intent-filter>
+            <!-- Static launcher shortcuts. src/debug shadows shortcuts.xml with
+                 the .debug applicationId (targetPackage must be a literal). -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
 
         <provider

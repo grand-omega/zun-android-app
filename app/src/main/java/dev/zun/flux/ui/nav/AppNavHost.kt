@@ -43,6 +43,8 @@ fun AppNavHost(
     repositoryVersion: Long,
     sharedUris: List<android.net.Uri> = emptyList(),
     onSharedUrisConsumed: () -> Unit = {},
+    navigateToGallery: Boolean = false,
+    onGalleryNavConsumed: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val app = context.applicationContext as FluxApp
@@ -50,6 +52,14 @@ fun AppNavHost(
     val startDestination = if (settingsManager.isConfigured) Routes.HOME else Routes.SETUP
 
     val nav = rememberNavController()
+
+    // Launcher-shortcut navigation. Unconfigured installs stay on SETUP.
+    LaunchedEffect(navigateToGallery) {
+        if (navigateToGallery) {
+            if (settingsManager.isConfigured) nav.navigate(Routes.GALLERY)
+            onGalleryNavConsumed()
+        }
+    }
     val slideSpec = tween<IntOffset>(durationMillis = 300)
     val fadeSpec = tween<Float>(durationMillis = 300)
     NavHost(

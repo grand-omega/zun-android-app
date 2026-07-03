@@ -106,9 +106,9 @@ fun PromptLibraryContent(
     onSavePromptClick: () -> Unit,
     onManagePrompts: () -> Unit,
     onSelectPrompt: (Long) -> Unit,
+    modifier: Modifier = Modifier,
     pinnedIds: Set<Long> = emptySet(),
     onTogglePin: (Long) -> Unit = {},
-    modifier: Modifier = Modifier,
     fillHeight: Boolean = false,
 ) {
     var query by rememberSaveable { mutableStateOf("") }

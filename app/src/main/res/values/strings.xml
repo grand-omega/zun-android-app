@@ -64,6 +64,10 @@
     <string name="gallery_hide_image_labels">Hide image labels</string>
     <string name="gallery_filter_by_tag">Filter by tag</string>
     <string name="gallery_sort">Sort</string>
+    <string name="shortcut_new_edit_short">New edit</string>
+    <string name="shortcut_new_edit_long">Start a new edit</string>
+    <string name="shortcut_gallery_short">Gallery</string>
+    <string name="shortcut_gallery_long">Open the gallery</string>
     <string name="gallery_sort_newest_first">Newest first</string>
     <string name="gallery_sort_oldest_first">Oldest first</string>
     <string name="gallery_search">Search</string>

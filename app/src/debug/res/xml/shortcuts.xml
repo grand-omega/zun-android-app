@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug variant: targetPackage must literally match the .debug applicationId. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="new_edit"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_edit"
+        android:shortcutShortLabel="@string/shortcut_new_edit_short"
+        android:shortcutLongLabel="@string/shortcut_new_edit_long">
+        <intent
+            android:action="dev.zun.flux.action.NEW_EDIT"
+            android:targetPackage="dev.zun.flux.debug"
+            android:targetClass="dev.zun.flux.MainActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="gallery"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_gallery"
+        android:shortcutShortLabel="@string/shortcut_gallery_short"
+        android:shortcutLongLabel="@string/shortcut_gallery_long">
+        <intent
+            android:action="dev.zun.flux.action.GALLERY"
+            android:targetPackage="dev.zun.flux.debug"
+            android:targetClass="dev.zun.flux.MainActivity" />
+    </shortcut>
+</shortcuts>

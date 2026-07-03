@@ -23,9 +23,13 @@ import dev.zun.flux.ui.theme.ZunFluxTheme
 
 private const val TAG = "MainActivity"
 
+/** Launcher-shortcut action (see res/xml/shortcuts.xml). */
+private const val ACTION_GALLERY = "dev.zun.flux.action.GALLERY"
+
 class MainActivity : FragmentActivity() {
     private var unlockMessage by mutableStateOf<String?>(null)
     private var sharedUris by mutableStateOf<List<Uri>>(emptyList())
+    private var pendingGalleryNav by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -33,6 +37,7 @@ class MainActivity : FragmentActivity() {
         window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
         enableEdgeToEdge()
         sharedUris = sharedImageUris(intent)
+        pendingGalleryNav = intent?.action == ACTION_GALLERY
         val app = application as FluxApp
         val auth = app.authStateHolder
 
@@ -57,6 +62,8 @@ class MainActivity : FragmentActivity() {
                         repositoryVersion = current.version,
                         sharedUris = sharedUris,
                         onSharedUrisConsumed = { sharedUris = emptyList() },
+                        navigateToGallery = pendingGalleryNav,
+                        onGalleryNavConsumed = { pendingGalleryNav = false },
                     )
                 } else {
                     LockScreen(
@@ -72,6 +79,7 @@ class MainActivity : FragmentActivity() {
         super.onNewIntent(intent)
         val uris = sharedImageUris(intent)
         if (uris.isNotEmpty()) sharedUris = uris
+        if (intent.action == ACTION_GALLERY) pendingGalleryNav = true
     }
 
     /** Image URIs delivered via the system share sheet (ACTION_SEND[_MULTIPLE]). */
