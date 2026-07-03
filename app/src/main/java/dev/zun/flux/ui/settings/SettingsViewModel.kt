@@ -1,5 +1,6 @@
 package dev.zun.flux.ui.settings
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.zun.flux.FluxApp
@@ -57,7 +58,9 @@ class SettingsViewModel(
             _offlineCache.value = _offlineCache.value.copy(stats = stats, status = "Offline cache ready.")
         }
         viewModelScope.launch {
-            _serverHealth.value = runCatching { app.repositories.health.health() }.getOrNull()
+            _serverHealth.value = runCatching { app.repositories.health.health() }
+                .onFailure { Log.w(TAG, "Diagnostics health fetch failed", it) }
+                .getOrNull()
         }
     }
 
@@ -144,5 +147,9 @@ class SettingsViewModel(
 
     private fun updateDraft(block: ConnectionDraftState.() -> ConnectionDraftState) {
         _connectionDraft.value = _connectionDraft.value.block()
+    }
+
+    private companion object {
+        const val TAG = "SettingsViewModel"
     }
 }

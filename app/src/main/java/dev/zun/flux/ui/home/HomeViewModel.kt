@@ -132,6 +132,7 @@ class HomeViewModel(
 
     private suspend fun fetchPrompts() {
         runCatching { promptRepo.listPrompts() }
+            .onFailure { Log.w(TAG, "Prompt fetch failed", it) }
     }
 
     suspend fun runHealthChecks() {
@@ -359,7 +360,7 @@ class HomeViewModel(
                 )
                 _promptSavedEvents.trySend(created.id)
             } catch (t: Throwable) {
-                _promptErrors.trySend(t.message ?: "Failed to save prompt")
+                _promptErrors.trySend(t.toUserMessage("save prompt"))
             }
         }
     }
@@ -369,7 +370,7 @@ class HomeViewModel(
             try {
                 promptRepo.updatePrompt(promptId, label.trim(), text.trim())
             } catch (t: Throwable) {
-                _promptErrors.trySend(t.message ?: "Failed to update prompt")
+                _promptErrors.trySend(t.toUserMessage("update prompt"))
             }
         }
     }
@@ -382,7 +383,7 @@ class HomeViewModel(
                     _composer.value = _composer.value.copy(selectedPromptId = null)
                 }
             } catch (t: Throwable) {
-                _promptErrors.trySend(t.message ?: "Failed to delete prompt")
+                _promptErrors.trySend(t.toUserMessage("delete prompt"))
             }
         }
     }
