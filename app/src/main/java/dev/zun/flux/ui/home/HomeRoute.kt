@@ -1,6 +1,5 @@
 package dev.zun.flux.ui.home
 
-import android.Manifest
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -70,8 +69,6 @@ import dev.zun.flux.data.repo.ImageSourceRepository
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.data.repo.PromptRepository
 import dev.zun.flux.data.repo.UploadRepository
-import dev.zun.flux.data.worker.JobWatchWorker
-import dev.zun.flux.util.JobNotifications
 import dev.zun.flux.util.cacheInputLocally
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -94,6 +91,7 @@ fun HomeRoute(
     onSettingsClick: () -> Unit,
     onJobSubmitted: (String) -> Unit,
     onBatchSubmitted: (List<String>) -> Unit,
+    onResumeBatch: (List<String>) -> Unit,
 ) {
     val viewModel: HomeViewModel =
         viewModel(
@@ -111,6 +109,7 @@ fun HomeRoute(
     val uploadProgress by viewModel.uploadProgress.collectAsStateWithLifecycle()
     val tryHarderAvailable by viewModel.tryHarderAvailable.collectAsStateWithLifecycle()
     val batchProgress by viewModel.batchProgress.collectAsStateWithLifecycle()
+    val activeJobIds by viewModel.activeJobIds.collectAsStateWithLifecycle()
     val recentInputIds by remember { images.recentInputIds(3) }
         .collectAsStateWithLifecycle(initialValue = emptyList())
     val haptic = LocalHapticFeedback.current
@@ -214,29 +213,15 @@ fun HomeRoute(
         }
     }
 
-    // Completion notifications: ask once on first submit, then watch each
-    // submitted job in the background via JobWatchWorker.
-    val notificationPermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { /* declining just means no notifications; watchers still no-op safely */ }
-
     LaunchedEffect(state) {
         when (val s = state) {
             is SubmitState.Done -> {
                 viewModel.acknowledgeDone()
-                if (!JobNotifications.canNotify(context)) {
-                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                }
-                JobWatchWorker.enqueue(context, s.jobId)
                 onJobSubmitted(s.jobId)
             }
 
             is SubmitState.DoneBatch -> {
                 viewModel.acknowledgeDone()
-                if (!JobNotifications.canNotify(context)) {
-                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                }
-                s.submittedIds.forEach { JobWatchWorker.enqueue(context, it) }
                 val message = submittedFailedMessage
                 if (message != null) {
                     snackbarHostState.showOne(
@@ -282,113 +267,126 @@ fun HomeRoute(
         },
         contentWindowInsets = WindowInsets.safeDrawing,
     ) { inner ->
-        PullToRefreshBox(
-            isRefreshing = isRefreshing,
-            onRefresh = { viewModel.manualRefresh() },
-            indicator = {},
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(inner)
-                .pointerInput(isRefreshing, refreshThresholdPx) {
-                    detectVerticalDragGestures(
-                        onDragStart = { pullDistancePx = 0f },
-                        onVerticalDrag = { change, dragAmount ->
-                            if (dragAmount > 0f || pullDistancePx > 0f) {
-                                pullDistancePx = (pullDistancePx + dragAmount)
-                                    .coerceIn(0f, refreshThresholdPx * 1.25f)
-                                change.consume()
-                            }
-                        },
-                        onDragEnd = {
-                            if (pullDistancePx >= refreshThresholdPx && !isRefreshing) {
-                                viewModel.manualRefresh()
-                            }
-                            pullDistancePx = 0f
-                        },
-                        onDragCancel = { pullDistancePx = 0f },
-                    )
-                },
+                .padding(inner),
         ) {
-            val onSubmit: () -> Unit = {
-                if (composer.inputUris.isNotEmpty() && composer.selectedPromptId != null) {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    viewModel.submit()
+            if (activeJobIds.isNotEmpty()) {
+                ActiveJobsBanner(
+                    count = activeJobIds.size,
+                    onClick = { onResumeBatch(activeJobIds) },
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+            }
+            PullToRefreshBox(
+                isRefreshing = isRefreshing,
+                onRefresh = { viewModel.manualRefresh() },
+                indicator = {},
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .pointerInput(isRefreshing, refreshThresholdPx) {
+                        detectVerticalDragGestures(
+                            onDragStart = { pullDistancePx = 0f },
+                            onVerticalDrag = { change, dragAmount ->
+                                if (dragAmount > 0f || pullDistancePx > 0f) {
+                                    pullDistancePx = (pullDistancePx + dragAmount)
+                                        .coerceIn(0f, refreshThresholdPx * 1.25f)
+                                    change.consume()
+                                }
+                            },
+                            onDragEnd = {
+                                if (pullDistancePx >= refreshThresholdPx && !isRefreshing) {
+                                    viewModel.manualRefresh()
+                                }
+                                pullDistancePx = 0f
+                            },
+                            onDragCancel = { pullDistancePx = 0f },
+                        )
+                    },
+            ) {
+                val onSubmit: () -> Unit = {
+                    if (composer.inputUris.isNotEmpty() && composer.selectedPromptId != null) {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        viewModel.submit()
+                    }
                 }
-            }
-            val onRemoveImage: (Uri) -> Unit = { uri ->
-                viewModel.removeInputUri(uri)
-            }
-            var isFetchingRecent by remember { mutableStateOf(false) }
-            val onPickRecent: (Int) -> Unit = { inputId ->
-                val expectedUri = images.recentInputUri(inputId)
-                if (expectedUri in composer.inputUris) {
-                    viewModel.removeInputUri(expectedUri)
-                } else if (!isFetchingRecent) {
-                    coroutineScope.launch {
-                        isFetchingRecent = true
-                        try {
-                            val uri = withContext(Dispatchers.IO) {
-                                images.downloadInputToCache(inputId)
+                val onRemoveImage: (Uri) -> Unit = { uri ->
+                    viewModel.removeInputUri(uri)
+                }
+                var isFetchingRecent by remember { mutableStateOf(false) }
+                val onPickRecent: (Int) -> Unit = { inputId ->
+                    val expectedUri = images.recentInputUri(inputId)
+                    if (expectedUri in composer.inputUris) {
+                        viewModel.removeInputUri(expectedUri)
+                    } else if (!isFetchingRecent) {
+                        coroutineScope.launch {
+                            isFetchingRecent = true
+                            try {
+                                val uri = withContext(Dispatchers.IO) {
+                                    images.downloadInputToCache(inputId)
+                                }
+                                appendUris(listOf(uri))
+                            } catch (_: Throwable) {
+                                snackbarHostState.showOne(couldntLoadImageMessage)
+                            } finally {
+                                isFetchingRecent = false
                             }
-                            appendUris(listOf(uri))
-                        } catch (_: Throwable) {
-                            snackbarHostState.showOne(couldntLoadImageMessage)
-                        } finally {
-                            isFetchingRecent = false
                         }
                     }
                 }
-            }
-            val recents = recentInputIds.map { id ->
-                Triple(id, images.inputModel(id), images.recentInputUri(id) in composer.inputUris)
-            }
+                val recents = recentInputIds.map { id ->
+                    Triple(id, images.inputModel(id), images.recentInputUri(id) in composer.inputUris)
+                }
 
-            HomeScreen(
-                isWide = isWide,
-                imageUris = composer.inputUris,
-                prompts = prompts,
-                selectedPromptId = composer.selectedPromptId,
-                customPromptText = composer.customPromptText,
-                onCustomPromptChange = viewModel::updateCustomPrompt,
-                tryHarder = composer.tryHarder,
-                onTryHarderChange = viewModel::setTryHarder,
-                tryHarderAvailable = tryHarderAvailable,
-                onDeletePrompt = viewModel::deletePrompt,
-                onUpdatePrompt = viewModel::updatePrompt,
-                onSavePromptClick = {
-                    saveDialogLabel = ""
-                    showSaveDialog = true
-                },
-                state = state,
-                uploadProgress = uploadProgress,
-                batchProgress = batchProgress,
-                onTakePhoto = onTakePhoto,
-                onPickGallery = launchPicker,
-                onRemoveImage = onRemoveImage,
-                onSelectPrompt = viewModel::selectPrompt,
-                onSubmit = onSubmit,
-                recents = recents,
-                isFetchingRecent = isFetchingRecent,
-                onPickRecent = onPickRecent,
-                pinnedIds = pinnedIds,
-                onTogglePin = { app.pinnedPrompts.toggle(it) },
-                onImagesDropped = appendUris,
-            )
-            if (isRefreshing || pullDistancePx > 0f) {
-                Surface(
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(top = 12.dp)
-                        .size(44.dp),
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surface,
-                    shadowElevation = 6.dp,
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
-                            strokeWidth = 2.5.dp,
-                        )
+                HomeScreen(
+                    isWide = isWide,
+                    imageUris = composer.inputUris,
+                    prompts = prompts,
+                    selectedPromptId = composer.selectedPromptId,
+                    customPromptText = composer.customPromptText,
+                    onCustomPromptChange = viewModel::updateCustomPrompt,
+                    tryHarder = composer.tryHarder,
+                    onTryHarderChange = viewModel::setTryHarder,
+                    tryHarderAvailable = tryHarderAvailable,
+                    onDeletePrompt = viewModel::deletePrompt,
+                    onUpdatePrompt = viewModel::updatePrompt,
+                    onSavePromptClick = {
+                        saveDialogLabel = ""
+                        showSaveDialog = true
+                    },
+                    state = state,
+                    uploadProgress = uploadProgress,
+                    batchProgress = batchProgress,
+                    onTakePhoto = onTakePhoto,
+                    onPickGallery = launchPicker,
+                    onRemoveImage = onRemoveImage,
+                    onSelectPrompt = viewModel::selectPrompt,
+                    onSubmit = onSubmit,
+                    recents = recents,
+                    isFetchingRecent = isFetchingRecent,
+                    onPickRecent = onPickRecent,
+                    pinnedIds = pinnedIds,
+                    onTogglePin = { app.pinnedPrompts.toggle(it) },
+                    onImagesDropped = appendUris,
+                )
+                if (isRefreshing || pullDistancePx > 0f) {
+                    Surface(
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = 12.dp)
+                            .size(44.dp),
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surface,
+                        shadowElevation = 6.dp,
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                strokeWidth = 2.5.dp,
+                            )
+                        }
                     }
                 }
             }

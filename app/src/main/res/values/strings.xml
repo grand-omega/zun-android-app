@@ -64,10 +64,6 @@
     <string name="gallery_hide_image_labels">Hide image labels</string>
     <string name="gallery_filter_by_tag">Filter by tag</string>
     <string name="gallery_sort">Sort</string>
-    <string name="notify_channel_job_results">Generation results</string>
-    <string name="notify_job_done_title">Your image is ready</string>
-    <string name="notify_job_failed_title">Generation failed</string>
-    <string name="notify_job_tap_to_view">Tap to view</string>
     <string name="shortcut_new_edit_short">New edit</string>
     <string name="shortcut_new_edit_long">Start a new edit</string>
     <string name="shortcut_gallery_short">Gallery</string>
@@ -240,6 +236,7 @@
     <string name="progress_batch_cancelled">Cancelled</string>
     <string name="progress_batch_source_image_in_progress">Source image in progress</string>
     <string name="progress_batch_view_result">View result</string>
+    <string name="home_resume_active_jobs_action">View</string>
 
     <!-- Result -->
     <string name="result_title">Result</string>

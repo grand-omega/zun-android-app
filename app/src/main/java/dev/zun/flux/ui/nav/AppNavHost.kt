@@ -45,8 +45,6 @@ fun AppNavHost(
     onSharedUrisConsumed: () -> Unit = {},
     navigateToGallery: Boolean = false,
     onGalleryNavConsumed: () -> Unit = {},
-    navigateToResultJobId: String? = null,
-    onResultNavConsumed: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val app = context.applicationContext as FluxApp
@@ -63,14 +61,6 @@ fun AppNavHost(
         }
     }
 
-    // Completion-notification tap → the finished job's result screen.
-    LaunchedEffect(navigateToResultJobId) {
-        val jobId = navigateToResultJobId
-        if (jobId != null) {
-            if (settingsManager.isConfigured) nav.navigate(Routes.result(jobId))
-            onResultNavConsumed()
-        }
-    }
     val slideSpec = tween<IntOffset>(durationMillis = 300)
     val fadeSpec = tween<Float>(durationMillis = 300)
     NavHost(
@@ -112,6 +102,9 @@ fun AppNavHost(
                     nav.navigate(Routes.progress(jobId))
                 },
                 onBatchSubmitted = { jobIds ->
+                    nav.navigate(Routes.batch(jobIds))
+                },
+                onResumeBatch = { jobIds ->
                     nav.navigate(Routes.batch(jobIds))
                 },
             )

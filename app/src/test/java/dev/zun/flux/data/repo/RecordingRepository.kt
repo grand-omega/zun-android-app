@@ -167,6 +167,13 @@ class RecordingRepository :
 
     override fun deletedJobIds(): Flow<Set<String>> = MutableStateFlow(emptySet())
 
+    private val activeJobIdsFlow = MutableStateFlow<List<String>>(emptyList())
+    override fun activeJobIds(): Flow<List<String>> = activeJobIdsFlow.asStateFlow()
+
+    fun setActiveJobIds(ids: List<String>) {
+        activeJobIdsFlow.value = ids
+    }
+
     override fun recentInputIds(limit: Int): Flow<List<Int>> = MutableStateFlow(emptyList())
 
     override suspend fun downloadInputToCache(inputId: Int): Uri = Uri.EMPTY

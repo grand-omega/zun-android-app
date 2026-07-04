@@ -117,6 +117,14 @@ class HomeViewModel(
             initialValue = listOf(CUSTOM_PROMPT),
         )
 
+    /** Ids of jobs still processing, so Home can offer a way back into their live view. */
+    val activeJobIds: StateFlow<List<String>> = jobRepo.activeJobIds()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = emptyList(),
+        )
+
     private val _health = MutableStateFlow<HealthState>(HealthState.Checking)
     val health: StateFlow<HealthState> = _health.asStateFlow()
 

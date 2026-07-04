@@ -94,6 +94,16 @@ interface JobDao {
     )
     fun jobTagTotals(): Flow<JobTagTotals>
 
+    @Query(
+        """
+        SELECT * FROM jobs
+        WHERE status NOT IN ('done', 'failed', 'cancelled')
+        AND id NOT IN (SELECT jobId FROM pending_deletes)
+        ORDER BY createdAt ASC, id ASC
+        """,
+    )
+    fun getActiveJobs(): Flow<List<JobEntity>>
+
     @Query("SELECT * FROM jobs WHERE id = :jobId")
     suspend fun getJobById(jobId: String): JobEntity?
 
