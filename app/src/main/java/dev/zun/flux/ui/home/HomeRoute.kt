@@ -231,14 +231,12 @@ fun HomeRoute(
             }
 
             is SubmitState.DoneBatch -> {
-                viewModel.acknowledgeDone()
                 val message = submittedFailedMessage
-                if (message != null) {
-                    snackbarHostState.showOne(
-                        message,
-                    )
-                }
+                viewModel.acknowledgeDone()
                 onBatchSubmitted(s.submittedIds)
+                if (message != null) {
+                    coroutineScope.launch { snackbarHostState.showOne(message) }
+                }
             }
 
             else -> Unit
