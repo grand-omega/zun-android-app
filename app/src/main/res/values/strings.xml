@@ -116,6 +116,7 @@
     <string name="viewer_use_input">Use input</string>
     <string name="viewer_save">Save</string>
     <string name="viewer_details">Details</string>
+    <string name="viewer_edit_history">History</string>
     <string name="viewer_delete">Delete</string>
     <string name="viewer_detail_created">Created</string>
     <string name="viewer_detail_duration">Duration</string>
@@ -172,6 +173,10 @@
     <plurals name="home_n_images_same_prompt_format">
         <item quantity="one">%1$d image · same prompt</item>
         <item quantity="other">%1$d images · same prompt</item>
+    </plurals>
+    <plurals name="home_edited_before_format">
+        <item quantity="one">Edited before · %1$d</item>
+        <item quantity="other">Edited before · %1$d</item>
     </plurals>
     <string name="home_add_source_image">Add a source image</string>
     <string name="home_take_photo">Take photo</string>
@@ -246,7 +251,9 @@
     <string name="result_new_image">New image</string>
     <string name="result_use_as_source">Use as new source</string>
     <string name="result_view_details">View details</string>
+    <string name="result_view_edit_history">View edit history</string>
     <string name="result_delete">Delete</string>
+    <string name="edit_history_title">Edit History</string>
     <string name="result_before">Before</string>
     <string name="result_after">After</string>
     <string name="result_regenerating">Regenerating…</string>

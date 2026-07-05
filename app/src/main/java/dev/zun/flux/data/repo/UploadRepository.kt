@@ -5,6 +5,9 @@ import dev.zun.flux.data.api.JobCreatedResponse
 import kotlinx.coroutines.flow.Flow
 import java.util.UUID
 
+/** A match found by [UploadRepository.findPriorEdits]: the lineage group and how many prior edits it holds. */
+data class PriorEditsInfo(val lineageRootId: String, val editCount: Int)
+
 /** Outcome stream for a background upload enqueued via WorkManager. */
 sealed interface JobUploadStatus {
     data object Pending : JobUploadStatus
@@ -62,4 +65,11 @@ interface UploadRepository {
         workflow: String? = null,
         onUploadProgress: ((Float) -> Unit)? = null,
     ): JobCreatedResponse
+
+    /**
+     * Looks up whether [sha256] (a source image's content hash) matches the
+     * source or result of any prior successfully-completed job. Returns
+     * `null` if there's no match — this photo hasn't been edited before.
+     */
+    suspend fun findPriorEdits(sha256: String): PriorEditsInfo?
 }

@@ -177,6 +177,8 @@ class FakeJobRepository(
         onUploadProgress = onUploadProgress,
     )
 
+    override suspend fun findPriorEdits(sha256: String): PriorEditsInfo? = null
+
     override suspend fun getJob(jobId: String, waitSeconds: Int?): JobStatusDto {
         if (deletedIds.contains(jobId)) error("Job was deleted")
         val entry = entries[jobId] ?: error("Unknown fake job: $jobId")
@@ -344,6 +346,12 @@ class FakeJobRepository(
     override suspend fun syncPendingDeletes() {
         // No-op for fake
     }
+
+    var lineageRootIdsByJobId: Map<String, String> = emptyMap()
+
+    override suspend fun getLineageRootId(jobId: String): String? = lineageRootIdsByJobId[jobId]
+
+    override fun getJobsByLineageRoot(rootId: String): Flow<List<JobSummaryDto>> = MutableStateFlow(emptyList())
 
     override fun recentInputIds(limit: Int): Flow<List<Int>> = updates.map {
         entries.values.sortedByDescending { it.createdAt }

@@ -45,6 +45,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.zun.flux.R
+import dev.zun.flux.data.repo.PriorEditsInfo
 import dev.zun.flux.ui.common.PanelShape
 
 const val MAX_BATCH_IMAGES = 20
@@ -58,6 +59,7 @@ fun ImageHero(
     onTakePhoto: () -> Unit,
     onPickRecent: (Int) -> Unit,
     onRemove: (Uri) -> Unit,
+    priorEditsByUri: Map<Uri, PriorEditsInfo> = emptyMap(),
 ) {
     when {
         imageUris.isEmpty() -> EmptyHero(
@@ -81,6 +83,9 @@ fun ImageHero(
                 contentScale = ContentScale.Fit,
                 modifier = Modifier.fillMaxSize(),
             )
+            priorEditsByUri[imageUris[0]]?.let { info ->
+                PriorEditsBadge(info, modifier = Modifier.align(Alignment.TopStart).padding(8.dp))
+            }
         }
 
         else -> Column(
@@ -96,7 +101,7 @@ fun ImageHero(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(imageUris, key = { it.toString() }) { uri ->
-                    ImageThumb(uri = uri, onRemove = { onRemove(uri) })
+                    ImageThumb(uri = uri, onRemove = { onRemove(uri) }, priorEdits = priorEditsByUri[uri])
                 }
                 if (imageUris.size < MAX_BATCH_IMAGES) {
                     item(key = "__add_more__") {
@@ -332,7 +337,7 @@ private fun RecentInputThumbnail(
 }
 
 @Composable
-private fun ImageThumb(uri: Uri, onRemove: () -> Unit) {
+private fun ImageThumb(uri: Uri, onRemove: () -> Unit, priorEdits: PriorEditsInfo? = null) {
     Box(modifier = Modifier.size(96.dp)) {
         AsyncImage(
             model = uri,
@@ -359,6 +364,26 @@ private fun ImageThumb(uri: Uri, onRemove: () -> Unit) {
                 modifier = Modifier.size(14.dp),
             )
         }
+        if (priorEdits != null) {
+            PriorEditsBadge(priorEdits, modifier = Modifier.align(Alignment.BottomStart).padding(4.dp))
+        }
+    }
+}
+
+/** Small "you've edited this photo before" indicator (User Story 1). Never blocks submission. */
+@Composable
+private fun PriorEditsBadge(info: PriorEditsInfo, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(6.dp),
+        color = MaterialTheme.colorScheme.scrim.copy(alpha = 0.7f),
+    ) {
+        Text(
+            text = pluralStringResource(R.plurals.home_edited_before_format, info.editCount, info.editCount),
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.White,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+        )
     }
 }
 

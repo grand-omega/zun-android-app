@@ -1,7 +1,10 @@
 package dev.zun.flux.ui.gallery
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -39,6 +42,7 @@ class PhotoViewerScreenTest {
                 viewModel = viewModel,
                 images = repo,
                 onUseInput = {},
+                onViewHistory = {},
                 onBack = {},
             )
         }
@@ -62,6 +66,7 @@ class PhotoViewerScreenTest {
                 viewModel = viewModel,
                 images = repo,
                 onUseInput = {},
+                onViewHistory = {},
                 onBack = {},
             )
         }
@@ -96,6 +101,7 @@ class PhotoViewerScreenTest {
                 viewModel = viewModel,
                 images = repo,
                 onUseInput = {},
+                onViewHistory = {},
                 onBack = {},
             )
         }
@@ -118,6 +124,7 @@ class PhotoViewerScreenTest {
                 viewModel = viewModel,
                 images = repo,
                 onUseInput = {},
+                onViewHistory = {},
                 onBack = {},
             )
         }
@@ -140,6 +147,7 @@ class PhotoViewerScreenTest {
                 viewModel = viewModel,
                 images = repo,
                 onUseInput = {},
+                onViewHistory = {},
                 onBack = {},
             )
         }
@@ -155,6 +163,59 @@ class PhotoViewerScreenTest {
         rule.onAllNodesWithTextSafe("Delete generation?").let { nodes ->
             assert(nodes.isEmpty()) { "expected delete dialog to be dismissed" }
         }
+    }
+
+    @Test
+    fun `history action is disabled when the current job has no lineage`() {
+        val repo = FakeJobRepository().apply { seedDoneJobs(listOf("a", "b")) }
+        val viewModel = GalleryViewModel(repo, repo, repo)
+
+        rule.setContent {
+            PhotoViewerScreen(
+                initialJobId = "a",
+                viewModel = viewModel,
+                images = repo,
+                onUseInput = {},
+                onViewHistory = {},
+                onBack = {},
+            )
+        }
+
+        rule.waitUntil(timeoutMillis = 3_000) {
+            rule.onAllNodesWithTagSafe("viewer_page_a").isNotEmpty()
+        }
+        rule.onNode(hasContentDescription("History")).assertIsNotEnabled()
+    }
+
+    @Test
+    fun `history action is enabled and reports the lineage root when one exists`() {
+        val repo = FakeJobRepository().apply {
+            seedDoneJobs(listOf("a", "b"))
+            lineageRootIdsByJobId = mapOf("a" to "root-a")
+        }
+        val viewModel = GalleryViewModel(repo, repo, repo)
+        var historyRootId: String? = null
+
+        rule.setContent {
+            PhotoViewerScreen(
+                initialJobId = "a",
+                viewModel = viewModel,
+                images = repo,
+                onUseInput = {},
+                onViewHistory = { historyRootId = it },
+                onBack = {},
+            )
+        }
+
+        rule.waitUntil(timeoutMillis = 3_000) {
+            rule.onAllNodesWithTagSafe("viewer_page_a").isNotEmpty()
+        }
+        rule.waitUntil(timeoutMillis = 3_000) {
+            rule.onAllNodes(hasContentDescription("History").and(isEnabled()))
+                .fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty()
+        }
+        rule.onNode(hasContentDescription("History")).assertIsEnabled().performClick()
+        assert(historyRootId == "root-a") { "expected onViewHistory to be called with root-a, got $historyRootId" }
     }
 
     private fun androidx.compose.ui.test.junit4.ComposeContentTestRule.onAllNodesWithTagSafe(tag: String) = onAllNodes(androidx.compose.ui.test.hasTestTag(tag)).fetchSemanticsNodes(atLeastOneRootRequired = false)

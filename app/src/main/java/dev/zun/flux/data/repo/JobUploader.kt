@@ -2,11 +2,14 @@ package dev.zun.flux.data.repo
 
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import dev.zun.flux.data.api.FluxApi
 import dev.zun.flux.data.api.JobCreatedResponse
 import dev.zun.flux.data.api.JobSubmitRequest
 import dev.zun.flux.data.api.NeedUploadResponse
 import dev.zun.flux.data.api.ProgressRequestBody
+import dev.zun.flux.data.local.JobDao
+import dev.zun.flux.data.local.JobEntity
 import dev.zun.flux.util.prepareImageForUpload
 import dev.zun.flux.util.sha256Hex
 import kotlinx.coroutines.delay
@@ -22,6 +25,7 @@ import java.io.IOException
 class JobUploader(
     private val context: Context,
     private val api: FluxApi,
+    private val dao: JobDao,
 ) {
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -49,6 +53,19 @@ class JobUploader(
         }
 
         val sha = sha256Hex(file)
+        val response = submitWithRetry(file, sha, promptId, promptText, workflow, onUploadProgress)
+        recordSourceLineage(response.job_id, sha)
+        return response
+    }
+
+    private suspend fun submitWithRetry(
+        file: File,
+        sha: String,
+        promptId: Long?,
+        promptText: String?,
+        workflow: String?,
+        onUploadProgress: ((Float) -> Unit)?,
+    ): JobCreatedResponse {
         val inputName = file.name
         var attempt = 0
         var lastError: Exception? = null
@@ -118,6 +135,52 @@ class JobUploader(
         throw lastError ?: IOException("Failed to submit job after $MAX_ATTEMPTS attempts")
     }
 
+    /**
+     * Persists this job's source-image hash and assigns it to a lineage
+     * group (a new one, or an existing one if [sha] matches a prior
+     * successfully-completed job's source or result). Best-effort — a
+     * failure here must never affect the job that was already submitted
+     * successfully.
+     *
+     * Checks for an existing row rather than blindly inserting: the first
+     * real status poll (`RealJobRepository.getJob`) may already have
+     * created this job's row by the time this runs, and a blind
+     * `REPLACE` insert here would clobber that real data with a stale
+     * placeholder.
+     */
+    private suspend fun recordSourceLineage(jobId: String, sha: String) {
+        runCatching {
+            val match = dao.findDoneJobByHash(sha)
+            val rootId = assignLineageRoot(jobId, match)
+            if (dao.getJobById(jobId) != null) {
+                dao.updateSourceLineage(jobId, sha, rootId)
+            } else {
+                dao.insertJob(
+                    JobEntity(
+                        id = jobId,
+                        status = "queued",
+                        inputId = null,
+                        promptId = null,
+                        promptText = null,
+                        workflow = null,
+                        seed = null,
+                        progress = null,
+                        error = null,
+                        createdAt = System.currentTimeMillis(),
+                        startedAt = null,
+                        completedAt = null,
+                        durationSeconds = null,
+                        width = null,
+                        height = null,
+                        sourceSha256 = sha,
+                        resultSha256 = null,
+                        lineageRootId = rootId,
+                    ),
+                )
+            }
+        }.onFailure { Log.w(TAG, "Failed to record source lineage for $jobId", it) }
+    }
+
     suspend fun submitJob(
         inputUri: Uri,
         selection: PromptSelection,
@@ -133,6 +196,7 @@ class JobUploader(
     }
 
     private companion object {
+        const val TAG = "JobUploader"
         val TEXT_PLAIN = "text/plain".toMediaType()
         const val MAX_ATTEMPTS = 3
     }

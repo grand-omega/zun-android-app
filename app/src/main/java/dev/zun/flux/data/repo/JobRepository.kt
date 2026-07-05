@@ -74,4 +74,10 @@ interface JobRepository {
 
     /** Flushes locally queued server deletes. Safe to call from background workers. */
     suspend fun syncPendingDeletes()
+
+    /** The lineage group this job belongs to, or `null` if it predates lineage tracking (FR-006). */
+    suspend fun getLineageRootId(jobId: String): String?
+
+    /** Every successfully-completed job sharing [rootId], in the order the edits were made (FR-004). */
+    fun getJobsByLineageRoot(rootId: String): Flow<List<JobSummaryDto>>
 }

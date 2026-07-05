@@ -119,6 +119,39 @@ interface JobDao {
     @Query("SELECT * FROM jobs WHERE id = :jobId")
     fun getJobByIdFlow(jobId: String): Flow<JobEntity?>
 
+    @Query(
+        """
+        SELECT * FROM jobs
+        WHERE status = 'done'
+        AND (sourceSha256 = :hash OR resultSha256 = :hash)
+        ORDER BY createdAt ASC
+        LIMIT 1
+        """,
+    )
+    suspend fun findDoneJobByHash(hash: String): JobEntity?
+
+    @Query("UPDATE jobs SET resultSha256 = :hash WHERE id = :jobId")
+    suspend fun updateResultHash(jobId: String, hash: String)
+
+    @Query("UPDATE jobs SET sourceSha256 = :hash, lineageRootId = :rootId WHERE id = :jobId")
+    suspend fun updateSourceLineage(jobId: String, hash: String, rootId: String)
+
+    @Query(
+        """
+        SELECT * FROM jobs
+        WHERE lineageRootId = :rootId
+        AND status = 'done'
+        ORDER BY createdAt ASC
+        """,
+    )
+    fun getJobsByLineageRoot(rootId: String): Flow<List<JobEntity>>
+
+    @Query("SELECT COUNT(*) FROM jobs WHERE lineageRootId = :rootId AND status = 'done'")
+    suspend fun countByLineageRoot(rootId: String): Int
+
+    @Query("SELECT * FROM jobs WHERE id IN (:ids)")
+    suspend fun getJobsByIds(ids: List<String>): List<JobEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertJob(job: JobEntity)
 

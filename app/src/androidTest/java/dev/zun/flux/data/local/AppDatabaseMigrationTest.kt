@@ -14,7 +14,7 @@ import org.junit.runner.RunWith
 class AppDatabaseMigrationTest {
 
     @Test
-    fun migrate1To4_preservesJobRowsAndCreatesPendingDeletes() {
+    fun migrate1To5_preservesJobRowsAndCreatesPendingDeletes() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         context.deleteDatabase(TEST_DB)
 
@@ -35,7 +35,7 @@ class AppDatabaseMigrationTest {
             db.execSQL("INSERT INTO jobs (id, createdAt) VALUES ('job-1', 100)")
         }
 
-        // Opening through Room runs MIGRATION_1_2..3_4 and then validates the
+        // Opening through Room runs MIGRATION_1_2..4_5 and then validates the
         // migrated schema against the generated Room model — a schema mismatch
         // throws IllegalStateException before any query runs.
         val database = Room.databaseBuilder(context, AppDatabase::class.java, TEST_DB)
@@ -43,6 +43,7 @@ class AppDatabaseMigrationTest {
                 AppDatabase.MIGRATION_1_2,
                 AppDatabase.MIGRATION_2_3,
                 AppDatabase.MIGRATION_3_4,
+                AppDatabase.MIGRATION_4_5,
             )
             .build()
         try {
@@ -53,6 +54,11 @@ class AppDatabaseMigrationTest {
                 assertEquals("done", migrated!!.status)
                 assertEquals(100L, migrated.createdAt)
                 assertEquals(emptyList<String>(), dao.getPendingDeleteIds())
+                // Lineage columns are new in v5 and are never backfilled for
+                // pre-existing rows (per FR-006 — no retroactive tracking).
+                assertEquals(null, migrated.sourceSha256)
+                assertEquals(null, migrated.resultSha256)
+                assertEquals(null, migrated.lineageRootId)
             }
         } finally {
             database.close()

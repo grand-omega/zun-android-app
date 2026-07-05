@@ -11,6 +11,7 @@ import dev.zun.flux.data.repo.ConnectionDiagnosis
 import dev.zun.flux.data.repo.HealthRepository
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.data.repo.JobUploadStatus
+import dev.zun.flux.data.repo.PriorEditsInfo
 import dev.zun.flux.data.repo.PromptRepository
 import dev.zun.flux.data.repo.PromptSelection
 import dev.zun.flux.data.repo.UploadRepository
@@ -106,6 +107,9 @@ class HomeViewModel(
 
     private val _composer = MutableStateFlow(HomeComposerState())
     val composer: StateFlow<HomeComposerState> = _composer.asStateFlow()
+
+    private val _priorEdits = MutableStateFlow<Map<Uri, PriorEditsInfo>>(emptyMap())
+    val priorEdits: StateFlow<Map<Uri, PriorEditsInfo>> = _priorEdits.asStateFlow()
 
     val prompts: StateFlow<List<PromptDto>> = promptRepo.promptsState
         .map { fetched ->
@@ -238,6 +242,16 @@ class HomeViewModel(
 
     fun removeInputUri(uri: Uri) {
         _composer.value = _composer.value.copy(inputUris = _composer.value.inputUris - uri)
+        _priorEdits.value = _priorEdits.value - uri
+    }
+
+    /** Checks whether [uri]'s content (already hashed as [sha256]) matches a prior completed job. */
+    fun checkPriorEdits(uri: Uri, sha256: String) {
+        viewModelScope.launch {
+            uploadRepo.findPriorEdits(sha256)?.let { info ->
+                _priorEdits.value = _priorEdits.value + (uri to info)
+            }
+        }
     }
 
     fun selectPrompt(promptId: Long) {
@@ -369,6 +383,7 @@ class HomeViewModel(
     fun acknowledgeDone() {
         if (_state.value is SubmitState.Done || _state.value is SubmitState.DoneBatch) {
             _composer.value = _composer.value.copy(inputUris = emptyList())
+            _priorEdits.value = emptyMap()
         }
         _state.value = SubmitState.Idle
     }

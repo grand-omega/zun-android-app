@@ -70,6 +70,7 @@ import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.data.repo.PromptRepository
 import dev.zun.flux.data.repo.UploadRepository
 import dev.zun.flux.util.cacheInputLocally
+import dev.zun.flux.util.sha256Hex
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -110,6 +111,7 @@ fun HomeRoute(
     val tryHarderAvailable by viewModel.tryHarderAvailable.collectAsStateWithLifecycle()
     val batchProgress by viewModel.batchProgress.collectAsStateWithLifecycle()
     val activeJobIds by viewModel.activeJobIds.collectAsStateWithLifecycle()
+    val priorEditsByUri by viewModel.priorEdits.collectAsStateWithLifecycle()
     val recentInputIds by remember { images.recentInputIds(3) }
         .collectAsStateWithLifecycle(initialValue = emptyList())
     val haptic = LocalHapticFeedback.current
@@ -144,6 +146,14 @@ fun HomeRoute(
             val toAdd = newUris.filter { it !in composer.inputUris }.take(remaining)
             val cached = withContext(Dispatchers.IO) {
                 toAdd.map { uri -> runCatching { cacheInputLocally(context, uri) }.getOrDefault(uri) }
+            }
+            withContext(Dispatchers.IO) {
+                cached.forEach { uri ->
+                    uri.path?.let { path ->
+                        runCatching { sha256Hex(java.io.File(path)) }
+                            .onSuccess { hash -> viewModel.checkPriorEdits(uri, hash) }
+                    }
+                }
             }
             val result = viewModel.addInputUris(cached, MAX_BATCH_IMAGES)
             if (newUris.size > toAdd.size || result.capped) {
@@ -370,6 +380,7 @@ fun HomeRoute(
                     pinnedIds = pinnedIds,
                     onTogglePin = { app.pinnedPrompts.toggle(it) },
                     onImagesDropped = appendUris,
+                    priorEditsByUri = priorEditsByUri,
                 )
                 if (isRefreshing || pullDistancePx > 0f) {
                     Surface(

@@ -30,6 +30,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.zun.flux.R
 import dev.zun.flux.data.api.PromptDto
+import dev.zun.flux.data.repo.PriorEditsInfo
 
 /**
  * Stateless presentation for the home screen. All state comes in via parameters
@@ -64,6 +65,7 @@ fun HomeScreen(
     pinnedIds: Set<Long>,
     onTogglePin: (Long) -> Unit,
     onImagesDropped: (List<Uri>) -> Unit = {},
+    priorEditsByUri: Map<Uri, PriorEditsInfo> = emptyMap(),
 ) {
     var showPromptSheet by rememberSaveable { mutableStateOf(false) }
     var showPromptManageSheet by rememberSaveable { mutableStateOf(false) }
@@ -123,6 +125,7 @@ fun HomeScreen(
                     onTakePhoto = onTakePhoto,
                     onPickRecent = onPickRecent,
                     onRemove = onRemoveImage,
+                    priorEditsByUri = priorEditsByUri,
                 )
             }
             Column(
@@ -166,6 +169,7 @@ fun HomeScreen(
                     onTakePhoto = onTakePhoto,
                     onPickRecent = onPickRecent,
                     onRemove = onRemoveImage,
+                    priorEditsByUri = priorEditsByUri,
                 )
             }
             composer(true)

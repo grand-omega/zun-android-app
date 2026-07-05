@@ -28,6 +28,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.CompareArrows
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.AlertDialog
@@ -104,6 +105,7 @@ fun PhotoViewerScreen(
     viewModel: GalleryViewModel,
     images: ImageSourceRepository,
     onUseInput: (Uri) -> Unit,
+    onViewHistory: (String) -> Unit,
     onBack: () -> Unit,
 ) {
     val jobs by viewModel.jobs.collectAsState()
@@ -187,6 +189,11 @@ fun PhotoViewerScreen(
 
     LaunchedEffect(currentJob?.id) {
         viewModel.setViewerJob(currentJob?.id)
+    }
+
+    var lineageRootId by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(currentJob?.id) {
+        lineageRootId = currentJob?.id?.let { viewModel.getLineageRootId(it) }
     }
 
     val undoCount = pendingUndo?.size ?: 0
@@ -280,6 +287,8 @@ fun PhotoViewerScreen(
                     onDelete = {
                         showDeleteConfirm = true
                     },
+                    onViewHistory = { lineageRootId?.let(onViewHistory) },
+                    hasHistory = lineageRootId != null,
                 )
             }
         },
@@ -572,6 +581,8 @@ private fun ViewerActionBar(
     onSave: () -> Unit,
     onDetails: () -> Unit,
     onDelete: () -> Unit,
+    onViewHistory: () -> Unit,
+    hasHistory: Boolean,
 ) {
     ActionBarSurface {
         if (hasInput) {
@@ -596,6 +607,12 @@ private fun ViewerActionBar(
             icon = Icons.Default.Info,
             label = stringResource(R.string.viewer_details),
             onClick = onDetails,
+        )
+        ActionIcon(
+            icon = Icons.Default.History,
+            label = stringResource(R.string.viewer_edit_history),
+            onClick = onViewHistory,
+            enabled = hasHistory,
         )
         ActionIcon(
             icon = Icons.Default.Delete,

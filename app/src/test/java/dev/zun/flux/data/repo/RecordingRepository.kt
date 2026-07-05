@@ -50,6 +50,7 @@ class RecordingRepository :
         private set
     var holdSubmit: CompletableDeferred<Unit>? = null
     val failingUris = mutableSetOf<Uri>()
+    var priorEditsResult: PriorEditsInfo? = null
     private var nextJobNumber = 1
 
     override suspend fun health(): HealthResponse = HealthResponse(status = "ok")
@@ -132,6 +133,8 @@ class RecordingRepository :
         onUploadProgress = onUploadProgress,
     )
 
+    override suspend fun findPriorEdits(sha256: String): PriorEditsInfo? = priorEditsResult
+
     override suspend fun getJob(jobId: String, waitSeconds: Int?): JobStatusDto = JobStatusDto(
         id = jobId,
         status = "done",
@@ -185,6 +188,10 @@ class RecordingRepository :
     override suspend fun syncHistory() = Unit
 
     override suspend fun syncPendingDeletes() = Unit
+
+    override suspend fun getLineageRootId(jobId: String): String? = null
+
+    override fun getJobsByLineageRoot(rootId: String): Flow<List<JobSummaryDto>> = MutableStateFlow(emptyList())
 
     override fun inputModel(inputId: Int?): Any? = null
 
