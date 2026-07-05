@@ -55,7 +55,7 @@ fun SetupScreen(
     onSuccess: () -> Unit,
 ) {
     val settings = app.settingsManager
-    var serverUrl by remember { mutableStateOf(settings.serverUrl ?: "") }
+    var serverUrl by remember { mutableStateOf(settings.serverUrl ?: BuildConfig.DEFAULT_SERVER_URL) }
     var token by remember { mutableStateOf(settings.apiToken ?: "") }
 
     var isTesting by remember { mutableStateOf(false) }
@@ -152,7 +152,13 @@ fun SetupScreen(
                         error = null
                         scope.launch {
                             try {
-                                val url = requireNotNull(normalizeOptionalServerUrl(serverUrl, allowHttp = BuildConfig.DEBUG)) {
+                                val url = requireNotNull(
+                                    normalizeOptionalServerUrl(
+                                        serverUrl,
+                                        allowHttp = BuildConfig.DEBUG,
+                                        blockHost = if (BuildConfig.DEBUG) "zun.h.doremysweet.com" else null,
+                                    ),
+                                ) {
                                     "Enter a server URL"
                                 }
                                 val oldServerUrl = settings.serverUrl

@@ -12,6 +12,7 @@ import java.net.URI
 fun normalizeOptionalServerUrl(
     raw: String,
     allowHttp: Boolean = true,
+    blockHost: String? = null,
 ): String? {
     val trimmed = raw.trim()
     if (trimmed.isBlank() || trimmed == "http://" || trimmed == "https://") return null
@@ -28,6 +29,9 @@ fun normalizeOptionalServerUrl(
     }
     if (uri.host.isNullOrBlank()) {
         throw IllegalArgumentException("URL must include a host")
+    }
+    if (blockHost != null && uri.host.equals(blockHost, ignoreCase = true)) {
+        throw IllegalArgumentException("This is the production server — use your local dev server instead.")
     }
     if (uri.rawQuery != null || uri.rawFragment != null) {
         throw IllegalArgumentException("URL must not include query or fragment text")

@@ -42,6 +42,20 @@ val sentryAuthToken: String =
         .ifBlank { System.getenv("SENTRY_AUTH_TOKEN") ?: "" }
 
 /**
+ * DEBUG_DEFAULT_SERVER_URL — the server address a debug build starts with
+ * before the developer has configured anything. Sourced from
+ * local.properties (machine-specific, gitignored) rather than hardcoded,
+ * since it's normally the developer's own LAN address for the zun-rust-server
+ * instance on their Ubuntu GPU workstation. Falls back to the Android
+ * emulator's host-loopback alias on zun-rust-server's default port so a
+ * fresh checkout still gets a working local-first default with zero setup
+ * when the emulator and server run on the same machine.
+ */
+val debugDefaultServerUrl: String =
+    localProps.getProperty("DEBUG_DEFAULT_SERVER_URL", "")
+        .ifBlank { "http://10.0.2.2:8080" }
+
+/**
  * Run a command and return its trimmed stdout, or null on any failure
  * (missing binary, non-zero exit, etc.). Used for git-derived version
  * metadata so a missing .git dir or shallow clone doesn't break the build —
@@ -124,6 +138,7 @@ android {
         debug {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
+            buildConfigField("String", "DEFAULT_SERVER_URL", "\"$debugDefaultServerUrl\"")
         }
         release {
             isMinifyEnabled = true
@@ -133,6 +148,7 @@ android {
             // arm64-only is fine for the sideloaded device build, but debug must
             // keep x86_64 native libs so instrumented tests run on CI emulators.
             ndk { abiFilters += "arm64-v8a" }
+            buildConfigField("String", "DEFAULT_SERVER_URL", "\"\"")
         }
     }
 
