@@ -1,21 +1,18 @@
 <!--
 Sync Impact Report
 ==================
-Version change: (template, unversioned) → 1.0.0
-Rationale: Initial ratification. No prior concrete constitution existed — the file
-only held placeholder tokens.
+Version change: 1.0.0 → 1.1.0
+Rationale: Feature 003 (debug-server-isolation) surfaced that the sibling
+server ecosystem and dev/prod isolation were undocumented as durable
+principles — this codifies them so future features inherit the rule
+without re-litigating it.
 
-Modified principles: none (initial adoption)
+Modified principles:
+  - V. Server Contract Fidelity (expanded to name zun-flux-pipeline and the
+    dev-branch requirement for server-side changes)
 Added principles:
-  - I. Privacy & Security by Default (NON-NEGOTIABLE)
-  - II. Surgical, Simplicity-First Changes (NON-NEGOTIABLE)
-  - III. Verify Before Claiming Done
-  - IV. Offline-Capable by Design
-  - V. Server Contract Fidelity
-Added sections:
-  - Technology & Architecture Constraints
-  - Quality Gates
-  - Governance (filled in)
+  - VI. Development/Production Environment Isolation
+Added sections: none
 Removed sections: none
 
 Templates requiring updates:
@@ -27,8 +24,7 @@ Templates requiring updates:
      references found; no changes needed.
   ⚠ No .specify/templates/commands/*.md directory present in this install; skipped.
 
-Follow-up TODOs: none. All placeholders resolved from repo context
-(README.md, CLAUDE.md, docs/architecture.md, TODO.md, git history).
+Follow-up TODOs: none.
 -->
 
 # FluxEdit (zun-android-app) Constitution
@@ -100,11 +96,40 @@ from the server. It MUST stay in sync with
 `../zun-rust-server/docs/API_CONTRACT.md`. Any change to a request/response
 shape or error code MUST update both sides in the same change set, or the
 plan MUST explicitly call out the required follow-up in the sibling
-`zun-rust-server` repo.
+`zun-rust-server` repo. `zun-rust-server` in turn drives a second sibling
+repo, `zun-flux-pipeline` (ComfyUI + FLUX inference), over HTTP; changes
+that touch that boundary (e.g. workflow JSON contracts) MUST call out the
+required follow-up in `zun-flux-pipeline` the same way. Any code change made
+in `zun-rust-server` or `zun-flux-pipeline` on behalf of this app MUST land
+on that repo's own `dev` branch, never directly on `main`, matching this
+repo's branching practice.
 
 **Rationale**: The client and server are developed together but live in
 separate git histories with no shared CI. Without an explicit rule, the
 contract drifts silently until a runtime 4xx/5xx surfaces it in the field.
+`zun-flux-pipeline` is one hop further downstream and easy to forget about
+precisely because this repo never imports its code directly.
+
+### VI. Development/Production Environment Isolation
+
+Debug builds MUST default to, and remain restricted to, a local development
+server — never the production server — so that development activity can
+never silently reach production. The production server address is a known,
+specific value (not "any remote host"); debug builds MUST refuse to save
+that exact address rather than gate it behind a warning, and this
+restriction MUST NOT apply to the release build, which continues to reach
+production exactly as before. The local development stack backing debug
+builds is `zun-rust-server` plus the `zun-flux-pipeline` inference process
+it depends on, both normally run together on the developer's Ubuntu Linux
+GPU workstation — the machine used for the large majority of this project's
+development work.
+
+**Rationale**: This app is developed against the same production server
+(`zun.h.doremysweet.com`) that a real device may be relying on. Without a
+hard default and a hard block, a debug build is one typo away from mixing
+test traffic into production data. This was reified as a standing principle
+rather than a one-off feature after feature 003 (debug-server-isolation)
+surfaced that it had no durable rule to point back to.
 
 ## Technology & Architecture Constraints
 
@@ -116,6 +141,12 @@ framework: wiring stays manual through `FluxApp` and the narrow
 versions live in `gradle.properties` / `gradle/libs.versions.toml` and
 `docs/build.md`, which remain the source of truth — this constitution does
 not duplicate them and MUST NOT be treated as overriding them.
+
+The local development server ecosystem this app talks to in debug builds —
+`zun-rust-server` (job orchestration/API) and `zun-flux-pipeline` (ComfyUI +
+FLUX inference, GPU-bound) — are sibling repos with their own toolchains and
+their own `dev`/`main` branch pairs; this repo does not vendor or duplicate
+their build tooling.
 
 ## Quality Gates
 
@@ -145,4 +176,4 @@ typo clarifications. Every plan produced by `/speckit-plan` MUST include a
 Constitution Check gate; violations MUST be justified in that plan's
 Complexity Tracking table, or the plan MUST be revised to comply.
 
-**Version**: 1.0.0 | **Ratified**: 2026-07-03 | **Last Amended**: 2026-07-03
+**Version**: 1.1.0 | **Ratified**: 2026-07-03 | **Last Amended**: 2026-07-05
