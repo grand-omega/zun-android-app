@@ -58,7 +58,7 @@ fun SetupScreen(
 ) {
     val settings = app.settingsManager
     var serverUrl by remember { mutableStateOf(settings.serverUrl ?: BuildConfig.DEFAULT_SERVER_URL) }
-    var token by remember { mutableStateOf(settings.apiToken ?: "") }
+    var token by remember { mutableStateOf(settings.apiToken ?: BuildConfig.DEFAULT_API_TOKEN) }
 
     var isTesting by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }

@@ -56,6 +56,17 @@ val debugDefaultServerUrl: String =
         .ifBlank { "http://10.0.2.2:8080" }
 
 /**
+ * DEBUG_DEFAULT_API_TOKEN — pre-fills the Setup screen's token field on
+ * debug builds, same rationale and same local.properties-only sourcing as
+ * DEBUG_DEFAULT_SERVER_URL above. No emulator-equivalent fallback makes
+ * sense here (there's no universal default token) — this is simply blank,
+ * and unset, until the developer puts their own zun-rust-server token in
+ * local.properties.
+ */
+val debugDefaultApiToken: String =
+    localProps.getProperty("DEBUG_DEFAULT_API_TOKEN", "")
+
+/**
  * Run a command and return its trimmed stdout, or null on any failure
  * (missing binary, non-zero exit, etc.). Used for git-derived version
  * metadata so a missing .git dir or shallow clone doesn't break the build —
@@ -139,6 +150,7 @@ android {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
             buildConfigField("String", "DEFAULT_SERVER_URL", "\"$debugDefaultServerUrl\"")
+            buildConfigField("String", "DEFAULT_API_TOKEN", "\"$debugDefaultApiToken\"")
         }
         release {
             isMinifyEnabled = true
@@ -149,6 +161,7 @@ android {
             // keep x86_64 native libs so instrumented tests run on CI emulators.
             ndk { abiFilters += "arm64-v8a" }
             buildConfigField("String", "DEFAULT_SERVER_URL", "\"\"")
+            buildConfigField("String", "DEFAULT_API_TOKEN", "\"\"")
         }
     }
 
