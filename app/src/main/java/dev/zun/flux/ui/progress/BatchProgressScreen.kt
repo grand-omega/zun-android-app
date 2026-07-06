@@ -506,9 +506,14 @@ private fun BatchPage(
                     Text(stringResource(R.string.common_cancel))
                 }
 
-                PollState.Deleted -> Unit
+                is PollState.Failed, PollState.Cancelled -> OutlinedButton(
+                    onClick = { viewModel.cancelJob(jobId) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.common_dismiss))
+                }
 
-                else -> Unit
+                PollState.Deleted -> Unit
             }
         }
     }

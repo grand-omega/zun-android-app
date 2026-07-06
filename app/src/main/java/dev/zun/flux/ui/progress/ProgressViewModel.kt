@@ -5,12 +5,14 @@ import androidx.lifecycle.viewModelScope
 import dev.zun.flux.data.api.JobStatusDto
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.util.toUserMessage
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import retrofit2.HttpException
 import kotlin.random.Random
 
 sealed interface PollState {
@@ -18,7 +20,12 @@ sealed interface PollState {
     data class Running(val dto: JobStatusDto) : PollState
     data class Done(val dto: JobStatusDto) : PollState
     data object Deleted : PollState
-    data class Failed(val message: String) : PollState
+
+    /** [confirmedGone] is true only when the server has definitively told us this job
+     * doesn't exist (a 404, or Room already carrying a server-synced "failed" status) —
+     * as opposed to merely failing to check status due to a transient network error,
+     * where the job could still be legitimately running. */
+    data class Failed(val message: String, val confirmedGone: Boolean = false) : PollState
     data object Cancelled : PollState
 }
 
@@ -59,7 +66,7 @@ class ProgressViewModel(
                         job == null && _state.value !is PollState.Starting -> PollState.Deleted
                         job == null -> PollState.Starting
                         job.status == "done" -> PollState.Done(job)
-                        job.status == "failed" -> PollState.Failed(job.error ?: "Job failed")
+                        job.status == "failed" -> PollState.Failed(job.error ?: "Job failed", confirmedGone = true)
                         job.status == "cancelled" -> PollState.Cancelled
                         else -> PollState.Running(job)
                     }
@@ -88,11 +95,22 @@ class ProgressViewModel(
                     if (job.status == "done" || job.status == "failed" || job.status == "cancelled") {
                         return@launch
                     }
+                } catch (ce: CancellationException) {
+                    throw ce
                 } catch (t: Throwable) {
+                    val notFound = t is HttpException && t.code() == 404
                     _state.value = if (_state.value is PollState.Deleted) {
                         PollState.Deleted
                     } else {
-                        PollState.Failed(t.toUserMessage("check job status"))
+                        PollState.Failed(t.toUserMessage("check job status"), confirmedGone = notFound)
+                    }
+                    if (notFound) {
+                        // The server has no record of this job at all — polling it
+                        // again will never succeed. Without this, the stale local
+                        // row keeps showing up as "in progress" (it's excluded from
+                        // getActiveJobs() only once its status leaves queued/running)
+                        // every time the app is reopened.
+                        deleteLocalRecordQuietly(jobId)
                     }
                     return@launch
                 }
@@ -121,14 +139,46 @@ class ProgressViewModel(
         start(jobId)
     }
 
+    /**
+     * Cancels [jobId] server-side, or — when called to dismiss a job already confirmed
+     * gone ([PollState.Failed] with `confirmedGone = true`, or [PollState.Cancelled]) —
+     * just cleans up its local record without asking the server to cancel it. A merely
+     * unreachable-during-polling [PollState.Failed] still goes through a real cancel
+     * first, since that job could still be legitimately running.
+     */
     fun cancelJob(jobId: String) {
         pollJob?.cancel()
+        val alreadyGone = when (val s = _state.value) {
+            is PollState.Failed -> s.confirmedGone
+            PollState.Cancelled -> true
+            else -> false
+        }
         viewModelScope.launch {
+            if (alreadyGone) {
+                deleteLocalRecordQuietly(jobId)
+                return@launch
+            }
             try {
                 repository.cancelJob(jobId)
-            } catch (_: Throwable) {
-                // 404 means the job already finished — fine to ignore.
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (t: Throwable) {
+                if (t is HttpException && t.code() == 404) {
+                    // The server has no record of this job — nothing to cancel, but
+                    // the stale local row must go or it'll keep showing as "in progress".
+                    deleteLocalRecordQuietly(jobId)
+                }
             }
+        }
+    }
+
+    private suspend fun deleteLocalRecordQuietly(jobId: String) {
+        try {
+            repository.deleteJob(jobId)
+        } catch (ce: CancellationException) {
+            throw ce
+        } catch (_: Exception) {
+            // Best-effort local cleanup; nothing actionable if it fails.
         }
     }
 }
