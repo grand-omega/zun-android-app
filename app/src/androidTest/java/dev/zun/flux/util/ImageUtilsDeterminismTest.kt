@@ -44,10 +44,18 @@ class ImageUtilsDeterminismTest {
             val rawUri = Uri.fromFile(rawFile)
 
             val staged1 = prepareImageForUpload(context, rawUri)
-            val hash1 = try { sha256Hex(staged1) } finally { staged1.delete() }
+            val hash1 = try {
+                sha256Hex(staged1)
+            } finally {
+                staged1.delete()
+            }
 
             val staged2 = prepareImageForUpload(context, rawUri)
-            val hash2 = try { sha256Hex(staged2) } finally { staged2.delete() }
+            val hash2 = try {
+                sha256Hex(staged2)
+            } finally {
+                staged2.delete()
+            }
 
             assertEquals(
                 "prepareImageForUpload must produce the same bytes for the same raw input — " +
