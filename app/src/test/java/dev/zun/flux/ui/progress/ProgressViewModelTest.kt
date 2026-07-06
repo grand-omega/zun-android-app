@@ -7,10 +7,17 @@ import dev.zun.flux.ui.home.MainDispatcherRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.Protocol
+import okhttp3.Request
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import retrofit2.HttpException
+import retrofit2.Response
+import java.io.IOException
 
 /**
  * Covers the refcounted resume/pause polling contract: network polls run only
@@ -98,4 +105,86 @@ class ProgressViewModelTest {
 
         assertEquals(1, repo.getJobCalls)
     }
+
+    /** Delegates to RecordingRepository but injects failures and records deleteJob/cancelJob calls. */
+    private class FaultyRepository(
+        private val getJobError: Throwable? = null,
+        private val cancelJobError: Throwable? = null,
+    ) : JobRepository by RecordingRepository() {
+        val deletedJobIds = mutableListOf<String>()
+        var cancelJobCalls = 0
+
+        override suspend fun getJob(jobId: String, waitSeconds: Int?): JobStatusDto {
+            getJobError?.let { throw it }
+            return JobStatusDto(id = jobId, status = "running", created_at = 1L)
+        }
+
+        override suspend fun deleteJob(jobId: String) {
+            deletedJobIds.add(jobId)
+        }
+
+        override suspend fun cancelJob(jobId: String) {
+            cancelJobCalls++
+            cancelJobError?.let { throw it }
+        }
+    }
+
+    @Test
+    fun `poll loop cleans up the local record when the server has never heard of the job`() = runTest {
+        val repo = FaultyRepository(getJobError = httpError(404))
+        val viewModel = ProgressViewModel(repo)
+
+        viewModel.resumePolling("j1")
+        advanceTimeBy(1_000)
+
+        assertEquals(listOf("j1"), repo.deletedJobIds)
+        assertTrue(viewModel.state.value is PollState.Failed)
+    }
+
+    @Test
+    fun `poll loop does not delete the local record on a transient network error`() = runTest {
+        val repo = FaultyRepository(getJobError = IOException("timeout"))
+        val viewModel = ProgressViewModel(repo)
+
+        viewModel.resumePolling("j1")
+        advanceTimeBy(1_000)
+
+        assertTrue("a transient error must not destroy the local job record", repo.deletedJobIds.isEmpty())
+        assertTrue(viewModel.state.value is PollState.Failed)
+    }
+
+    @Test
+    fun `dismissing a job the server has never heard of cleans up its local record`() = runTest {
+        val repo = FaultyRepository(cancelJobError = httpError(404))
+        val viewModel = ProgressViewModel(repo)
+
+        viewModel.cancelJob("j1")
+        advanceTimeBy(1_000)
+
+        assertEquals(listOf("j1"), repo.deletedJobIds)
+    }
+
+    @Test
+    fun `cancelling a still-live job does not touch its local record`() = runTest {
+        val repo = FaultyRepository()
+        val viewModel = ProgressViewModel(repo)
+
+        viewModel.cancelJob("j1")
+        advanceTimeBy(1_000)
+
+        assertEquals(1, repo.cancelJobCalls)
+        assertTrue(repo.deletedJobIds.isEmpty())
+    }
+
+    private fun httpError(code: Int): HttpException = HttpException(
+        Response.error<Unit>(
+            "".toResponseBody("application/json".toMediaType()),
+            okhttp3.Response.Builder()
+                .request(Request.Builder().url("http://x/").build())
+                .protocol(Protocol.HTTP_1_1)
+                .code(code)
+                .message("err")
+                .build(),
+        ),
+    )
 }

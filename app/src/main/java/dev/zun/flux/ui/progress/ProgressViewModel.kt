@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import retrofit2.HttpException
 import kotlin.random.Random
 
 sealed interface PollState {
@@ -94,6 +95,14 @@ class ProgressViewModel(
                     } else {
                         PollState.Failed(t.toUserMessage("check job status"))
                     }
+                    if (t is HttpException && t.code() == 404) {
+                        // The server has no record of this job at all — polling it
+                        // again will never succeed. Without this, the stale local
+                        // row keeps showing up as "in progress" (it's excluded from
+                        // getActiveJobs() only once its status leaves queued/running)
+                        // every time the app is reopened.
+                        runCatching { repository.deleteJob(jobId) }
+                    }
                     return@launch
                 }
                 delay(nextPollDelayMs(iteration++))
@@ -121,13 +130,21 @@ class ProgressViewModel(
         start(jobId)
     }
 
+    /**
+     * Cancels [jobId] server-side, or — when called to dismiss a job already in
+     * [PollState.Failed] or [PollState.Cancelled] — just cleans up its local record.
+     */
     fun cancelJob(jobId: String) {
         pollJob?.cancel()
         viewModelScope.launch {
             try {
                 repository.cancelJob(jobId)
-            } catch (_: Throwable) {
-                // 404 means the job already finished — fine to ignore.
+            } catch (t: Throwable) {
+                if (t is HttpException && t.code() == 404) {
+                    // The server has no record of this job — nothing to cancel, but
+                    // the stale local row must go or it'll keep showing as "in progress".
+                    runCatching { repository.deleteJob(jobId) }
+                }
             }
         }
     }
