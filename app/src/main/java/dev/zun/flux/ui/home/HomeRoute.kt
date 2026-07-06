@@ -154,7 +154,10 @@ fun HomeRoute(
                 snackbarHostState.showOne(limitImagesMessage)
                 return@launch
             }
-            val toAdd = newUris.filter { it !in composer.inputUris }.take(remaining)
+            val deduped = newUris.filter { it !in composer.inputUris }
+            val exactDuplicatesSkipped = newUris.size - deduped.size
+            val toAdd = deduped.take(remaining)
+            val cappedByCount = deduped.size > toAdd.size
             val cached = withContext(Dispatchers.IO) {
                 toAdd.map { uri ->
                     runCatching {
@@ -175,8 +178,22 @@ fun HomeRoute(
             }
             hashes.forEach { (uri, hash) -> viewModel.checkPriorEdits(uri, hash) }
             val result = viewModel.addInputUris(cached, hashes, MAX_BATCH_IMAGES)
-            if (newUris.size > toAdd.size || result.capped) {
-                snackbarHostState.showOne(cappedImagesMessage)
+            val duplicatesSkipped = exactDuplicatesSkipped + result.duplicatesSkipped
+            // A duplicate photo takes priority over a capacity message — the count you
+            // hit is a red herring when the real reason is "that one's already selected".
+            when {
+                // pluralStringResource can't be called here — the count is only known at
+                // runtime inside this callback, not during composition.
+                duplicatesSkipped > 0 -> snackbarHostState.showOne(
+                    @Suppress("LocalContextResourcesRead")
+                    context.resources.getQuantityString(
+                        R.plurals.home_duplicate_images_format,
+                        duplicatesSkipped,
+                        duplicatesSkipped,
+                    ),
+                )
+
+                cappedByCount || result.capped -> snackbarHostState.showOne(cappedImagesMessage)
             }
         }
     }

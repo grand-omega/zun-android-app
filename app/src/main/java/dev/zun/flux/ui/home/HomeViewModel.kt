@@ -70,7 +70,7 @@ data class HomeComposerState(
     val tryHarder: Boolean = false,
 )
 
-data class AddInputResult(val capped: Boolean)
+data class AddInputResult(val capped: Boolean, val duplicatesSkipped: Int = 0)
 
 sealed interface HealthState {
     data object Checking : HealthState
@@ -250,17 +250,19 @@ class HomeViewModel(
         if (remaining <= 0) return AddInputResult(capped = true)
 
         val seenHashes = current.mapNotNullTo(mutableSetOf()) { inputHashes[it] }
-        val toAdd = uris.filter { uri ->
-            if (uri in current) return@filter false
+        var duplicatesSkipped = 0
+        val deduped = uris.filter { uri ->
             val hash = hashesOf[uri]
-            if (hash != null && !seenHashes.add(hash)) return@filter false
-            true
-        }.take(remaining)
+            val isDuplicate = uri in current || (hash != null && !seenHashes.add(hash))
+            if (isDuplicate) duplicatesSkipped++
+            !isDuplicate
+        }
+        val toAdd = deduped.take(remaining)
 
         toAdd.forEach { uri -> hashesOf[uri]?.let { inputHashes[uri] = it } }
         _composer.value = _composer.value.copy(inputUris = current + toAdd)
 
-        return AddInputResult(capped = uris.size > toAdd.size)
+        return AddInputResult(capped = deduped.size > toAdd.size, duplicatesSkipped = duplicatesSkipped)
     }
 
     fun removeInputUri(uri: Uri) {

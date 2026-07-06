@@ -148,6 +148,10 @@
         <item quantity="one">Capped at %1$d image</item>
         <item quantity="other">Capped at %1$d images</item>
     </plurals>
+    <plurals name="home_duplicate_images_format">
+        <item quantity="one">That photo is already selected</item>
+        <item quantity="other">%1$d photos are already selected</item>
+    </plurals>
     <string name="home_prompt_saved">Prompt saved</string>
     <string name="home_couldnt_load_image">Couldn\'t load that image</string>
     <plurals name="home_submitted_failed_format">

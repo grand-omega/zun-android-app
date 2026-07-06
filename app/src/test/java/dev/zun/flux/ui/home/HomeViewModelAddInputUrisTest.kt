@@ -47,7 +47,7 @@ class HomeViewModelAddInputUrisTest {
         val result = viewModel.addInputUris(listOf(uriA2), hashesOf = mapOf(uriA2 to "hash-a"), maxImages = 10)
 
         assertEquals(listOf(uriA1), viewModel.composer.value.inputUris)
-        assertEquals(AddInputResult(capped = true), result)
+        assertEquals(AddInputResult(capped = false, duplicatesSkipped = 1), result)
     }
 
     @Test
@@ -68,7 +68,7 @@ class HomeViewModelAddInputUrisTest {
         )
 
         assertEquals(listOf(uriA1), viewModel.composer.value.inputUris)
-        assertEquals(AddInputResult(capped = true), result)
+        assertEquals(AddInputResult(capped = false, duplicatesSkipped = 1), result)
     }
 
     @Test
