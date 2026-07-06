@@ -70,6 +70,7 @@ import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.data.repo.PromptRepository
 import dev.zun.flux.data.repo.UploadRepository
 import dev.zun.flux.util.cacheInputLocally
+import dev.zun.flux.util.prepareImageForUpload
 import dev.zun.flux.util.sha256Hex
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -136,7 +137,17 @@ fun HomeRoute(
         ?.takeIf { it.failed > 0 }
         ?.let { pluralStringResource(R.plurals.home_submitted_failed_format, it.submittedIds.size, it.submittedIds.size, it.failed) }
 
-    val appendUris: (List<Uri>) -> Unit = { newUris ->
+    // [alreadyProcessed] must be true only for a Uri from images.downloadInputToCache
+    // (a "recent photo" re-pick): that's already the exact bytes the server stored from
+    // some prior upload, so re-running it through prepareImageForUpload would decode and
+    // re-compress it a second time. JPEG re-encoding isn't guaranteed to reproduce the same
+    // bytes even from an unmodified decode, which would make its hash below diverge from a
+    // fresh pick of the same original photo (or from the very upload it came from) --
+    // silently defeating both prior-edit detection and the same-photo-twice check in
+    // HomeViewModel.addInputUris. A fresh gallery/camera/share/drag-and-drop pick is
+    // unprocessed and must go through prepareImageForUpload to reach that same canonical,
+    // hashable representation.
+    val appendUris: (List<Uri>, Boolean) -> Unit = { newUris, alreadyProcessed ->
         coroutineScope.launch {
             val remaining = MAX_BATCH_IMAGES - composer.inputUris.size
             if (remaining <= 0) {
@@ -145,7 +156,15 @@ fun HomeRoute(
             }
             val toAdd = newUris.filter { it !in composer.inputUris }.take(remaining)
             val cached = withContext(Dispatchers.IO) {
-                toAdd.map { uri -> runCatching { cacheInputLocally(context, uri) }.getOrDefault(uri) }
+                toAdd.map { uri ->
+                    runCatching {
+                        if (alreadyProcessed) {
+                            cacheInputLocally(context, uri)
+                        } else {
+                            Uri.fromFile(prepareImageForUpload(context, uri))
+                        }
+                    }.getOrDefault(uri)
+                }
             }
             val hashes = withContext(Dispatchers.IO) {
                 cached.mapNotNull { uri ->
@@ -164,14 +183,14 @@ fun HomeRoute(
 
     LaunchedEffect(capturedUri) {
         val src = capturedUri ?: return@LaunchedEffect
-        appendUris(listOf(src))
+        appendUris(listOf(src), false)
     }
 
     // Images arriving via the system share sheet. Consume immediately so a
     // recomposition doesn't re-add them.
     LaunchedEffect(sharedUris) {
         if (sharedUris.isNotEmpty()) {
-            appendUris(sharedUris)
+            appendUris(sharedUris, false)
             onSharedUrisConsumed()
         }
     }
@@ -198,13 +217,13 @@ fun HomeRoute(
         rememberLauncherForActivityResult(
             ActivityResultContracts.PickVisualMedia(),
         ) { uri ->
-            if (uri != null) appendUris(listOf(uri))
+            if (uri != null) appendUris(listOf(uri), false)
         }
     val pickerMulti =
         rememberLauncherForActivityResult(
             ActivityResultContracts.PickMultipleVisualMedia(MAX_BATCH_IMAGES),
         ) { uris ->
-            if (uris.isNotEmpty()) appendUris(uris)
+            if (uris.isNotEmpty()) appendUris(uris, false)
         }
     val launchPicker: () -> Unit = {
         val remaining = MAX_BATCH_IMAGES - composer.inputUris.size
@@ -336,7 +355,7 @@ fun HomeRoute(
                                     images.downloadInputToCache(inputId)
                                 }
                                 viewModel.recordRecentSourceInputId(uri, inputId)
-                                appendUris(listOf(uri))
+                                appendUris(listOf(uri), true)
                             } catch (_: Throwable) {
                                 snackbarHostState.showOne(couldntLoadImageMessage)
                             } finally {
@@ -378,7 +397,7 @@ fun HomeRoute(
                     onPickRecent = onPickRecent,
                     pinnedIds = pinnedIds,
                     onTogglePin = { app.pinnedPrompts.toggle(it) },
-                    onImagesDropped = appendUris,
+                    onImagesDropped = { uris -> appendUris(uris, false) },
                     priorEditsByUri = priorEditsByUri,
                 )
                 if (isRefreshing || pullDistancePx > 0f) {

@@ -144,7 +144,10 @@ class RealJobRepository(
                 "workflow is required for custom prompts"
             }
         }
-        val staged = jobUploader.stageImage(inputUri)
+        // inputUri is already fully processed by this point (HomeRoute stages fresh
+        // picks via prepareImageForUpload before they ever reach composer.inputUris) —
+        // just copy it for this worker to own, don't reprocess it.
+        val staged = jobUploader.copyForUpload(inputUri)
         val data = workDataOf(
             JobUploadWorker.KEY_FILE_PATH to staged.absolutePath,
             JobUploadWorker.KEY_PROMPT_ID to ((selection as? PromptSelection.Saved)?.promptId ?: -1L),

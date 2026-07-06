@@ -36,6 +36,26 @@ class JobUploader(
     suspend fun stageImage(uri: Uri): File = prepareImageForUpload(context, uri)
 
     /**
+     * Copies [uri]'s bytes verbatim into a new isolated cache file for a WorkManager
+     * upload to own (and later delete) independently of [uri]'s own lifecycle.
+     *
+     * Unlike [stageImage], this does NOT re-run image processing: [uri] here is always
+     * already-processed (produced by `HomeRoute`'s own prepareImageForUpload call at
+     * pick-time, or a verbatim re-download of a prior upload's stored bytes), and
+     * decoding + re-compressing an already-processed image a second time isn't
+     * guaranteed to reproduce the same bytes — which would silently break the hash-based
+     * duplicate/prior-edit detection this is called from.
+     */
+    fun copyForUpload(uri: Uri): File {
+        val outFile = File(context.cacheDir, "upload_staged_${uri.lastPathSegment}_${System.nanoTime()}.jpg")
+        context.contentResolver.openInputStream(uri).use { input ->
+            requireNotNull(input) { "Failed to open input stream for $uri" }
+            outFile.outputStream().use { output -> input.copyTo(output) }
+        }
+        return outFile
+    }
+
+    /**
      * Submits an already-staged image. Use this when the upload is being
      * driven by something with its own retry policy (WorkManager). [file] is
      * not deleted; that's the caller's responsibility.
