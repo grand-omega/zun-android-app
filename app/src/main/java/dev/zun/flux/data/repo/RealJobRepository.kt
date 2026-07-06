@@ -341,11 +341,7 @@ class RealJobRepository(
     }
 
     override fun recentInputIds(limit: Int): Flow<List<Int>> = dao.getVisibleJobs().map { entities ->
-        entities.asSequence()
-            .mapNotNull { it.inputId }
-            .distinct()
-            .take(limit)
-            .toList()
+        dedupeRecentInputIds(entities, limit)
     }
 
     override suspend fun downloadInputToCache(inputId: Int): Uri = recentInputCache.downloadInputToCache(inputId)
