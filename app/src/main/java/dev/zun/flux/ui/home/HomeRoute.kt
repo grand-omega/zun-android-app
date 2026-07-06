@@ -147,15 +147,15 @@ fun HomeRoute(
             val cached = withContext(Dispatchers.IO) {
                 toAdd.map { uri -> runCatching { cacheInputLocally(context, uri) }.getOrDefault(uri) }
             }
-            withContext(Dispatchers.IO) {
-                cached.forEach { uri ->
+            val hashes = withContext(Dispatchers.IO) {
+                cached.mapNotNull { uri ->
                     uri.path?.let { path ->
-                        runCatching { sha256Hex(java.io.File(path)) }
-                            .onSuccess { hash -> viewModel.checkPriorEdits(uri, hash) }
+                        runCatching { sha256Hex(java.io.File(path)) }.getOrNull()?.let { uri to it }
                     }
-                }
+                }.toMap()
             }
-            val result = viewModel.addInputUris(cached, MAX_BATCH_IMAGES)
+            hashes.forEach { (uri, hash) -> viewModel.checkPriorEdits(uri, hash) }
+            val result = viewModel.addInputUris(cached, hashes, MAX_BATCH_IMAGES)
             if (newUris.size > toAdd.size || result.capped) {
                 snackbarHostState.showOne(cappedImagesMessage)
             }

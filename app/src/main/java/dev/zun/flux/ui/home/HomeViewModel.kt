@@ -114,6 +114,14 @@ class HomeViewModel(
     /** Which recent inputId (if any) a staged [Uri] was re-downloaded from — see [submitOne]. */
     private val recentSourceInputIds = MutableStateFlow<Map<Uri, Int>>(emptyMap())
 
+    /**
+     * Content hash of each selected [Uri], so [addInputUris] can reject a photo that's
+     * already selected under a *different* Uri — a fresh gallery re-pick and a "recent"
+     * re-download both mint a new Uri for what may be byte-identical content, so exact-Uri
+     * equality alone lets the same photo end up selected (and processed) twice.
+     */
+    private val inputHashes = mutableMapOf<Uri, String>()
+
     val prompts: StateFlow<List<PromptDto>> = promptRepo.promptsState
         .map { fetched ->
             clearDeletedPromptSelection(fetched)
@@ -232,12 +240,24 @@ class HomeViewModel(
         }
     }
 
-    fun addInputUris(uris: List<Uri>, maxImages: Int): AddInputResult {
+    /**
+     * [hashesOf] should carry every entry in [uris] that's known (best-effort —
+     * an unhashable candidate is still added, just not content-deduped).
+     */
+    fun addInputUris(uris: List<Uri>, hashesOf: Map<Uri, String> = emptyMap(), maxImages: Int): AddInputResult {
         val current = _composer.value.inputUris
         val remaining = maxImages - current.size
         if (remaining <= 0) return AddInputResult(capped = true)
 
-        val toAdd = uris.filter { it !in current }.take(remaining)
+        val seenHashes = current.mapNotNullTo(mutableSetOf()) { inputHashes[it] }
+        val toAdd = uris.filter { uri ->
+            if (uri in current) return@filter false
+            val hash = hashesOf[uri]
+            if (hash != null && !seenHashes.add(hash)) return@filter false
+            true
+        }.take(remaining)
+
+        toAdd.forEach { uri -> hashesOf[uri]?.let { inputHashes[uri] = it } }
         _composer.value = _composer.value.copy(inputUris = current + toAdd)
 
         return AddInputResult(capped = uris.size > toAdd.size)
@@ -247,6 +267,7 @@ class HomeViewModel(
         _composer.value = _composer.value.copy(inputUris = _composer.value.inputUris - uri)
         _priorEdits.value = _priorEdits.value - uri
         recentSourceInputIds.value = recentSourceInputIds.value - uri
+        inputHashes -= uri
     }
 
     /** Records that [uri] is a re-download of recent photo [inputId], so [submitOne] can tie the
