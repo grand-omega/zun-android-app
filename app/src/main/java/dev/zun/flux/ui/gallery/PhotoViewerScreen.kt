@@ -24,7 +24,6 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.CompareArrows
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
@@ -84,6 +83,7 @@ import dev.zun.flux.data.api.effectivePromptId
 import dev.zun.flux.data.repo.ImageSourceRepository
 import dev.zun.flux.data.repo.OfflineImageAvailability
 import dev.zun.flux.ui.common.ActionBarSurface
+import dev.zun.flux.ui.common.BackNavigationIcon
 import dev.zun.flux.ui.common.MissingImageState
 import dev.zun.flux.util.resolvePromptLabel
 import dev.zun.flux.util.saveToPictures
@@ -201,16 +201,12 @@ fun PhotoViewerScreen(
     val undoActionLabel = stringResource(R.string.gallery_undo)
     LaunchedEffect(pendingUndo) {
         val undo = pendingUndo ?: return@LaunchedEffect
-        val result = snackbarHostState.showSnackbar(
+        snackbarHostState.showUndoDeletedSnackbar(
             message = undoDeletedMessage,
             actionLabel = undoActionLabel,
-            duration = androidx.compose.material3.SnackbarDuration.Short,
+            onUndo = { viewModel.undoDelete(undo) },
+            onDismiss = { viewModel.clearPendingUndo() },
         )
-        if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
-            viewModel.undoDelete(undo)
-        } else {
-            viewModel.clearPendingUndo()
-        }
     }
 
     LaunchedEffect(viewerNotice) {
@@ -234,9 +230,7 @@ fun PhotoViewerScreen(
                 TopAppBar(
                     title = { },
                     navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back), tint = Color.White)
-                        }
+                        BackNavigationIcon(onBack = onBack, contentDescription = stringResource(R.string.common_back), tint = Color.White)
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
                 )

@@ -24,7 +24,6 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
@@ -94,6 +93,7 @@ import dev.zun.flux.data.api.PromptDto
 import dev.zun.flux.data.api.effectivePromptId
 import dev.zun.flux.data.repo.ImageSourceRepository
 import dev.zun.flux.data.repo.OfflineImageAvailability
+import dev.zun.flux.ui.common.BackNavigationIcon
 import dev.zun.flux.ui.common.EmptyState
 import dev.zun.flux.ui.common.MissingImageState
 import dev.zun.flux.util.resolvePromptLabel
@@ -162,16 +162,12 @@ fun GalleryScreen(
     LaunchedEffect(pendingUndo, showUndoSnackbars) {
         if (!showUndoSnackbars) return@LaunchedEffect
         val undo = pendingUndo ?: return@LaunchedEffect
-        val result = snackbarHostState.showSnackbar(
+        snackbarHostState.showUndoDeletedSnackbar(
             message = undoDeletedMessage,
             actionLabel = undoActionLabel,
-            duration = androidx.compose.material3.SnackbarDuration.Short,
+            onUndo = { viewModel.undoDelete(undo) },
+            onDismiss = { viewModel.clearPendingUndo() },
         )
-        if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
-            viewModel.undoDelete(undo)
-        } else {
-            viewModel.clearPendingUndo()
-        }
     }
 
     Scaffold(
@@ -216,9 +212,7 @@ fun GalleryScreen(
                 TopAppBar(
                     title = { Text(stringResource(R.string.gallery_title)) },
                     navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                        }
+                        BackNavigationIcon(onBack = onBack, contentDescription = stringResource(R.string.common_back))
                     },
                     actions = {
                         IconButton(
@@ -622,5 +616,24 @@ fun GalleryScreen(
             onConfirm = { viewModel.confirmPostSaveDelete() },
             onDismiss = { viewModel.dismissPostSaveDelete() },
         )
+    }
+}
+
+/** Shared by [GalleryScreen] and `PhotoViewerScreen` — shows the "item(s) deleted" snackbar with Undo. */
+suspend fun SnackbarHostState.showUndoDeletedSnackbar(
+    message: String,
+    actionLabel: String,
+    onUndo: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val result = showSnackbar(
+        message = message,
+        actionLabel = actionLabel,
+        duration = androidx.compose.material3.SnackbarDuration.Short,
+    )
+    if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+        onUndo()
+    } else {
+        onDismiss()
     }
 }

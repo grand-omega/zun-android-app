@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
@@ -68,6 +67,7 @@ import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.data.repo.PromptRepository
 import dev.zun.flux.data.repo.PromptSelection
 import dev.zun.flux.data.repo.UploadRepository
+import dev.zun.flux.ui.common.BackNavigationIcon
 import dev.zun.flux.ui.common.ControlShape
 import dev.zun.flux.ui.gallery.BeforeAfterSlider
 import dev.zun.flux.ui.home.CUSTOM_PROMPT_ID
@@ -225,9 +225,7 @@ fun ResultScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.result_title)) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                    }
+                    BackNavigationIcon(onBack = onBack, contentDescription = stringResource(R.string.common_back))
                 },
                 actions = {
                     IconButton(onClick = { showMenu = true }) {
