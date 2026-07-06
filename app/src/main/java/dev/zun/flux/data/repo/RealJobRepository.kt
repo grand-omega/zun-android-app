@@ -137,6 +137,7 @@ class RealJobRepository(
         inputUri: Uri,
         selection: PromptSelection,
         workflow: String?,
+        knownSourceInputId: Int?,
     ): java.util.UUID {
         if (selection is PromptSelection.Custom) {
             require(!workflow.isNullOrBlank()) {
@@ -149,6 +150,7 @@ class RealJobRepository(
             JobUploadWorker.KEY_PROMPT_ID to ((selection as? PromptSelection.Saved)?.promptId ?: -1L),
             JobUploadWorker.KEY_PROMPT_TEXT to (selection as? PromptSelection.Custom)?.text,
             JobUploadWorker.KEY_WORKFLOW to workflow,
+            JobUploadWorker.KEY_KNOWN_SOURCE_INPUT_ID to (knownSourceInputId ?: -1),
         )
         val request = OneTimeWorkRequestBuilder<JobUploadWorker>()
             .setInputData(data)
@@ -203,11 +205,13 @@ class RealJobRepository(
         selection: PromptSelection,
         workflow: String?,
         onUploadProgress: ((Float) -> Unit)?,
+        knownSourceInputId: Int?,
     ): JobCreatedResponse = jobUploader.submitStagedJob(
         file = java.io.File(filePath),
         selection = selection,
         workflow = workflow,
         onUploadProgress = onUploadProgress,
+        knownSourceInputId = knownSourceInputId,
     )
 
     override suspend fun findPriorEdits(sha256: String): PriorEditsInfo? {

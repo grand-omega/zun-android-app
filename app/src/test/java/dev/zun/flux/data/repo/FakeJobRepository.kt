@@ -141,6 +141,7 @@ class FakeJobRepository(
         inputUri: Uri,
         selection: PromptSelection,
         workflow: String?,
+        knownSourceInputId: Int?,
     ): java.util.UUID {
         // The fake fulfills the contract synchronously: it submits and stores
         // the result keyed by the returned UUID for [observeJobUpload].
@@ -170,6 +171,7 @@ class FakeJobRepository(
         selection: PromptSelection,
         workflow: String?,
         onUploadProgress: ((Float) -> Unit)?,
+        knownSourceInputId: Int?,
     ): JobCreatedResponse = submitJob(
         inputUri = Uri.fromFile(java.io.File(filePath)),
         selection = selection,

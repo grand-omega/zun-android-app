@@ -30,6 +30,7 @@ class JobUploadWorker(
         val promptId = inputData.getLong(KEY_PROMPT_ID, -1L).takeIf { it != -1L }
         val promptText = inputData.getString(KEY_PROMPT_TEXT)
         val workflow = inputData.getString(KEY_WORKFLOW)
+        val knownSourceInputId = inputData.getInt(KEY_KNOWN_SOURCE_INPUT_ID, -1).takeIf { it != -1 }
         val selection = when {
             promptId != null -> PromptSelection.Saved(promptId)
             promptText != null -> PromptSelection.Custom(promptText)
@@ -50,6 +51,7 @@ class JobUploadWorker(
                 onUploadProgress = { fraction ->
                     setProgressAsync(workDataOf(KEY_PROGRESS to fraction))
                 },
+                knownSourceInputId = knownSourceInputId,
             )
             file.delete()
             Result.success(
@@ -91,6 +93,7 @@ class JobUploadWorker(
         const val KEY_PROMPT_ID = "prompt_id"
         const val KEY_PROMPT_TEXT = "prompt_text"
         const val KEY_WORKFLOW = "workflow"
+        const val KEY_KNOWN_SOURCE_INPUT_ID = "known_source_input_id"
         const val KEY_PROGRESS = "progress"
         const val KEY_JOB_ID = "job_id"
         const val KEY_INPUT_ID = "input_id"

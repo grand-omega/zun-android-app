@@ -39,11 +39,18 @@ interface UploadRepository {
      * synchronously before this returns so the file outlives the URI grant.
      * Returns the work request UUID — pass it to [observeJobUpload] for
      * progress and outcome.
+     *
+     * Pass [knownSourceInputId] when [inputUri] is a re-download of a
+     * previously-uploaded recent photo (not a fresh gallery pick), so the
+     * new job's lineage is tied to that original input directly instead of
+     * being independently re-derived from a hash of the re-staged file —
+     * re-encoding doesn't reliably reproduce the exact same bytes.
      */
     suspend fun enqueueJobUpload(
         inputUri: Uri,
         selection: PromptSelection,
         workflow: String? = null,
+        knownSourceInputId: Int? = null,
     ): UUID
 
     /** Observe progress and outcome of a prior [enqueueJobUpload]. */
@@ -64,6 +71,7 @@ interface UploadRepository {
         selection: PromptSelection,
         workflow: String? = null,
         onUploadProgress: ((Float) -> Unit)? = null,
+        knownSourceInputId: Int? = null,
     ): JobCreatedResponse
 
     /**

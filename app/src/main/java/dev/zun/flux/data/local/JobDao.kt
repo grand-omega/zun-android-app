@@ -130,6 +130,18 @@ interface JobDao {
     )
     suspend fun findDoneJobByHash(hash: String): JobEntity?
 
+    @Query(
+        """
+        SELECT * FROM jobs
+        WHERE status = 'done'
+        AND inputId = :inputId
+        AND sourceSha256 IS NOT NULL
+        ORDER BY createdAt ASC
+        LIMIT 1
+        """,
+    )
+    suspend fun findDoneJobByInputId(inputId: Int): JobEntity?
+
     @Query("UPDATE jobs SET resultSha256 = :hash WHERE id = :jobId")
     suspend fun updateResultHash(jobId: String, hash: String)
 

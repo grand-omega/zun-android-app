@@ -335,6 +335,7 @@ fun HomeRoute(
                                 val uri = withContext(Dispatchers.IO) {
                                     images.downloadInputToCache(inputId)
                                 }
+                                viewModel.recordRecentSourceInputId(uri, inputId)
                                 appendUris(listOf(uri))
                             } catch (_: Throwable) {
                                 snackbarHostState.showOne(couldntLoadImageMessage)

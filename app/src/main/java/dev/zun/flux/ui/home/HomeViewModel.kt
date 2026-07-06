@@ -111,6 +111,9 @@ class HomeViewModel(
     private val _priorEdits = MutableStateFlow<Map<Uri, PriorEditsInfo>>(emptyMap())
     val priorEdits: StateFlow<Map<Uri, PriorEditsInfo>> = _priorEdits.asStateFlow()
 
+    /** Which recent inputId (if any) a staged [Uri] was re-downloaded from — see [submitOne]. */
+    private val recentSourceInputIds = MutableStateFlow<Map<Uri, Int>>(emptyMap())
+
     val prompts: StateFlow<List<PromptDto>> = promptRepo.promptsState
         .map { fetched ->
             clearDeletedPromptSelection(fetched)
@@ -243,6 +246,13 @@ class HomeViewModel(
     fun removeInputUri(uri: Uri) {
         _composer.value = _composer.value.copy(inputUris = _composer.value.inputUris - uri)
         _priorEdits.value = _priorEdits.value - uri
+        recentSourceInputIds.value = recentSourceInputIds.value - uri
+    }
+
+    /** Records that [uri] is a re-download of recent photo [inputId], so [submitOne] can tie the
+     *  new job's lineage to that original input directly instead of re-deriving it from a hash. */
+    fun recordRecentSourceInputId(uri: Uri, inputId: Int) {
+        recentSourceInputIds.value = recentSourceInputIds.value + (uri to inputId)
     }
 
     /** Checks whether [uri]'s content (already hashed as [sha256]) matches a prior completed job. */
@@ -353,6 +363,7 @@ class HomeViewModel(
             inputUri = inputUri,
             selection = selection,
             workflow = workflow,
+            knownSourceInputId = recentSourceInputIds.value[inputUri],
         )
         val terminal = try {
             withTimeout(UPLOAD_WAIT_TIMEOUT_MS) {
@@ -384,6 +395,7 @@ class HomeViewModel(
         if (_state.value is SubmitState.Done || _state.value is SubmitState.DoneBatch) {
             _composer.value = _composer.value.copy(inputUris = emptyList())
             _priorEdits.value = emptyMap()
+            recentSourceInputIds.value = emptyMap()
         }
         _state.value = SubmitState.Idle
     }

@@ -97,6 +97,21 @@ class JobDaoLineageTest {
     }
 
     @Test
+    fun findDoneJobByInputId_matchesEarliestDoneJobWithAHash_ignoringOthers() = runBlocking {
+        dao.insertJob(job(id = "job-1", status = "done", sourceSha256 = "hash-a", inputId = 42, createdAt = 100))
+        dao.insertJob(job(id = "job-2", status = "done", sourceSha256 = "hash-a", inputId = 42, createdAt = 200))
+        dao.insertJob(job(id = "job-3", status = "queued", sourceSha256 = null, inputId = 42, createdAt = 50))
+        dao.insertJob(job(id = "job-4", status = "done", sourceSha256 = "hash-b", inputId = 7, createdAt = 10))
+
+        assertEquals(
+            "the earliest done job carrying a hash for this inputId, not a queued sibling or a different inputId",
+            "job-1",
+            dao.findDoneJobByInputId(42)?.id,
+        )
+        assertNull("no done job (with a hash) has this inputId", dao.findDoneJobByInputId(999))
+    }
+
+    @Test
     fun hardDeletingAJob_removesItFromFutureHashDetection() = runBlocking {
         dao.insertJob(job(id = "job-1", status = "done", sourceSha256 = "hash-a", lineageRootId = "job-1"))
         assertEquals("job-1", dao.findDoneJobByHash("hash-a")?.id)
@@ -128,10 +143,11 @@ class JobDaoLineageTest {
         lineageRootId: String? = null,
         progress: Float? = null,
         createdAt: Long = 0L,
+        inputId: Int? = null,
     ): JobEntity = JobEntity(
         id = id,
         status = status,
-        inputId = null,
+        inputId = inputId,
         promptId = null,
         promptText = null,
         workflow = null,

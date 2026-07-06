@@ -45,6 +45,7 @@ class JobUploader(
         selection: PromptSelection,
         workflow: String?,
         onUploadProgress: ((Float) -> Unit)?,
+        knownSourceInputId: Int? = null,
     ): JobCreatedResponse {
         val promptId = (selection as? PromptSelection.Saved)?.promptId
         val promptText = (selection as? PromptSelection.Custom)?.text
@@ -54,7 +55,7 @@ class JobUploader(
 
         val sha = sha256Hex(file)
         val response = submitWithRetry(file, sha, promptId, promptText, workflow, onUploadProgress)
-        recordSourceLineage(response.job_id, sha)
+        recordSourceLineage(response.job_id, sha, knownSourceInputId)
         return response
     }
 
@@ -142,18 +143,27 @@ class JobUploader(
      * failure here must never affect the job that was already submitted
      * successfully.
      *
+     * When [knownSourceInputId] is set (the source came from re-picking an
+     * existing recent photo, not a fresh gallery pick), the match is found
+     * by that inputId instead of by [sha] and the match's own recorded hash
+     * is reused verbatim: re-downloading and re-staging an image doesn't
+     * reliably reproduce the exact same bytes as the original upload (JPEG
+     * re-encoding isn't guaranteed byte-identical), so [sha] alone can't be
+     * trusted to match here even though it's definitely the same photo.
+     *
      * Checks for an existing row rather than blindly inserting: the first
      * real status poll (`RealJobRepository.getJob`) may already have
      * created this job's row by the time this runs, and a blind
      * `REPLACE` insert here would clobber that real data with a stale
      * placeholder.
      */
-    private suspend fun recordSourceLineage(jobId: String, sha: String) {
+    private suspend fun recordSourceLineage(jobId: String, sha: String, knownSourceInputId: Int? = null) {
         runCatching {
-            val match = dao.findDoneJobByHash(sha)
+            val match = knownSourceInputId?.let { dao.findDoneJobByInputId(it) } ?: dao.findDoneJobByHash(sha)
+            val recordedSha = match?.sourceSha256 ?: sha
             val rootId = assignLineageRoot(jobId, match)
             if (dao.getJobById(jobId) != null) {
-                dao.updateSourceLineage(jobId, sha, rootId)
+                dao.updateSourceLineage(jobId, recordedSha, rootId)
             } else {
                 dao.insertJob(
                     JobEntity(
@@ -172,7 +182,7 @@ class JobUploader(
                         durationSeconds = null,
                         width = null,
                         height = null,
-                        sourceSha256 = sha,
+                        sourceSha256 = recordedSha,
                         resultSha256 = null,
                         lineageRootId = rootId,
                     ),

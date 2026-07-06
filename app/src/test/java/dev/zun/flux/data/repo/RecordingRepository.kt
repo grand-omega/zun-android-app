@@ -106,6 +106,7 @@ class RecordingRepository :
         inputUri: Uri,
         selection: PromptSelection,
         workflow: String?,
+        knownSourceInputId: Int?,
     ): java.util.UUID {
         val resp = submitJob(inputUri, selection, workflow, onUploadProgress = null)
         val workId = java.util.UUID.randomUUID()
@@ -126,6 +127,7 @@ class RecordingRepository :
         selection: PromptSelection,
         workflow: String?,
         onUploadProgress: ((Float) -> Unit)?,
+        knownSourceInputId: Int?,
     ): JobCreatedResponse = submitJob(
         inputUri = Uri.parse("file://$filePath"),
         selection = selection,
