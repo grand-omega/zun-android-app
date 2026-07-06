@@ -45,6 +45,7 @@ class HomeViewModelPriorEditsTest {
     @Test
     fun checkPriorEdits_recordsAMatchByUri() = runTest {
         runCurrent()
+        viewModel.addInputUris(listOf(testUri), maxImages = 10)
         repository.priorEditsResult = PriorEditsInfo(lineageRootId = "job-1", editCount = 2)
 
         viewModel.checkPriorEdits(testUri, "some-sha256")
@@ -59,6 +60,7 @@ class HomeViewModelPriorEditsTest {
     @Test
     fun checkPriorEdits_recordsNothingWhenNoMatch() = runTest {
         runCurrent()
+        viewModel.addInputUris(listOf(testUri), maxImages = 10)
         repository.priorEditsResult = null
 
         viewModel.checkPriorEdits(testUri, "some-sha256")
@@ -68,8 +70,25 @@ class HomeViewModelPriorEditsTest {
     }
 
     @Test
+    fun checkPriorEdits_ignoresAMatchForAUriAlreadyRemoved() = runTest {
+        // Regression test: findPriorEdits is a suspend call, so the user can remove the
+        // image from the composer before it resolves — the match must not be recorded
+        // for a Uri that's no longer selected (stale state otherwise).
+        runCurrent()
+        repository.priorEditsResult = PriorEditsInfo(lineageRootId = "job-1", editCount = 2)
+
+        viewModel.checkPriorEdits(testUri, "some-sha256")
+        // testUri was never added to the composer at all — simulates removal
+        // happening before findPriorEdits resolves.
+        advanceUntilIdle()
+
+        assertTrue(viewModel.priorEdits.value.isEmpty())
+    }
+
+    @Test
     fun removeInputUri_alsoClearsItsPriorEditsEntry() = runTest {
         runCurrent()
+        viewModel.addInputUris(listOf(testUri), maxImages = 10)
         repository.priorEditsResult = PriorEditsInfo(lineageRootId = "job-1", editCount = 1)
         viewModel.checkPriorEdits(testUri, "some-sha256")
         advanceUntilIdle()

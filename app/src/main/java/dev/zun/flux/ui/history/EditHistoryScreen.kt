@@ -26,6 +26,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -97,6 +98,9 @@ private fun EditHistoryRow(
     onClick: () -> Unit,
 ) {
     val locale = LocalLocale.current.platformLocale
+    val formattedDate = remember(entry.created_at, locale) {
+        SimpleDateFormat("MMM d, yyyy · HH:mm", locale).format(Date(entry.created_at * 1000))
+    }
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -118,7 +122,7 @@ private fun EditHistoryRow(
             )
             Column {
                 Text(
-                    text = SimpleDateFormat("MMM d, yyyy · HH:mm", locale).format(Date(entry.created_at * 1000)),
+                    text = formattedDate,
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }

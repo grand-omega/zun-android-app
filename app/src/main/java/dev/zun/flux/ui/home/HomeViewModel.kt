@@ -281,7 +281,10 @@ class HomeViewModel(
     /** Checks whether [uri]'s content (already hashed as [sha256]) matches a prior completed job. */
     fun checkPriorEdits(uri: Uri, sha256: String) {
         viewModelScope.launch {
-            uploadRepo.findPriorEdits(sha256)?.let { info ->
+            val info = uploadRepo.findPriorEdits(sha256)
+            // The user may have removed uri while this suspended — don't resurrect a stale
+            // entry for an image that's no longer selected.
+            if (info != null && uri in _composer.value.inputUris) {
                 _priorEdits.value = _priorEdits.value + (uri to info)
             }
         }
