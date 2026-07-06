@@ -60,6 +60,13 @@ interface JobRepository {
 
     fun getJobFlow(jobId: String): Flow<JobStatusDto?>
 
+    /**
+     * Ids of jobs not yet in a terminal state (done/failed/cancelled) and not
+     * locally deleted. Backed by local Room state — no network call, so it
+     * reflects whatever was last synced even while offline.
+     */
+    fun activeJobIds(): Flow<List<String>>
+
     /** Job ids hidden locally because the user deleted them but server sync may still be pending. */
     fun deletedJobIds(): Flow<Set<String>>
 
@@ -67,4 +74,10 @@ interface JobRepository {
 
     /** Flushes locally queued server deletes. Safe to call from background workers. */
     suspend fun syncPendingDeletes()
+
+    /** The lineage group this job belongs to, or `null` if it predates lineage tracking (FR-006). */
+    suspend fun getLineageRootId(jobId: String): String?
+
+    /** Every successfully-completed job sharing [rootId], in the order the edits were made (FR-004). */
+    fun getJobsByLineageRoot(rootId: String): Flow<List<JobSummaryDto>>
 }

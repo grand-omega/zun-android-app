@@ -28,6 +28,7 @@ fun GalleryScaffold(
     onUseInput: (Uri) -> Unit,
     onBack: () -> Unit,
     settings: SettingsManager? = null,
+    onViewEditHistory: (String) -> Unit = {},
 ) {
     val viewModel: GalleryViewModel =
         viewModel(
@@ -67,6 +68,7 @@ fun GalleryScaffold(
                         viewModel = viewModel,
                         images = images,
                         onUseInput = onUseInput,
+                        onViewHistory = onViewEditHistory,
                         onBack = { scope.launch { navigator.navigateBack() } },
                     )
                 }

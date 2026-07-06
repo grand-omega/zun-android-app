@@ -23,6 +23,7 @@ import dev.zun.flux.FluxApp
 import dev.zun.flux.Repositories
 import dev.zun.flux.ui.capture.CameraScreen
 import dev.zun.flux.ui.gallery.GalleryScaffold
+import dev.zun.flux.ui.history.EditHistoryScreen
 import dev.zun.flux.ui.home.HomeRoute
 import dev.zun.flux.ui.progress.BatchProgressScreen
 import dev.zun.flux.ui.progress.ProgressScreen
@@ -45,8 +46,6 @@ fun AppNavHost(
     onSharedUrisConsumed: () -> Unit = {},
     navigateToGallery: Boolean = false,
     onGalleryNavConsumed: () -> Unit = {},
-    navigateToResultJobId: String? = null,
-    onResultNavConsumed: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val app = context.applicationContext as FluxApp
@@ -63,14 +62,6 @@ fun AppNavHost(
         }
     }
 
-    // Completion-notification tap → the finished job's result screen.
-    LaunchedEffect(navigateToResultJobId) {
-        val jobId = navigateToResultJobId
-        if (jobId != null) {
-            if (settingsManager.isConfigured) nav.navigate(Routes.result(jobId))
-            onResultNavConsumed()
-        }
-    }
     val slideSpec = tween<IntOffset>(durationMillis = 300)
     val fadeSpec = tween<Float>(durationMillis = 300)
     NavHost(
@@ -114,6 +105,9 @@ fun AppNavHost(
                 onBatchSubmitted = { jobIds ->
                     nav.navigate(Routes.batch(jobIds))
                 },
+                onResumeBatch = { jobIds ->
+                    nav.navigate(Routes.batch(jobIds))
+                },
             )
         }
         composable(Routes.SETUP) {
@@ -146,6 +140,7 @@ fun AppNavHost(
                     nav.getBackStackEntry(Routes.HOME).savedStateHandle["capturedUri"] = uri
                     nav.popBackStack(Routes.HOME, inclusive = false)
                 },
+                onViewEditHistory = { rootId -> nav.navigate(Routes.history(rootId)) },
                 onBack = { nav.popBackStack() },
             )
         }
@@ -194,6 +189,17 @@ fun AppNavHost(
                         ?.set(KEY_DELETED_JOB_ID, jobId)
                     nav.popBackStack()
                 },
+                onViewEditHistory = { rootId -> nav.navigate(Routes.history(rootId)) },
+                onBack = { nav.popBackStack() },
+            )
+        }
+        composable(Routes.HISTORY) { entry ->
+            val lineageRootId = entry.arguments?.getString("lineageRootId").orEmpty()
+            EditHistoryScreen(
+                lineageRootId = lineageRootId,
+                jobs = repositories.jobs,
+                images = repositories.images,
+                onJobClick = { jobId -> nav.navigate(Routes.result(jobId)) },
                 onBack = { nav.popBackStack() },
             )
         }

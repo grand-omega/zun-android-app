@@ -3,8 +3,10 @@ package dev.zun.flux.ui.settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.exclude
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -55,8 +57,8 @@ fun SetupScreen(
     onSuccess: () -> Unit,
 ) {
     val settings = app.settingsManager
-    var serverUrl by remember { mutableStateOf(settings.serverUrl ?: "") }
-    var token by remember { mutableStateOf(settings.apiToken ?: "") }
+    var serverUrl by remember { mutableStateOf(settings.serverUrl ?: BuildConfig.DEFAULT_SERVER_URL) }
+    var token by remember { mutableStateOf(settings.apiToken ?: BuildConfig.DEFAULT_API_TOKEN) }
 
     var isTesting by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -67,7 +69,7 @@ fun SetupScreen(
 
     Scaffold(
         topBar = { TopAppBar(title = { Text(stringResource(R.string.setup_title)) }) },
-        contentWindowInsets = WindowInsets.safeDrawing,
+        contentWindowInsets = WindowInsets.safeDrawing.exclude(WindowInsets.ime),
     ) { inner ->
         Column(
             modifier = Modifier
@@ -152,7 +154,13 @@ fun SetupScreen(
                         error = null
                         scope.launch {
                             try {
-                                val url = requireNotNull(normalizeOptionalServerUrl(serverUrl, allowHttp = BuildConfig.DEBUG)) {
+                                val url = requireNotNull(
+                                    normalizeOptionalServerUrl(
+                                        serverUrl,
+                                        allowHttp = BuildConfig.DEBUG,
+                                        blockHost = if (BuildConfig.DEBUG) "zun.h.doremysweet.com" else null,
+                                    ),
+                                ) {
                                     "Enter a server URL"
                                 }
                                 val oldServerUrl = settings.serverUrl

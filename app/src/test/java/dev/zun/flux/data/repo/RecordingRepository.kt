@@ -50,6 +50,7 @@ class RecordingRepository :
         private set
     var holdSubmit: CompletableDeferred<Unit>? = null
     val failingUris = mutableSetOf<Uri>()
+    var priorEditsResult: PriorEditsInfo? = null
     private var nextJobNumber = 1
 
     override suspend fun health(): HealthResponse = HealthResponse(status = "ok")
@@ -105,6 +106,7 @@ class RecordingRepository :
         inputUri: Uri,
         selection: PromptSelection,
         workflow: String?,
+        knownSourceInputId: Int?,
     ): java.util.UUID {
         val resp = submitJob(inputUri, selection, workflow, onUploadProgress = null)
         val workId = java.util.UUID.randomUUID()
@@ -125,12 +127,15 @@ class RecordingRepository :
         selection: PromptSelection,
         workflow: String?,
         onUploadProgress: ((Float) -> Unit)?,
+        knownSourceInputId: Int?,
     ): JobCreatedResponse = submitJob(
         inputUri = Uri.parse("file://$filePath"),
         selection = selection,
         workflow = workflow,
         onUploadProgress = onUploadProgress,
     )
+
+    override suspend fun findPriorEdits(sha256: String): PriorEditsInfo? = priorEditsResult
 
     override suspend fun getJob(jobId: String, waitSeconds: Int?): JobStatusDto = JobStatusDto(
         id = jobId,
@@ -167,6 +172,13 @@ class RecordingRepository :
 
     override fun deletedJobIds(): Flow<Set<String>> = MutableStateFlow(emptySet())
 
+    private val activeJobIdsFlow = MutableStateFlow<List<String>>(emptyList())
+    override fun activeJobIds(): Flow<List<String>> = activeJobIdsFlow.asStateFlow()
+
+    fun setActiveJobIds(ids: List<String>) {
+        activeJobIdsFlow.value = ids
+    }
+
     override fun recentInputIds(limit: Int): Flow<List<Int>> = MutableStateFlow(emptyList())
 
     override suspend fun downloadInputToCache(inputId: Int): Uri = Uri.EMPTY
@@ -178,6 +190,10 @@ class RecordingRepository :
     override suspend fun syncHistory() = Unit
 
     override suspend fun syncPendingDeletes() = Unit
+
+    override suspend fun getLineageRootId(jobId: String): String? = null
+
+    override fun getJobsByLineageRoot(rootId: String): Flow<List<JobSummaryDto>> = MutableStateFlow(emptyList())
 
     override fun inputModel(inputId: Int?): Any? = null
 

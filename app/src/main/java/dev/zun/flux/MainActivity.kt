@@ -21,7 +21,6 @@ import dev.zun.flux.ui.auth.LockScreen
 import dev.zun.flux.ui.auth.promptBiometric
 import dev.zun.flux.ui.nav.AppNavHost
 import dev.zun.flux.ui.theme.ZunFluxTheme
-import dev.zun.flux.util.JobNotifications
 
 private const val TAG = "MainActivity"
 
@@ -32,7 +31,6 @@ class MainActivity : FragmentActivity() {
     private var unlockMessage by mutableStateOf<String?>(null)
     private var sharedUris by mutableStateOf<List<Uri>>(emptyList())
     private var pendingGalleryNav by mutableStateOf(false)
-    private var pendingResultJobId by mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -41,7 +39,6 @@ class MainActivity : FragmentActivity() {
         enableEdgeToEdge()
         sharedUris = sharedImageUris(intent)
         pendingGalleryNav = intent?.action == ACTION_GALLERY
-        pendingResultJobId = resultJobId(intent)
         val app = application as FluxApp
         val auth = app.authStateHolder
 
@@ -71,8 +68,6 @@ class MainActivity : FragmentActivity() {
                         onSharedUrisConsumed = { sharedUris = emptyList() },
                         navigateToGallery = pendingGalleryNav,
                         onGalleryNavConsumed = { pendingGalleryNav = false },
-                        navigateToResultJobId = pendingResultJobId,
-                        onResultNavConsumed = { pendingResultJobId = null },
                     )
                 } else {
                     LockScreen(
@@ -90,12 +85,7 @@ class MainActivity : FragmentActivity() {
         val uris = sharedImageUris(intent)
         if (uris.isNotEmpty()) sharedUris = uris
         if (intent.action == ACTION_GALLERY) pendingGalleryNav = true
-        resultJobId(intent)?.let { pendingResultJobId = it }
     }
-
-    /** Job id from a completion-notification tap (see JobNotifications). */
-    private fun resultJobId(intent: Intent?): String? = intent?.takeIf { it.action == JobNotifications.ACTION_VIEW_RESULT }
-        ?.getStringExtra(JobNotifications.EXTRA_JOB_ID)
 
     /** Image URIs delivered via the system share sheet (ACTION_SEND[_MULTIPLE]). */
     private fun sharedImageUris(intent: Intent?): List<Uri> = when (intent?.action) {

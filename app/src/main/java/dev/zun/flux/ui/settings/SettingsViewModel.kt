@@ -72,7 +72,13 @@ class SettingsViewModel(
     fun connect() {
         val draft = _connectionDraft.value
         try {
-            val url = requireNotNull(normalizeOptionalServerUrl(draft.serverUrl, allowHttp = BuildConfig.DEBUG)) {
+            val url = requireNotNull(
+                normalizeOptionalServerUrl(
+                    draft.serverUrl,
+                    allowHttp = BuildConfig.DEBUG,
+                    blockHost = if (BuildConfig.DEBUG) "zun.h.doremysweet.com" else null,
+                ),
+            ) {
                 "Enter a server URL"
             }
             require(draft.token.isNotBlank()) {

@@ -9,6 +9,8 @@ import org.junit.Test
 import retrofit2.HttpException
 import retrofit2.Response
 import java.io.IOException
+import java.net.ConnectException
+import java.net.NoRouteToHostException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import javax.net.ssl.SSLHandshakeException
@@ -19,7 +21,22 @@ class ErrorMessagesTest {
     @Test
     fun `IOException maps to network unavailable`() {
         val msg = IOException("connect timed out").toUserMessage("regenerate")
-        assertEquals("Couldn't regenerate: network unavailable", msg)
+        assertEquals("Couldn't regenerate: network unavailable — check this device's own connection", msg)
+    }
+
+    @Test
+    fun `connection refused maps to server not reachable`() {
+        val msg = ConnectException("Connection refused").toUserMessage("connect")
+        assertEquals("Couldn't connect: couldn't reach the server — is it running, and is the address/port correct?", msg)
+    }
+
+    @Test
+    fun `no route to host maps to server not reachable`() {
+        val msg = NoRouteToHostException("No route to host").toUserMessage("connect")
+        assertEquals(
+            "Couldn't connect: couldn't reach the server — check the address, and that this device can reach it on the network",
+            msg,
+        )
     }
 
     @Test
@@ -31,13 +48,13 @@ class ErrorMessagesTest {
     @Test
     fun `unknown host maps to dns failure`() {
         val msg = UnknownHostException("flux.invalid").toUserMessage("connect")
-        assertEquals("Couldn't connect: server hostname cannot be resolved", msg)
+        assertEquals("Couldn't connect: server hostname cannot be resolved — check the address", msg)
     }
 
     @Test
     fun `timeout maps to server timed out`() {
         val msg = SocketTimeoutException("timeout").toUserMessage("connect")
-        assertEquals("Couldn't connect: server timed out", msg)
+        assertEquals("Couldn't connect: server timed out — it may be unreachable or overloaded", msg)
     }
 
     @Test

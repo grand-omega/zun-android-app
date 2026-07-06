@@ -98,12 +98,16 @@ fun ResultScreen(
     onNewImage: () -> Unit,
     onUseAsSource: (Uri) -> Unit,
     onDeleted: () -> Unit,
+    onViewEditHistory: (String) -> Unit,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val jobDto by produceState<JobStatusDto?>(null, jobId) {
         jobs.getJobFlow(jobId).collect { value = it }
+    }
+    val lineageRootId by produceState<String?>(null, jobId) {
+        value = jobs.getLineageRootId(jobId)
     }
     val inputModel = remember(jobDto?.input_id) { images.inputModel(jobDto?.input_id) }
     val previewModel = remember(jobId) { images.previewModel(jobId) }
@@ -259,6 +263,14 @@ fun ResultScreen(
                             onClick = {
                                 showMenu = false
                                 showDetails = true
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.result_view_edit_history)) },
+                            enabled = lineageRootId != null,
+                            onClick = {
+                                showMenu = false
+                                lineageRootId?.let(onViewEditHistory)
                             },
                         )
                         DropdownMenuItem(

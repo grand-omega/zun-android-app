@@ -11,6 +11,7 @@ import dev.zun.flux.data.repo.ConnectionDiagnosis
 import dev.zun.flux.data.repo.HealthRepository
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.data.repo.JobUploadStatus
+import dev.zun.flux.data.repo.PriorEditsInfo
 import dev.zun.flux.data.repo.PromptRepository
 import dev.zun.flux.data.repo.PromptSelection
 import dev.zun.flux.data.repo.UploadRepository
@@ -69,7 +70,7 @@ data class HomeComposerState(
     val tryHarder: Boolean = false,
 )
 
-data class AddInputResult(val capped: Boolean)
+data class AddInputResult(val capped: Boolean, val duplicatesSkipped: Int = 0)
 
 sealed interface HealthState {
     data object Checking : HealthState
@@ -107,6 +108,20 @@ class HomeViewModel(
     private val _composer = MutableStateFlow(HomeComposerState())
     val composer: StateFlow<HomeComposerState> = _composer.asStateFlow()
 
+    private val _priorEdits = MutableStateFlow<Map<Uri, PriorEditsInfo>>(emptyMap())
+    val priorEdits: StateFlow<Map<Uri, PriorEditsInfo>> = _priorEdits.asStateFlow()
+
+    /** Which recent inputId (if any) a staged [Uri] was re-downloaded from — see [submitOne]. */
+    private val recentSourceInputIds = MutableStateFlow<Map<Uri, Int>>(emptyMap())
+
+    /**
+     * Content hash of each selected [Uri], so [addInputUris] can reject a photo that's
+     * already selected under a *different* Uri — a fresh gallery re-pick and a "recent"
+     * re-download both mint a new Uri for what may be byte-identical content, so exact-Uri
+     * equality alone lets the same photo end up selected (and processed) twice.
+     */
+    private val inputHashes = mutableMapOf<Uri, String>()
+
     val prompts: StateFlow<List<PromptDto>> = promptRepo.promptsState
         .map { fetched ->
             clearDeletedPromptSelection(fetched)
@@ -115,6 +130,14 @@ class HomeViewModel(
             scope = viewModelScope,
             started = SharingStarted.Eagerly,
             initialValue = listOf(CUSTOM_PROMPT),
+        )
+
+    /** Ids of jobs still processing, so Home can offer a way back into their live view. */
+    val activeJobIds: StateFlow<List<String>> = jobRepo.activeJobIds()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = emptyList(),
         )
 
     private val _health = MutableStateFlow<HealthState>(HealthState.Checking)
@@ -217,19 +240,54 @@ class HomeViewModel(
         }
     }
 
-    fun addInputUris(uris: List<Uri>, maxImages: Int): AddInputResult {
+    /**
+     * [hashesOf] should carry every entry in [uris] that's known (best-effort —
+     * an unhashable candidate is still added, just not content-deduped).
+     */
+    fun addInputUris(uris: List<Uri>, hashesOf: Map<Uri, String> = emptyMap(), maxImages: Int): AddInputResult {
         val current = _composer.value.inputUris
         val remaining = maxImages - current.size
         if (remaining <= 0) return AddInputResult(capped = true)
 
-        val toAdd = uris.filter { it !in current }.take(remaining)
+        val seenHashes = current.mapNotNullTo(mutableSetOf()) { inputHashes[it] }
+        var duplicatesSkipped = 0
+        val deduped = uris.filter { uri ->
+            val hash = hashesOf[uri]
+            val isDuplicate = uri in current || (hash != null && !seenHashes.add(hash))
+            if (isDuplicate) duplicatesSkipped++
+            !isDuplicate
+        }
+        val toAdd = deduped.take(remaining)
+
+        toAdd.forEach { uri -> hashesOf[uri]?.let { inputHashes[uri] = it } }
         _composer.value = _composer.value.copy(inputUris = current + toAdd)
 
-        return AddInputResult(capped = uris.size > toAdd.size)
+        return AddInputResult(capped = deduped.size > toAdd.size, duplicatesSkipped = duplicatesSkipped)
     }
 
     fun removeInputUri(uri: Uri) {
         _composer.value = _composer.value.copy(inputUris = _composer.value.inputUris - uri)
+        _priorEdits.value = _priorEdits.value - uri
+        recentSourceInputIds.value = recentSourceInputIds.value - uri
+        inputHashes -= uri
+    }
+
+    /** Records that [uri] is a re-download of recent photo [inputId], so [submitOne] can tie the
+     *  new job's lineage to that original input directly instead of re-deriving it from a hash. */
+    fun recordRecentSourceInputId(uri: Uri, inputId: Int) {
+        recentSourceInputIds.value = recentSourceInputIds.value + (uri to inputId)
+    }
+
+    /** Checks whether [uri]'s content (already hashed as [sha256]) matches a prior completed job. */
+    fun checkPriorEdits(uri: Uri, sha256: String) {
+        viewModelScope.launch {
+            val info = uploadRepo.findPriorEdits(sha256)
+            // The user may have removed uri while this suspended — don't resurrect a stale
+            // entry for an image that's no longer selected.
+            if (info != null && uri in _composer.value.inputUris) {
+                _priorEdits.value = _priorEdits.value + (uri to info)
+            }
+        }
     }
 
     fun selectPrompt(promptId: Long) {
@@ -331,6 +389,7 @@ class HomeViewModel(
             inputUri = inputUri,
             selection = selection,
             workflow = workflow,
+            knownSourceInputId = recentSourceInputIds.value[inputUri],
         )
         val terminal = try {
             withTimeout(UPLOAD_WAIT_TIMEOUT_MS) {
@@ -361,6 +420,8 @@ class HomeViewModel(
     fun acknowledgeDone() {
         if (_state.value is SubmitState.Done || _state.value is SubmitState.DoneBatch) {
             _composer.value = _composer.value.copy(inputUris = emptyList())
+            _priorEdits.value = emptyMap()
+            recentSourceInputIds.value = emptyMap()
         }
         _state.value = SubmitState.Idle
     }

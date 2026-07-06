@@ -114,6 +114,16 @@ class HomeViewModelTest {
     }
 
     @Test
+    fun activeJobIds_reflectsRepositoryState() = runTest {
+        runCurrent()
+
+        repository.setActiveJobIds(listOf("job-1", "job-2"))
+        runCurrent()
+
+        assertEquals(listOf("job-1", "job-2"), viewModel.activeJobIds.value)
+    }
+
+    @Test
     fun submit_tryHarderCustomPromptUsesExperimentalWorkflow() = runTest {
         runCurrent()
         viewModel.addInputUris(listOf(Uri.EMPTY), maxImages = 20)

@@ -6,19 +6,31 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import dev.zun.flux.R
 import dev.zun.flux.data.api.PromptDto
+import dev.zun.flux.data.repo.PriorEditsInfo
 
 /**
  * Stateless presentation for the home screen. All state comes in via parameters
@@ -53,6 +65,7 @@ fun HomeScreen(
     pinnedIds: Set<Long>,
     onTogglePin: (Long) -> Unit,
     onImagesDropped: (List<Uri>) -> Unit = {},
+    priorEditsByUri: Map<Uri, PriorEditsInfo> = emptyMap(),
 ) {
     var showPromptSheet by rememberSaveable { mutableStateOf(false) }
     var showPromptManageSheet by rememberSaveable { mutableStateOf(false) }
@@ -112,6 +125,7 @@ fun HomeScreen(
                     onTakePhoto = onTakePhoto,
                     onPickRecent = onPickRecent,
                     onRemove = onRemoveImage,
+                    priorEditsByUri = priorEditsByUri,
                 )
             }
             Column(
@@ -155,6 +169,7 @@ fun HomeScreen(
                     onTakePhoto = onTakePhoto,
                     onPickRecent = onPickRecent,
                     onRemove = onRemoveImage,
+                    priorEditsByUri = priorEditsByUri,
                 )
             }
             composer(true)
@@ -195,5 +210,43 @@ fun HomeScreen(
             onUpdatePrompt = onUpdatePrompt,
             onDismiss = { showPromptManageSheet = false },
         )
+    }
+}
+
+/**
+ * Entry point back into the live view for jobs still processing in the
+ * background, shown on Home after the user has navigated away from it.
+ */
+@Composable
+fun ActiveJobsBanner(
+    count: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (count == 0) return
+    Surface(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                Spacer(Modifier.width(12.dp))
+                Text(pluralStringResource(R.plurals.progress_batch_n_generations_format, count, count))
+            }
+            Text(
+                text = stringResource(R.string.home_resume_active_jobs_action),
+                style = MaterialTheme.typography.labelLarge,
+            )
+        }
     }
 }

@@ -64,10 +64,6 @@
     <string name="gallery_hide_image_labels">Hide image labels</string>
     <string name="gallery_filter_by_tag">Filter by tag</string>
     <string name="gallery_sort">Sort</string>
-    <string name="notify_channel_job_results">Generation results</string>
-    <string name="notify_job_done_title">Your image is ready</string>
-    <string name="notify_job_failed_title">Generation failed</string>
-    <string name="notify_job_tap_to_view">Tap to view</string>
     <string name="shortcut_new_edit_short">New edit</string>
     <string name="shortcut_new_edit_long">Start a new edit</string>
     <string name="shortcut_gallery_short">Gallery</string>
@@ -120,6 +116,7 @@
     <string name="viewer_use_input">Use input</string>
     <string name="viewer_save">Save</string>
     <string name="viewer_details">Details</string>
+    <string name="viewer_edit_history">History</string>
     <string name="viewer_delete">Delete</string>
     <string name="viewer_detail_created">Created</string>
     <string name="viewer_detail_duration">Duration</string>
@@ -151,6 +148,10 @@
         <item quantity="one">Capped at %1$d image</item>
         <item quantity="other">Capped at %1$d images</item>
     </plurals>
+    <plurals name="home_duplicate_images_format">
+        <item quantity="one">That photo is already selected</item>
+        <item quantity="other">%1$d photos are already selected</item>
+    </plurals>
     <string name="home_prompt_saved">Prompt saved</string>
     <string name="home_couldnt_load_image">Couldn\'t load that image</string>
     <plurals name="home_submitted_failed_format">
@@ -176,6 +177,10 @@
     <plurals name="home_n_images_same_prompt_format">
         <item quantity="one">%1$d image · same prompt</item>
         <item quantity="other">%1$d images · same prompt</item>
+    </plurals>
+    <plurals name="home_edited_before_format">
+        <item quantity="one">Edited before · %1$d</item>
+        <item quantity="other">Edited before · %1$d</item>
     </plurals>
     <string name="home_add_source_image">Add a source image</string>
     <string name="home_take_photo">Take photo</string>
@@ -240,6 +245,7 @@
     <string name="progress_batch_cancelled">Cancelled</string>
     <string name="progress_batch_source_image_in_progress">Source image in progress</string>
     <string name="progress_batch_view_result">View result</string>
+    <string name="home_resume_active_jobs_action">View</string>
 
     <!-- Result -->
     <string name="result_title">Result</string>
@@ -249,7 +255,9 @@
     <string name="result_new_image">New image</string>
     <string name="result_use_as_source">Use as new source</string>
     <string name="result_view_details">View details</string>
+    <string name="result_view_edit_history">View edit history</string>
     <string name="result_delete">Delete</string>
+    <string name="edit_history_title">Edit History</string>
     <string name="result_before">Before</string>
     <string name="result_after">After</string>
     <string name="result_regenerating">Regenerating…</string>

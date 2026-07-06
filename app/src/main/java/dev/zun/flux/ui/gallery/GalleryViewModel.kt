@@ -369,6 +369,8 @@ class GalleryViewModel(
         }
     }
 
+    suspend fun getLineageRootId(jobId: String): String? = jobRepo.getLineageRootId(jobId)
+
     private companion object {
         const val TAG = "GalleryViewModel"
     }

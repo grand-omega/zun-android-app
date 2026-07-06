@@ -9,10 +9,13 @@ object Routes {
     const val PROGRESS = "progress/{jobId}"
     const val RESULT = "result/{jobId}"
     const val BATCH_PROGRESS = "batch/{jobIds}"
+    const val HISTORY = "history/{lineageRootId}"
 
     fun progress(jobId: String) = "progress/$jobId"
 
     fun result(jobId: String) = "result/$jobId"
 
     fun batch(jobIds: List<String>) = "batch/${jobIds.joinToString(",")}"
+
+    fun history(lineageRootId: String) = "history/$lineageRootId"
 }

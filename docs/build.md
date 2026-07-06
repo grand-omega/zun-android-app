@@ -16,7 +16,7 @@
    # edit and set sdk.dir=/path/to/Android/sdk
    ```
 
-   Server URL and API token are *not* configured here. URLs are entered at runtime from the in-app Setup screen and stored in app-private preferences; the API token is stored in the Keystore-backed secure store.
+   Server URL and API token are *not* configured here. URLs are entered at runtime from the in-app Setup screen and stored in app-private preferences; the API token is stored in the Keystore-backed secure store. Debug builds may optionally set `DEBUG_DEFAULT_SERVER_URL` here to override the local-dev-server address the Setup screen starts with (see the `debugDefaultServerUrl` comment in `app/build.gradle.kts`); it falls back to `http://10.0.2.2:8080` (the Android emulator's host-loopback alias, matching `zun-rust-server`'s default port) when unset.
 
 2. **`keystore.properties`** *(release builds only)* — copy the example and point it at a real keystore:
 

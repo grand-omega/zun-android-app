@@ -35,3 +35,9 @@ Thumbs.db
 .claude/
 .codex/
 .agents/
+
+# Local dev-server runtime state (justfile dev-up/dev-down)
+.dev/
+
+# Machine-specific dev-environment config (see dev.toml.example)
+dev.toml

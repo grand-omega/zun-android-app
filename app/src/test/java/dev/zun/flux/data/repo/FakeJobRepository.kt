@@ -141,6 +141,7 @@ class FakeJobRepository(
         inputUri: Uri,
         selection: PromptSelection,
         workflow: String?,
+        knownSourceInputId: Int?,
     ): java.util.UUID {
         // The fake fulfills the contract synchronously: it submits and stores
         // the result keyed by the returned UUID for [observeJobUpload].
@@ -170,12 +171,15 @@ class FakeJobRepository(
         selection: PromptSelection,
         workflow: String?,
         onUploadProgress: ((Float) -> Unit)?,
+        knownSourceInputId: Int?,
     ): JobCreatedResponse = submitJob(
         inputUri = Uri.fromFile(java.io.File(filePath)),
         selection = selection,
         workflow = workflow,
         onUploadProgress = onUploadProgress,
     )
+
+    override suspend fun findPriorEdits(sha256: String): PriorEditsInfo? = null
 
     override suspend fun getJob(jobId: String, waitSeconds: Int?): JobStatusDto {
         if (deletedIds.contains(jobId)) error("Job was deleted")
@@ -335,6 +339,8 @@ class FakeJobRepository(
 
     override fun deletedJobIds(): Flow<Set<String>> = updates.map { deletedIds.toSet() }
 
+    override fun activeJobIds(): Flow<List<String>> = MutableStateFlow(emptyList())
+
     override suspend fun syncHistory() {
         // No-op for fake
     }
@@ -342,6 +348,12 @@ class FakeJobRepository(
     override suspend fun syncPendingDeletes() {
         // No-op for fake
     }
+
+    var lineageRootIdsByJobId: Map<String, String> = emptyMap()
+
+    override suspend fun getLineageRootId(jobId: String): String? = lineageRootIdsByJobId[jobId]
+
+    override fun getJobsByLineageRoot(rootId: String): Flow<List<JobSummaryDto>> = MutableStateFlow(emptyList())
 
     override fun recentInputIds(limit: Int): Flow<List<Int>> = updates.map {
         entries.values.sortedByDescending { it.createdAt }

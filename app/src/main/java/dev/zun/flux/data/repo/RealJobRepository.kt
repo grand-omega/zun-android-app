@@ -25,12 +25,14 @@ import dev.zun.flux.data.api.PromptDto
 import dev.zun.flux.data.api.WorkflowSupportDto
 import dev.zun.flux.data.api.Workflows
 import dev.zun.flux.data.local.AppDatabase
+import dev.zun.flux.data.local.JobEntity
 import dev.zun.flux.data.local.PendingDeleteEntity
 import dev.zun.flux.data.local.toEntity
 import dev.zun.flux.data.local.toStatusDto
 import dev.zun.flux.data.local.toSummaryDto
 import dev.zun.flux.data.worker.DeleteSyncWorker
 import dev.zun.flux.data.worker.JobUploadWorker
+import dev.zun.flux.util.sha256Hex
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -60,7 +62,7 @@ class RealJobRepository(
     ImageSourceRepository {
     private val dao = AppDatabase.getDatabase(context).jobDao()
     private val connectionDiagnoser = ConnectionDiagnoser(settingsManager)
-    private val jobUploader = JobUploader(context, api)
+    private val jobUploader = JobUploader(context, api, dao)
     private val recentInputCache = RecentInputCache(context, api)
     private val cacheScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val cachedPromptsStore = CachedPromptsStore(context)
@@ -135,18 +137,23 @@ class RealJobRepository(
         inputUri: Uri,
         selection: PromptSelection,
         workflow: String?,
+        knownSourceInputId: Int?,
     ): java.util.UUID {
         if (selection is PromptSelection.Custom) {
             require(!workflow.isNullOrBlank()) {
                 "workflow is required for custom prompts"
             }
         }
-        val staged = jobUploader.stageImage(inputUri)
+        // inputUri is already fully processed by this point (HomeRoute stages fresh
+        // picks via prepareImageForUpload before they ever reach composer.inputUris) —
+        // just copy it for this worker to own, don't reprocess it.
+        val staged = jobUploader.copyForUpload(inputUri)
         val data = workDataOf(
             JobUploadWorker.KEY_FILE_PATH to staged.absolutePath,
             JobUploadWorker.KEY_PROMPT_ID to ((selection as? PromptSelection.Saved)?.promptId ?: -1L),
             JobUploadWorker.KEY_PROMPT_TEXT to (selection as? PromptSelection.Custom)?.text,
             JobUploadWorker.KEY_WORKFLOW to workflow,
+            JobUploadWorker.KEY_KNOWN_SOURCE_INPUT_ID to (knownSourceInputId ?: -1),
         )
         val request = OneTimeWorkRequestBuilder<JobUploadWorker>()
             .setInputData(data)
@@ -201,12 +208,20 @@ class RealJobRepository(
         selection: PromptSelection,
         workflow: String?,
         onUploadProgress: ((Float) -> Unit)?,
+        knownSourceInputId: Int?,
     ): JobCreatedResponse = jobUploader.submitStagedJob(
         file = java.io.File(filePath),
         selection = selection,
         workflow = workflow,
         onUploadProgress = onUploadProgress,
+        knownSourceInputId = knownSourceInputId,
     )
+
+    override suspend fun findPriorEdits(sha256: String): PriorEditsInfo? {
+        val match = dao.findDoneJobByHash(sha256) ?: return null
+        val rootId = match.lineageRootId ?: match.id
+        return PriorEditsInfo(lineageRootId = rootId, editCount = dao.countByLineageRoot(rootId))
+    }
 
     override suspend fun getJob(jobId: String, waitSeconds: Int?): JobStatusDto {
         if (jobId in localDeletedIds.value || dao.isPendingDelete(jobId)) {
@@ -214,7 +229,16 @@ class RealJobRepository(
         }
         val job = api.getJob(jobId, waitSeconds)
         if (jobId !in localDeletedIds.value && !dao.isPendingDelete(jobId)) {
-            dao.insertJob(job.toEntity())
+            // REPLACE would otherwise wipe the lineage-tracking columns (they're
+            // local-only, never present on the server DTO) on every poll.
+            val existing = dao.getJobById(job.id)
+            dao.insertJob(
+                job.toEntity().copy(
+                    sourceSha256 = existing?.sourceSha256,
+                    resultSha256 = existing?.resultSha256,
+                    lineageRootId = existing?.lineageRootId,
+                ),
+            )
             prefetchIfDone(job)
         }
         return job
@@ -230,7 +254,7 @@ class RealJobRepository(
         val hiddenIds = dao.getPendingDeleteIds().toSet() + localDeletedIds.value
         val visibleResp = resp.withoutHiddenJobs(hiddenIds)
         val visibleItems = visibleResp.items
-        dao.insertJobs(visibleItems.map { it.toEntity() })
+        dao.insertJobs(carryForwardLineage(visibleItems.map { it.toEntity() }))
         prefetchDone(visibleItems)
         return visibleResp
     }
@@ -314,6 +338,8 @@ class RealJobRepository(
 
     override fun getJobFlow(jobId: String): Flow<JobStatusDto?> = dao.getVisibleJobByIdFlow(jobId).map { it?.toStatusDto() }
 
+    override fun activeJobIds(): Flow<List<String>> = dao.getActiveJobs().map { entities -> entities.map { it.id } }
+
     override fun deletedJobIds(): Flow<Set<String>> = combine(
         dao.getPendingDeleteIdsFlow(),
         localDeletedIds,
@@ -322,11 +348,7 @@ class RealJobRepository(
     }
 
     override fun recentInputIds(limit: Int): Flow<List<Int>> = dao.getVisibleJobs().map { entities ->
-        entities.asSequence()
-            .mapNotNull { it.inputId }
-            .distinct()
-            .take(limit)
-            .toList()
+        dedupeRecentInputIds(entities, limit)
     }
 
     override suspend fun downloadInputToCache(inputId: Int): Uri = recentInputCache.downloadInputToCache(inputId)
@@ -349,7 +371,7 @@ class RealJobRepository(
             val resp = api.listJobs(status = "done", limit = 100)
             val hiddenIds = dao.getPendingDeleteIds().toSet() + localDeletedIds.value
             val visibleItems = resp.items.filterNot { it.id in hiddenIds }
-            dao.insertJobs(visibleItems.map { it.toEntity() })
+            dao.insertJobs(carryForwardLineage(visibleItems.map { it.toEntity() }))
             prefetchDone(visibleItems)
         } catch (e: Exception) {
             Log.w(TAG, "Background syncHistory failed", e)
@@ -374,6 +396,12 @@ class RealJobRepository(
                 }
             }
         }
+    }
+
+    override suspend fun getLineageRootId(jobId: String): String? = dao.getJobById(jobId)?.lineageRootId
+
+    override fun getJobsByLineageRoot(rootId: String): Flow<List<JobSummaryDto>> = dao.getJobsByLineageRoot(rootId).map { list ->
+        list.map { it.toSummaryDto() }
     }
 
     override fun inputModel(inputId: Int?): Any? {
@@ -401,6 +429,24 @@ class RealJobRepository(
     }
 
     private fun buildUrlOrNull(path: String): String? = settingsManager.serverUrl?.takeUnless { it.isBlank() }?.let { "$it$path" }
+
+    /**
+     * REPLACE would otherwise wipe the lineage-tracking columns (they're
+     * local-only, never present on the server DTOs these entities are mapped
+     * from) on every bulk sync. Copies any previously-stored values across
+     * before the upsert.
+     */
+    private suspend fun carryForwardLineage(entities: List<JobEntity>): List<JobEntity> {
+        val existingById = dao.getJobsByIds(entities.map { it.id }).associateBy { it.id }
+        return entities.map { entity ->
+            val existing = existingById[entity.id] ?: return@map entity
+            entity.copy(
+                sourceSha256 = existing.sourceSha256,
+                resultSha256 = existing.resultSha256,
+                lineageRootId = existing.lineageRootId,
+            )
+        }
+    }
 
     private fun prefetchIfDone(job: JobStatusDto) {
         if (job.status != "done") return
@@ -430,8 +476,23 @@ class RealJobRepository(
         if (resultUrl != null) {
             cacheScope.launch {
                 offlineImageCache.prefetch(jobId, OfflineImageCache.Kind.Result, resultUrl)
+                recordResultHashIfCached(jobId)
             }
         }
+    }
+
+    /**
+     * Hashes the result file the eager offline-cache prefetch above just
+     * wrote (if it succeeded), so future submissions can detect "this is a
+     * copy of a result I've already generated" (e.g. a saved-and-re-picked
+     * "use as new source" done outside the app). Best-effort: a hashing
+     * failure must never affect the app.
+     */
+    private suspend fun recordResultHashIfCached(jobId: String) {
+        runCatching {
+            val path = offlineImageCache.localUri(jobId, OfflineImageCache.Kind.Result)?.path ?: return
+            dao.updateResultHash(jobId, sha256Hex(java.io.File(path)))
+        }.onFailure { Log.w(TAG, "Failed to hash cached result for $jobId", it) }
     }
 
     private suspend fun refreshPromptsQuietly() {

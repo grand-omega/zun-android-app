@@ -64,4 +64,40 @@ class ServerUrlsTest {
             normalizeOptionalServerUrl("https://example.com#section")
         }
     }
+
+    @Test
+    fun normalizeOptionalServerUrl_rejectsBlockedHostRegardlessOfSchemePortOrCase() {
+        val expectedMessage = "This is the production server — use your local dev server instead."
+
+        val httpsError = assertThrows(IllegalArgumentException::class.java) {
+            normalizeOptionalServerUrl("https://zun.h.doremysweet.com", blockHost = "zun.h.doremysweet.com")
+        }
+        assertEquals(expectedMessage, httpsError.message)
+
+        val httpWithPortError = assertThrows(IllegalArgumentException::class.java) {
+            normalizeOptionalServerUrl("http://zun.h.doremysweet.com:8443", blockHost = "zun.h.doremysweet.com")
+        }
+        assertEquals(expectedMessage, httpWithPortError.message)
+
+        val mixedCaseError = assertThrows(IllegalArgumentException::class.java) {
+            normalizeOptionalServerUrl("https://ZUN.H.DOREMYSWEET.COM", blockHost = "zun.h.doremysweet.com")
+        }
+        assertEquals(expectedMessage, mixedCaseError.message)
+    }
+
+    @Test
+    fun normalizeOptionalServerUrl_acceptsOtherHostsWhenBlockHostSupplied() {
+        assertEquals(
+            "https://flux.example.test",
+            normalizeOptionalServerUrl("https://flux.example.test", blockHost = "zun.h.doremysweet.com"),
+        )
+    }
+
+    @Test
+    fun normalizeOptionalServerUrl_acceptsProductionHostWhenBlockHostIsNull() {
+        assertEquals(
+            "https://zun.h.doremysweet.com",
+            normalizeOptionalServerUrl("https://zun.h.doremysweet.com", blockHost = null),
+        )
+    }
 }

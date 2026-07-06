@@ -1,12 +1,16 @@
 package dev.zun.flux.data.local
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import dev.zun.flux.data.api.JobStatusDto
 import dev.zun.flux.data.api.JobSummaryDto
 import dev.zun.flux.data.api.effectivePromptId
 
-@Entity(tableName = "jobs")
+@Entity(
+    tableName = "jobs",
+    indices = [Index("sourceSha256"), Index("resultSha256"), Index("lineageRootId")],
+)
 data class JobEntity(
     @PrimaryKey val id: String,
     val status: String,
@@ -23,6 +27,9 @@ data class JobEntity(
     val durationSeconds: Int?,
     val width: Int?,
     val height: Int?,
+    val sourceSha256: String? = null,
+    val resultSha256: String? = null,
+    val lineageRootId: String? = null,
 )
 
 fun JobStatusDto.toEntity(): JobEntity = JobEntity(
