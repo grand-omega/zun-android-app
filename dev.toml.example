@@ -1,0 +1,10 @@
+# Local dev-environment paths used by justfile (dev-up/dev-up-full/dev-down/dev-status).
+# Copy to dev.toml and edit if your checkout layout differs from the default
+# sibling-repo assumption (../zun-rust-server, ../zun-flux-pipeline next to
+# this repo). dev.toml itself is gitignored — it's machine-specific, same as
+# zun-rust-server's config.toml.
+#
+#   cp dev.toml.example dev.toml
+
+rust_server_dir = "../zun-rust-server"
+flux_pipeline_dir = "../zun-flux-pipeline"
