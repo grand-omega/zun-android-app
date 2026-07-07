@@ -8,6 +8,12 @@
 
 **Input**: User description: "Add a second before/after comparison mode to the photo viewer's existing Compare feature, alongside the current slider (both coexist -- the user can switch between them, neither replaces the other). The new mode is a finger-erase "reveal" interaction: the original (before) image sits on top, the transformed (after) image underneath; as the user drags a finger across the image, it progressively erases the top layer wherever touched, revealing the transformed image beneath in exactly those areas (not a straight wipe line -- an organic, freehand-erased area matching wherever the finger has passed). Brush size is user-adjustable. The brush must have a soft, feathered edge (a Photoshop-eraser feel, not a hard-edged circle), so erased/not-yet-erased areas blend gradually rather than with a hard line. The erased state is ephemeral -- it resets to fully covered (showing the original) each time the compare view is reopened, like a fresh scratch card, rather than being persisted."
 
+## Clarifications
+
+### Session 2026-07-08
+
+- Q: Should scratch mode show a discoverability hint, similar to the slider's existing "Before / After" pill, or rely on touch feedback alone? → A: Yes — add a brief instructional hint, matching the slider's approach.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Reveal the edit by scratching it away (Priority: P1)
@@ -24,6 +30,7 @@ A user is looking at a generated edit and wants a more playful, tactile way to s
 2. **Given** the user has partially revealed the transformed image, **When** they drag over an already-revealed area again, **Then** that area remains revealed (re-touching doesn't hide it again).
 3. **Given** the user wants a bigger or smaller reveal area, **When** they adjust the brush size, **Then** subsequent strokes reveal a correspondingly larger or smaller area; already-erased areas are unaffected by the size change.
 4. **Given** the user has revealed part of the image, **When** they close the Compare view and reopen it (for the same or a different image), **Then** the view starts fully covered again, with no memory of the previous reveal.
+5. **Given** scratch mode has just been switched to, **When** the user looks at the screen, **Then** a brief instructional hint is visible telling them what to do (FR-011) — not left to guesswork the way an entirely unlabeled canvas would be.
 
 ---
 
@@ -62,6 +69,7 @@ Having used the existing before/after slider before, a user wants the new scratc
 - **FR-008**: Users MUST be able to switch between the slider mode and the new scratch mode from within the Compare view, without closing it.
 - **FR-009**: Switching between modes within the same Compare session MUST NOT reset or otherwise affect scratch progress already made.
 - **FR-010**: The existing slider mode's behavior and default availability MUST remain unchanged by this feature — it is additive, not a replacement.
+- **FR-011**: Scratch mode MUST show a brief instructional hint (e.g. "drag to reveal") while active, so a first-time user understands what to do with an interaction that isn't as self-evident as the slider's drag handle — mirroring the discoverability the slider already gets from its "Before / After" pill.
 
 ## Success Criteria *(mandatory)*
 
@@ -80,3 +88,4 @@ Having used the existing before/after slider before, a user wants the new scratc
 - Only single-finger/single-touch interaction is in scope, consistent with how the existing slider already handles a single drag gesture.
 - Out of scope for this version: haptic feedback, sound, and any paper-grain/textured edge effect. These were discussed as possible later enhancements but are not part of this baseline — the soft edge requirement (FR-004) is about a gradual blend, not a specific grain texture.
 - No new persisted data or settings are introduced — brush size and reveal state are both session-local (brush size does not need to be remembered across app restarts for this version).
+- The instructional hint (FR-011) stays visible for as long as scratch mode is active, mirroring the slider's persistent "Before / After" pill exactly, rather than a "show once then fade" treatment — the latter would need to remember whether the hint has already been shown, which is unnecessary state for a lightweight second mode and isn't otherwise required.

@@ -181,6 +181,7 @@ fun AppNavHost(
                 promptRepo = repositories.prompts,
                 uploads = repositories.uploads,
                 images = repositories.images,
+                settings = settingsManager,
                 onRegenerated = { newJobId ->
                     nav.navigate(Routes.progress(newJobId)) {
                         popUpTo(Routes.HOME)

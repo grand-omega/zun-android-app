@@ -56,6 +56,11 @@ class SettingsManager(context: Context) {
         get() = prefs.getBoolean(KEY_ALLOW_CELLULAR_DATA, false)
         set(value) = prefs.edit { putBoolean(KEY_ALLOW_CELLULAR_DATA, value) }
 
+    /** Slider by default (false); when true, Compare opens in scratch-reveal mode instead. */
+    var defaultCompareModeIsScratch: Boolean
+        get() = prefs.getBoolean(KEY_DEFAULT_COMPARE_MODE_SCRATCH, false)
+        set(value) = prefs.edit { putBoolean(KEY_DEFAULT_COMPARE_MODE_SCRATCH, value) }
+
     val isConfigured: Boolean
         get() = !serverUrl.isNullOrBlank() && !apiToken.isNullOrBlank()
 
@@ -66,5 +71,6 @@ class SettingsManager(context: Context) {
         private const val KEY_LAST_AUTH_TIMESTAMP = "last_auth_timestamp"
         private const val KEY_GALLERY_SORT_NEWEST_FIRST = "gallery_sort_newest_first"
         private const val KEY_ALLOW_CELLULAR_DATA = "allow_cellular_data"
+        private const val KEY_DEFAULT_COMPARE_MODE_SCRATCH = "default_compare_mode_scratch"
     }
 }

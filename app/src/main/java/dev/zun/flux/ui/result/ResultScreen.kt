@@ -42,7 +42,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -66,10 +65,12 @@ import dev.zun.flux.data.repo.ImageSourceRepository
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.data.repo.PromptRepository
 import dev.zun.flux.data.repo.PromptSelection
+import dev.zun.flux.data.repo.SettingsManager
 import dev.zun.flux.data.repo.UploadRepository
 import dev.zun.flux.ui.common.BackNavigationIcon
 import dev.zun.flux.ui.common.ControlShape
-import dev.zun.flux.ui.gallery.BeforeAfterSlider
+import dev.zun.flux.ui.gallery.CompareMode
+import dev.zun.flux.ui.gallery.CompareModeSwitcher
 import dev.zun.flux.ui.home.CUSTOM_PROMPT_ID
 import dev.zun.flux.ui.home.PromptLibrarySheet
 import dev.zun.flux.ui.home.PromptManageSheet
@@ -100,6 +101,7 @@ fun ResultScreen(
     onDeleted: () -> Unit,
     onViewEditHistory: (String) -> Unit,
     onBack: () -> Unit,
+    settings: SettingsManager? = null,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -310,14 +312,16 @@ fun ResultScreen(
                     )
                 }
             } else {
-                var sliderProgress by remember { mutableFloatStateOf(0.5f) }
                 Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                     if (inputModel != null) {
-                        BeforeAfterSlider(
+                        CompareModeSwitcher(
                             beforeModel = inputModel,
                             afterModel = previewModel,
-                            progress = sliderProgress,
-                            onProgressChange = { sliderProgress = it },
+                            initialMode = if (settings?.defaultCompareModeIsScratch == true) {
+                                CompareMode.Scratch
+                            } else {
+                                CompareMode.Slider
+                            },
                         )
                     } else {
                         // No input image (e.g. text-only generation) — just show the result.

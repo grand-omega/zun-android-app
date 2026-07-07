@@ -77,6 +77,7 @@ fun GalleryScaffold(
                             viewModel.clearStackScope()
                         },
                         scopedJobIds = stackScope,
+                        settings = settings,
                     )
                 }
             }

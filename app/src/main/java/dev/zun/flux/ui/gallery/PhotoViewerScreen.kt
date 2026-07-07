@@ -87,6 +87,7 @@ import dev.zun.flux.data.api.Workflows
 import dev.zun.flux.data.api.effectivePromptId
 import dev.zun.flux.data.repo.ImageSourceRepository
 import dev.zun.flux.data.repo.OfflineImageAvailability
+import dev.zun.flux.data.repo.SettingsManager
 import dev.zun.flux.ui.common.ActionBarSurface
 import dev.zun.flux.ui.common.BackNavigationIcon
 import dev.zun.flux.ui.common.MissingImageState
@@ -113,6 +114,7 @@ fun PhotoViewerScreen(
     onViewHistory: (String) -> Unit,
     onBack: () -> Unit,
     scopedJobIds: Set<String>? = null,
+    settings: SettingsManager? = null,
 ) {
     val allJobs by viewModel.jobs.collectAsState()
     // When opened from a stack (feature 009), narrow the pager to just that stack's members —
@@ -396,6 +398,11 @@ fun PhotoViewerScreen(
                     CompareOverlay(
                         beforeModel = images.inputModel(inputId),
                         afterModel = images.previewModel(currentJob.id),
+                        initialMode = if (settings?.defaultCompareModeIsScratch == true) {
+                            CompareMode.Scratch
+                        } else {
+                            CompareMode.Slider
+                        },
                         onDismiss = { showCompare = false },
                     )
                 } else {

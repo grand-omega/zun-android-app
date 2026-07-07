@@ -87,6 +87,7 @@ fun SettingsScreen(
     val settingsManager = app.settingsManager
     var lockoutDuration by remember { mutableLongStateOf(settingsManager.lockoutDurationMs) }
     var allowCellularData by remember { mutableStateOf(settingsManager.allowCellularData) }
+    var defaultCompareModeIsScratch by remember { mutableStateOf(settingsManager.defaultCompareModeIsScratch) }
     val connectionDraft by viewModel.connectionDraft.collectAsStateWithLifecycle()
     val offlineCache by viewModel.offlineCache.collectAsStateWithLifecycle()
     val serverHealth by viewModel.serverHealth.collectAsStateWithLifecycle()
@@ -226,6 +227,26 @@ fun SettingsScreen(
                             onCheckedChange = {
                                 allowCellularData = it
                                 settingsManager.allowCellularData = it
+                            },
+                        )
+                    }
+                }
+
+                SettingsGroup(
+                    title = stringResource(R.string.settings_compare_title),
+                    detail = stringResource(R.string.settings_compare_detail),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(stringResource(R.string.settings_default_compare_scratch))
+                        Switch(
+                            checked = defaultCompareModeIsScratch,
+                            onCheckedChange = {
+                                defaultCompareModeIsScratch = it
+                                settingsManager.defaultCompareModeIsScratch = it
                             },
                         )
                     }
