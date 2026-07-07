@@ -18,4 +18,12 @@ interface PromptRepository {
 
     /** Soft-deletes a server-side prompt and refreshes [promptsState]. */
     suspend fun deletePrompt(promptId: Long)
+
+    /**
+     * Rewrites a rough custom prompt into a structured one via the server's
+     * self-hosted rewrite endpoint. Throws on failure (unreachable, timed
+     * out, or unparsable) — callers treat that as "polishing unavailable
+     * right now", never as a reason to fall back to a third-party service.
+     */
+    suspend fun polishPrompt(text: String): String
 }

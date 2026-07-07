@@ -226,6 +226,9 @@
     <string name="prompts_write_your_own">Write your own…</string>
     <string name="prompts_custom_placeholder">e.g. A cat wearing a spacesuit</string>
     <string name="prompts_save_prompt">Save prompt</string>
+    <string name="prompts_polish">Polish</string>
+    <string name="prompts_polish_undo">Undo</string>
+    <string name="prompts_polish_failed">Couldn\'t polish this prompt — try again later.</string>
 
     <!-- Progress -->
     <string name="progress_title">Generating</string>

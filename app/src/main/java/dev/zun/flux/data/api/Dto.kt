@@ -69,6 +69,16 @@ data class NeedUploadResponse(
 )
 
 @Serializable
+data class PolishPromptRequest(
+    val text: String,
+)
+
+@Serializable
+data class PolishPromptResponse(
+    val text: String,
+)
+
+@Serializable
 data class JobStatusDto(
     val id: String,
     val status: String,

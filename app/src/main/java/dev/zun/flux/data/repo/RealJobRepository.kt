@@ -23,6 +23,7 @@ import dev.zun.flux.data.api.JobCreatedResponse
 import dev.zun.flux.data.api.JobListResponse
 import dev.zun.flux.data.api.JobStatusDto
 import dev.zun.flux.data.api.JobSummaryDto
+import dev.zun.flux.data.api.PolishPromptRequest
 import dev.zun.flux.data.api.PromptDto
 import dev.zun.flux.data.api.WorkflowSupportDto
 import dev.zun.flux.data.api.Workflows
@@ -122,6 +123,8 @@ class RealJobRepository(
         api.deletePrompt(promptId)
         refreshPromptsQuietly()
     }
+
+    override suspend fun polishPrompt(text: String): String = api.polishPrompt(PolishPromptRequest(text)).text
 
     override suspend fun submitJob(
         inputUri: Uri,

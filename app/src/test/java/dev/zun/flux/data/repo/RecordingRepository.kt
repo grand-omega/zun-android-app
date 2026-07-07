@@ -82,6 +82,23 @@ class RecordingRepository :
         _promptsState.value = _promptsState.value.filterNot { it.id == promptId }
     }
 
+    var holdPolish: CompletableDeferred<Unit>? = null
+    var polishShouldFail = false
+    var polishCalls = 0
+        private set
+    var lastPolishInput: String? = null
+        private set
+
+    override suspend fun polishPrompt(text: String): String {
+        polishCalls++
+        lastPolishInput = text
+        holdPolish?.await()
+        if (polishShouldFail) {
+            error("Polish failed")
+        }
+        return "Polished: $text"
+    }
+
     override suspend fun submitJob(
         inputUri: Uri,
         selection: PromptSelection,

@@ -113,6 +113,8 @@ fun HomeRoute(
     val batchProgress by viewModel.batchProgress.collectAsStateWithLifecycle()
     val activeJobIds by viewModel.activeJobIds.collectAsStateWithLifecycle()
     val priorEditsByUri by viewModel.priorEdits.collectAsStateWithLifecycle()
+    val polishState by viewModel.polishState.collectAsStateWithLifecycle()
+    val prePolishText by viewModel.prePolishText.collectAsStateWithLifecycle()
     val recentInputIds by remember { images.recentInputIds(3) }
         .collectAsStateWithLifecycle(initialValue = emptyList())
     val haptic = LocalHapticFeedback.current
@@ -416,6 +418,10 @@ fun HomeRoute(
                     onTogglePin = { app.pinnedPrompts.toggle(it) },
                     onImagesDropped = { uris -> appendUris(uris, false) },
                     priorEditsByUri = priorEditsByUri,
+                    polishState = polishState,
+                    onPolishClick = viewModel::polishPrompt,
+                    canRevertPolish = prePolishText != null,
+                    onRevertPolishClick = viewModel::revertPolish,
                 )
                 if (isRefreshing || pullDistancePx > 0f) {
                     Surface(

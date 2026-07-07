@@ -108,6 +108,8 @@ class FakeJobRepository(
         listPrompts()
     }
 
+    override suspend fun polishPrompt(text: String): String = "Polished: $text"
+
     override suspend fun submitJob(
         inputUri: Uri,
         selection: PromptSelection,
