@@ -36,6 +36,11 @@
 
     <!-- Before/after compare -->
     <string name="compare_before_after">Before / After</string>
+    <string name="compare_switch_mode_to_scratch">Switch to drag-to-reveal mode</string>
+    <string name="compare_switch_mode_to_slider">Switch to slider mode</string>
+    <string name="compare_scratch_hint">Drag to reveal</string>
+    <string name="compare_scratch_reset">Reset — cover the photo again</string>
+    <string name="compare_scratch_brush_size">Brush size</string>
 
     <!-- Auth / Lock -->
     <string name="auth_locked_title">FluxEdit is locked</string>
@@ -94,6 +99,7 @@
     <string name="gallery_undo">Undo</string>
     <string name="gallery_selected">Selected</string>
     <string name="gallery_favorited">Favorited</string>
+    <string name="gallery_stack_partially_favorited">One or more variants in this stack are favorited</string>
     <string name="gallery_not_cached_needs_network">Not cached — needs network</string>
     <string name="gallery_unavailable">Unavailable</string>
     <string name="gallery_delete_confirm_title">Delete selected?</string>
@@ -324,6 +330,9 @@
     <string name="settings_data_usage_title">Data Usage</string>
     <string name="settings_data_usage_detail">Controls whether submitting a photo for editing and fetching a finished result may use cellular data. Saving or sharing an already-downloaded image is never affected.</string>
     <string name="settings_allow_cellular_data">Allow cellular data</string>
+    <string name="settings_compare_title">Compare</string>
+    <string name="settings_compare_detail">Choose which before/after comparison mode opens by default in the gallery viewer and on phone-sized result screens. You can always switch modes from within Compare itself. On larger/tablet screens, the result screen shows both images side by side instead, so this setting doesn\'t apply there.</string>
+    <string name="settings_default_compare_scratch">Default to drag-to-reveal</string>
     <string name="settings_offline_cache_title">Offline Cache</string>
     <string name="settings_offline_cache_detail">Keeps recently viewed images usable when the server is unavailable.</string>
     <string name="settings_cached_images">Cached Images</string>

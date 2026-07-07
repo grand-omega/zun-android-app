@@ -137,6 +137,7 @@ fun GalleryScreen(
     val favoritesOnly by viewModel.favoritesOnly.collectAsStateWithLifecycle()
     val sortNewestFirst by viewModel.sortNewestFirst.collectAsStateWithLifecycle()
     val availableTags by viewModel.availableTags.collectAsStateWithLifecycle()
+    val revealEligibleJobIds by viewModel.revealEligibleJobIds.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
@@ -602,6 +603,8 @@ fun GalleryScreen(
                                                     viewModel.openJob(job, onJobClick)
                                                 }
                                             },
+                                            isRevealEligible = job.id in revealEligibleJobIds,
+                                            onRevealPlayed = viewModel::markRevealed,
                                         )
                                     }
 

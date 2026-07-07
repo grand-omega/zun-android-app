@@ -117,6 +117,10 @@ data class JobSummaryDto(
     // share this job's lineage root under the currently-applied gallery filters. 1 means "no
     // stack" (no badge shown).
     val stackCount: Int = 1,
+    // Local-only, computed at query time. True when any job in this stack (cover or not) is
+    // favorited — lets the gallery show a partial-favorite cue on a stack whose own cover isn't
+    // the favorited member, without implying the whole stack was favorited.
+    val stackHasFavorite: Boolean = false,
 )
 
 @Serializable

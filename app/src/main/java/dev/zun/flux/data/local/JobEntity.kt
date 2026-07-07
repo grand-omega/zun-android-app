@@ -83,7 +83,7 @@ fun JobEntity.toSummaryDto(): JobSummaryDto = JobSummaryDto(
     isFavorite = isFavorite,
 )
 
-fun JobWithStackCount.toSummaryDto(): JobSummaryDto = job.toSummaryDto().copy(stackCount = stackCount)
+fun JobWithStackCount.toSummaryDto(): JobSummaryDto = job.toSummaryDto().copy(stackCount = stackCount, stackHasFavorite = stackHasFavorite)
 
 fun JobEntity.toStatusDto(): JobStatusDto = JobStatusDto(
     id = id,

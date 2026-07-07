@@ -17,9 +17,12 @@ data class JobTagTotals(val customCount: Int, val totalCount: Int)
  * where a "stack" is every done job sharing [JobEntity.lineageRootId] (falling back to its own
  * id when unset). [stackCount] respects whatever prompt/tag + favorites-only predicate the
  * enclosing query applies — it does not account for the client-side free-text search filter,
- * which is applied after paging (see research.md Decision 1's scoping note).
+ * which is applied after paging (see research.md Decision 1's scoping note). [stackHasFavorite]
+ * is true when *any* member of the stack (cover or not) is favorited — lets the gallery show a
+ * "something in here is favorited" cue on a stack whose own cover isn't the favorited one,
+ * without implying the whole stack was favorited.
  */
-data class JobWithStackCount(@Embedded val job: JobEntity, val stackCount: Int)
+data class JobWithStackCount(@Embedded val job: JobEntity, val stackCount: Int, val stackHasFavorite: Boolean)
 
 @Dao
 interface JobDao {
@@ -43,7 +46,13 @@ interface JobDao {
              AND j2.id NOT IN (SELECT jobId FROM pending_deletes)
              AND (:favoritesOnly = 0 OR j2.isFavorite = 1)
              AND (j2.lineageRootId = COALESCE(jobs.lineageRootId, jobs.id) OR (j2.lineageRootId IS NULL AND j2.id = COALESCE(jobs.lineageRootId, jobs.id)))
-            ) AS stackCount
+            ) AS stackCount,
+            (SELECT MAX(j2.isFavorite) FROM jobs j2
+             WHERE j2.status = 'done'
+             AND j2.id NOT IN (SELECT jobId FROM pending_deletes)
+             AND (:favoritesOnly = 0 OR j2.isFavorite = 1)
+             AND (j2.lineageRootId = COALESCE(jobs.lineageRootId, jobs.id) OR (j2.lineageRootId IS NULL AND j2.id = COALESCE(jobs.lineageRootId, jobs.id)))
+            ) AS stackHasFavorite
         FROM jobs
         WHERE status = 'done'
         AND id NOT IN (SELECT jobId FROM pending_deletes)
@@ -75,7 +84,14 @@ interface JobDao {
              AND j2.id NOT IN (SELECT jobId FROM pending_deletes)
              AND (:favoritesOnly = 0 OR j2.isFavorite = 1)
              AND (j2.lineageRootId = COALESCE(jobs.lineageRootId, jobs.id) OR (j2.lineageRootId IS NULL AND j2.id = COALESCE(jobs.lineageRootId, jobs.id)))
-            ) AS stackCount
+            ) AS stackCount,
+            (SELECT MAX(j2.isFavorite) FROM jobs j2
+             WHERE j2.status = 'done'
+             AND j2.promptId = :promptId
+             AND j2.id NOT IN (SELECT jobId FROM pending_deletes)
+             AND (:favoritesOnly = 0 OR j2.isFavorite = 1)
+             AND (j2.lineageRootId = COALESCE(jobs.lineageRootId, jobs.id) OR (j2.lineageRootId IS NULL AND j2.id = COALESCE(jobs.lineageRootId, jobs.id)))
+            ) AS stackHasFavorite
         FROM jobs
         WHERE status = 'done'
         AND promptId = :promptId
@@ -110,7 +126,15 @@ interface JobDao {
              AND j2.id NOT IN (SELECT jobId FROM pending_deletes)
              AND (:favoritesOnly = 0 OR j2.isFavorite = 1)
              AND (j2.lineageRootId = COALESCE(jobs.lineageRootId, jobs.id) OR (j2.lineageRootId IS NULL AND j2.id = COALESCE(jobs.lineageRootId, jobs.id)))
-            ) AS stackCount
+            ) AS stackCount,
+            (SELECT MAX(j2.isFavorite) FROM jobs j2
+             WHERE j2.status = 'done'
+             AND j2.promptId IS NULL
+             AND j2.promptText IS NOT NULL
+             AND j2.id NOT IN (SELECT jobId FROM pending_deletes)
+             AND (:favoritesOnly = 0 OR j2.isFavorite = 1)
+             AND (j2.lineageRootId = COALESCE(jobs.lineageRootId, jobs.id) OR (j2.lineageRootId IS NULL AND j2.id = COALESCE(jobs.lineageRootId, jobs.id)))
+            ) AS stackHasFavorite
         FROM jobs
         WHERE status = 'done'
         AND promptId IS NULL

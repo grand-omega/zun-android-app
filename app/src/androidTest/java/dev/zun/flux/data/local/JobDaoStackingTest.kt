@@ -107,6 +107,42 @@ class JobDaoStackingTest {
     }
 
     @Test
+    fun stackHasFavorite_isTrueWhenANonCoverSiblingIsFavoritedEvenIfTheCoverIsNot() = runBlocking {
+        dao.insertJob(job(id = "v1", lineageRootId = "root", createdAt = 100, isFavorite = true))
+        dao.insertJob(job(id = "v2-cover", lineageRootId = "root", createdAt = 200, isFavorite = false))
+
+        val rows = loadAll()
+
+        assertEquals(1, rows.size)
+        assertEquals("v2-cover", rows.single().job.id)
+        assertEquals(false, rows.single().job.isFavorite)
+        assertEquals(true, rows.single().stackHasFavorite)
+    }
+
+    @Test
+    fun stackHasFavorite_isFalseWhenNoMemberOfTheStackIsFavorited() = runBlocking {
+        dao.insertJob(job(id = "v1", lineageRootId = "root", createdAt = 100, isFavorite = false))
+        dao.insertJob(job(id = "v2", lineageRootId = "root", createdAt = 200, isFavorite = false))
+
+        val rows = loadAll()
+
+        assertEquals(1, rows.size)
+        assertEquals(false, rows.single().stackHasFavorite)
+    }
+
+    @Test
+    fun stackHasFavorite_isTrueWhenTheCoverItselfIsTheFavoritedOne() = runBlocking {
+        dao.insertJob(job(id = "v1", lineageRootId = "root", createdAt = 100, isFavorite = false))
+        dao.insertJob(job(id = "v2-cover", lineageRootId = "root", createdAt = 200, isFavorite = true))
+
+        val rows = loadAll()
+
+        assertEquals(1, rows.size)
+        assertEquals(true, rows.single().job.isFavorite)
+        assertEquals(true, rows.single().stackHasFavorite)
+    }
+
+    @Test
     fun twoIndependentStacks_bothAppearAsSeparateRows() = runBlocking {
         dao.insertJob(job(id = "a1", lineageRootId = "root-a", createdAt = 100))
         dao.insertJob(job(id = "a2", lineageRootId = "root-a", createdAt = 200))

@@ -236,8 +236,47 @@ class GalleryViewModel(
     private val _postSaveDelete = MutableStateFlow<Set<String>?>(null)
     val postSaveDelete: StateFlow<Set<String>?> = _postSaveDelete.asStateFlow()
 
+    /**
+     * Job ids that transitioned from active to done while this ViewModel has been observing
+     * (see feature 011 research.md Decision 1) and haven't yet had their one-time reveal
+     * animation consumed. A thumbnail plays its reveal iff its id is in this set; playing it
+     * removes the id via [markRevealed] so it never replays.
+     */
+    private val _revealEligibleJobIds = MutableStateFlow<Set<String>>(emptySet())
+    val revealEligibleJobIds: StateFlow<Set<String>> = _revealEligibleJobIds.asStateFlow()
+
+    /**
+     * Last-seen [JobRepository.activeJobIds] emission, used only to diff the next one. Null
+     * until the first emission arrives, so that first emission is a baseline (nothing eligible)
+     * rather than being diffed against an assumed-empty set — this is what keeps a job that was
+     * already done before Gallery opened from ever being treated as a live completion.
+     */
+    private var previousActiveIds: Set<String>? = null
+
     init {
         refresh()
+        observeCompletions()
+    }
+
+    private fun observeCompletions() {
+        viewModelScope.launch {
+            jobRepo.activeJobIds().collect { active ->
+                val activeSet = active.toSet()
+                val previous = previousActiveIds
+                if (previous != null) {
+                    val justCompleted = previous - activeSet
+                    if (justCompleted.isNotEmpty()) {
+                        _revealEligibleJobIds.value = _revealEligibleJobIds.value + justCompleted
+                    }
+                }
+                previousActiveIds = activeSet
+            }
+        }
+    }
+
+    /** Consumes a thumbnail's one-time reveal eligibility once it has played. */
+    fun markRevealed(jobId: String) {
+        _revealEligibleJobIds.value = _revealEligibleJobIds.value - jobId
     }
 
     fun refresh() {

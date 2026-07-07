@@ -1,8 +1,10 @@
 package dev.zun.flux.ui.gallery
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import dev.zun.flux.data.api.JobSummaryDto
 import dev.zun.flux.data.repo.OfflineImageAvailability
@@ -24,10 +26,16 @@ class GalleryThumbnailTest {
     @get:Rule
     val rule = createComposeRule()
 
-    private fun job(stackCount: Int) = JobSummaryDto(
+    private fun job(
+        stackCount: Int,
+        isFavorite: Boolean = false,
+        stackHasFavorite: Boolean = false,
+    ) = JobSummaryDto(
         id = "job-1",
         created_at = 0L,
         stackCount = stackCount,
+        isFavorite = isFavorite,
+        stackHasFavorite = stackHasFavorite,
     )
 
     private val availability = OfflineImageAvailability(
@@ -71,5 +79,64 @@ class GalleryThumbnailTest {
 
         val badges = rule.onAllNodes(hasText("1")).fetchSemanticsNodes(atLeastOneRootRequired = false)
         assertTrue("expected no count badge for an unstacked job", badges.isEmpty())
+    }
+
+    @Test
+    fun `a favorited cover shows the full heart`() {
+        rule.setContent {
+            JobThumbnail(
+                job = job(stackCount = 3, isFavorite = true, stackHasFavorite = true),
+                prompts = emptyList(),
+                model = null,
+                availability = availability,
+                showMetadata = false,
+                isSelected = false,
+                isSelectionMode = false,
+                onClick = {},
+            )
+        }
+
+        rule.onNodeWithContentDescription("Favorited").assertIsDisplayed()
+    }
+
+    @Test
+    fun `a stack whose cover isn't favorited but has a favorited variant shows the half heart`() {
+        rule.setContent {
+            JobThumbnail(
+                job = job(stackCount = 3, isFavorite = false, stackHasFavorite = true),
+                prompts = emptyList(),
+                model = null,
+                availability = availability,
+                showMetadata = false,
+                isSelected = false,
+                isSelectionMode = false,
+                onClick = {},
+            )
+        }
+
+        rule.onNodeWithContentDescription("One or more variants in this stack are favorited").assertIsDisplayed()
+        val fullHeart = rule.onAllNodes(hasContentDescription("Favorited")).fetchSemanticsNodes(atLeastOneRootRequired = false)
+        assertTrue("expected no full-heart badge, only the half-heart", fullHeart.isEmpty())
+    }
+
+    @Test
+    fun `a stack with no favorited variants at all shows no heart`() {
+        rule.setContent {
+            JobThumbnail(
+                job = job(stackCount = 3, isFavorite = false, stackHasFavorite = false),
+                prompts = emptyList(),
+                model = null,
+                availability = availability,
+                showMetadata = false,
+                isSelected = false,
+                isSelectionMode = false,
+                onClick = {},
+            )
+        }
+
+        val hearts = rule.onAllNodes(
+            hasContentDescription("Favorited") or hasContentDescription("One or more variants in this stack are favorited"),
+        ).fetchSemanticsNodes(atLeastOneRootRequired = false)
+        assertTrue("expected no heart at all", hearts.isEmpty())
     }
 }

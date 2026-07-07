@@ -1,5 +1,7 @@
 package dev.zun.flux.ui.gallery
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -15,16 +17,26 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -41,6 +53,14 @@ import dev.zun.flux.data.repo.OfflineImageAvailability
 import dev.zun.flux.ui.common.MissingImageState
 import dev.zun.flux.util.resolvePromptLabel
 
+/**
+ * Duration of the "developing" reveal (feature 011) — comfortably under the 1-second bound
+ * FR-005/SC-003 require; a `tween` is used deliberately instead of the implicit default spring,
+ * whose settling time isn't guaranteed to land under that bound.
+ */
+private const val REVEAL_DURATION_MS = 450
+private val REVEAL_MAX_BLUR = 16.dp
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun JobThumbnail(
@@ -53,7 +73,27 @@ internal fun JobThumbnail(
     isSelectionMode: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    isRevealEligible: Boolean = false,
+    onRevealPlayed: (String) -> Unit = {},
 ) {
+    // Captured once per job.id: eligible thumbnails start blurred/soft and animate to settled;
+    // ineligible ones start (and stay) fully settled, no animation, no delay.
+    var revealTarget by remember(job.id) { mutableFloatStateOf(if (isRevealEligible) 0f else 1f) }
+    val revealProgress by animateFloatAsState(
+        targetValue = revealTarget,
+        animationSpec = tween(durationMillis = REVEAL_DURATION_MS),
+        label = "thumbnailReveal",
+    )
+    LaunchedEffect(job.id) {
+        if (isRevealEligible) {
+            // Consume immediately — before the animation plays out, not after — so a disposed
+            // (navigated away, scrolled off) mid-animation cell can never replay on a later
+            // composition (feature 011 research.md Decision 2; ties FR-002 to FR-006).
+            onRevealPlayed(job.id)
+            revealTarget = 1f
+        }
+    }
+
     Card(
         modifier =
         modifier
@@ -94,7 +134,14 @@ internal fun JobThumbnail(
                     .fillMaxSize()
                     .then(
                         if (isSelected) Modifier.padding(8.dp).clip(RoundedCornerShape(4.dp)) else Modifier,
-                    ),
+                    )
+                    .graphicsLayer {
+                        val scale = 0.92f + 0.08f * revealProgress
+                        scaleX = scale
+                        scaleY = scale
+                        alpha = 0.3f + 0.7f * revealProgress
+                    }
+                    .blur(REVEAL_MAX_BLUR * (1f - revealProgress)),
                 loading = {
                     Box(
                         modifier = Modifier
@@ -139,6 +186,20 @@ internal fun JobThumbnail(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .padding(4.dp)
+                        .background(Color.Black.copy(alpha = 0.35f), CircleShape)
+                        .padding(3.dp)
+                        .size(16.dp),
+                )
+            } else if (!isSelectionMode && job.stackCount > 1 && job.stackHasFavorite) {
+                // This stack's cover isn't itself favorited, but another variant in it is — a
+                // half-filled heart signals "something in here is favorited" without implying
+                // the whole stack (or this specific cover) was favorited.
+                HalfFavoriteIcon(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(4.dp)
+                        .background(Color.Black.copy(alpha = 0.35f), CircleShape)
+                        .padding(3.dp)
                         .size(16.dp),
                 )
             }
@@ -181,6 +242,35 @@ internal fun JobThumbnail(
                 }
             }
         }
+    }
+}
+
+/**
+ * A heart that's solid on its left half and outlined on its right half — "some, not all, of this
+ * stack is favorited," visually distinct from both the full solid heart (this cover itself is
+ * favorited) and no heart at all (nothing in this stack is favorited).
+ */
+@Composable
+private fun HalfFavoriteIcon(modifier: Modifier = Modifier) {
+    Box(modifier = modifier) {
+        Icon(
+            imageVector = Icons.Default.FavoriteBorder,
+            contentDescription = stringResource(R.string.gallery_stack_partially_favorited),
+            tint = Color.White,
+            modifier = Modifier.fillMaxSize(),
+        )
+        Icon(
+            imageVector = Icons.Default.Favorite,
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier
+                .fillMaxSize()
+                .drawWithContent {
+                    clipRect(right = size.width / 2f) {
+                        this@drawWithContent.drawContent()
+                    }
+                },
+        )
     }
 }
 
