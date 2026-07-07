@@ -42,6 +42,7 @@ class FakeJobRepository(
         val promptText: String?,
         val workflow: String?,
         val createdAt: Long,
+        val isFavorite: Boolean = false,
     )
 
     private val entries = ConcurrentHashMap<String, Entry>()
@@ -252,9 +253,15 @@ class FakeJobRepository(
                     created_at = entry.createdAt,
                     completed_at = entry.createdAt + (queuedDurationMs + runningDurationMs) / 1000,
                     duration_seconds = ((queuedDurationMs + runningDurationMs) / 1000).toInt(),
+                    isFavorite = entry.isFavorite,
                 )
             }
         return JobListResponse(items = items, next_cursor = null)
+    }
+
+    override suspend fun setFavorite(jobId: String, isFavorite: Boolean) {
+        entries[jobId] = entries[jobId]?.copy(isFavorite = isFavorite) ?: return
+        updates.value++
     }
 
     override suspend fun deleteJob(jobId: String) {
@@ -304,13 +311,19 @@ class FakeJobRepository(
         listJobs(status = "done", limit = 100, cursor = null, inputId = null).items
     }
 
-    override fun pagedJobs(promptId: Long?, customOnly: Boolean, newestFirst: Boolean): Flow<PagingData<JobSummaryDto>> = updates.map {
+    override fun pagedJobs(
+        promptId: Long?,
+        customOnly: Boolean,
+        newestFirst: Boolean,
+        favoritesOnly: Boolean,
+    ): Flow<PagingData<JobSummaryDto>> = updates.map {
         val all = listJobs(status = "done", limit = 100, cursor = null, inputId = null).items
-        val filtered = when {
+        val tagFiltered = when {
             customOnly -> all.filter { it.effectivePromptId == null && it.prompt_text != null }
             promptId != null -> all.filter { it.effectivePromptId == promptId }
             else -> all
         }
+        val filtered = if (favoritesOnly) tagFiltered.filter { it.isFavorite } else tagFiltered
         // listJobs returns newest-first; mirror the DAO's ascending order otherwise.
         PagingData.from(if (newestFirst) filtered else filtered.asReversed())
     }
@@ -395,5 +408,9 @@ class FakeJobRepository(
 
     override fun offlineCacheStats(): OfflineCacheStats = OfflineCacheStats(bytes = 0L, fileCount = 0)
 
-    override fun clearOfflineImageCache() = Unit
+    override fun listCachedJobs(): List<OfflineImageCache.CachedJobSummary> = emptyList()
+
+    override fun evictFromCache(jobId: String) = Unit
+
+    override fun hasNetworkConnectivity(): Boolean = true
 }

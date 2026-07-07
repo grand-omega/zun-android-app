@@ -1,6 +1,8 @@
 package dev.zun.flux.data.repo
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.Uri
 import android.util.Log
 import androidx.paging.Pager
@@ -155,11 +157,12 @@ class RealJobRepository(
             JobUploadWorker.KEY_WORKFLOW to workflow,
             JobUploadWorker.KEY_KNOWN_SOURCE_INPUT_ID to (knownSourceInputId ?: -1),
         )
+        val networkType = networkTypeFor(settingsManager.allowCellularData)
         val request = OneTimeWorkRequestBuilder<JobUploadWorker>()
             .setInputData(data)
             .setConstraints(
                 Constraints.Builder()
-                    .setRequiredNetworkType(NetworkType.CONNECTED)
+                    .setRequiredNetworkType(networkType)
                     .build(),
             )
             .addTag(STAGED_PATH_TAG_PREFIX + staged.absolutePath)
@@ -305,7 +308,12 @@ class RealJobRepository(
         entities.filter { it.status == "done" }.map { it.toSummaryDto() }
     }
 
-    override fun pagedJobs(promptId: Long?, customOnly: Boolean, newestFirst: Boolean): Flow<PagingData<JobSummaryDto>> = Pager(
+    override fun pagedJobs(
+        promptId: Long?,
+        customOnly: Boolean,
+        newestFirst: Boolean,
+        favoritesOnly: Boolean,
+    ): Flow<PagingData<JobSummaryDto>> = Pager(
         config = PagingConfig(
             pageSize = Tuning.GALLERY_PAGE_SIZE,
             // One page up front (default is 3x) for a faster first paint;
@@ -316,13 +324,17 @@ class RealJobRepository(
         ),
         pagingSourceFactory = {
             when {
-                customOnly -> dao.pagedDoneJobsCustom(newestFirst)
-                promptId != null -> dao.pagedDoneJobsByPromptId(promptId, newestFirst)
-                else -> dao.pagedDoneJobsAll(newestFirst)
+                customOnly -> dao.pagedDoneJobsCustom(newestFirst, favoritesOnly)
+                promptId != null -> dao.pagedDoneJobsByPromptId(promptId, newestFirst, favoritesOnly)
+                else -> dao.pagedDoneJobsAll(newestFirst, favoritesOnly)
             }
         },
     ).flow.map { pagingData ->
         pagingData.map { it.toSummaryDto() }
+    }
+
+    override suspend fun setFavorite(jobId: String, isFavorite: Boolean) {
+        dao.setFavorite(jobId, isFavorite)
     }
 
     override fun jobTagStats(): Flow<JobTagStats> = combine(
@@ -424,17 +436,13 @@ class RealJobRepository(
 
     override fun offlineCacheStats(): OfflineCacheStats = offlineImageCache.stats()
 
-    override fun clearOfflineImageCache() {
-        offlineImageCache.clear()
-    }
-
     private fun buildUrlOrNull(path: String): String? = settingsManager.serverUrl?.takeUnless { it.isBlank() }?.let { "$it$path" }
 
     /**
-     * REPLACE would otherwise wipe the lineage-tracking columns (they're
-     * local-only, never present on the server DTOs these entities are mapped
-     * from) on every bulk sync. Copies any previously-stored values across
-     * before the upsert.
+     * REPLACE would otherwise wipe local-only columns (lineage tracking,
+     * favorite status — never present on the server DTOs these entities are
+     * mapped from) on every bulk sync. Copies any previously-stored values
+     * across before the upsert.
      */
     private suspend fun carryForwardLineage(entities: List<JobEntity>): List<JobEntity> {
         val existingById = dao.getJobsByIds(entities.map { it.id }).associateBy { it.id }
@@ -444,6 +452,7 @@ class RealJobRepository(
                 sourceSha256 = existing.sourceSha256,
                 resultSha256 = existing.resultSha256,
                 lineageRootId = existing.lineageRootId,
+                isFavorite = existing.isFavorite,
             )
         }
     }
@@ -459,7 +468,45 @@ class RealJobRepository(
             .forEach { prefetchJobImages(it.id) }
     }
 
+    /**
+     * Automatic, opportunistic result prefetch is skipped (not errored) on a metered
+     * connection when the user hasn't allowed cellular data — it isn't on WorkManager
+     * like uploads are, so this is checked manually rather than via a NetworkType
+     * constraint.
+     */
+    private fun canPrefetchNow(): Boolean {
+        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+        val isUnmetered = connectivityManager?.let { cm ->
+            val network = cm.activeNetwork ?: return@let false
+            val capabilities = cm.getNetworkCapabilities(network) ?: return@let false
+            capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
+        }
+        return canPrefetchGivenNetwork(settingsManager.allowCellularData, isUnmetered)
+    }
+
+    /**
+     * Unlike [canPrefetchNow], cache-cleanup's safety gate (feature 009) doesn't care about the
+     * Wi-Fi-only setting — evicting while offline would leave a cached image with zero reachable
+     * copies regardless of that preference, so this only answers "is there connectivity at all."
+     */
+    override fun hasNetworkConnectivity(): Boolean {
+        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+        val hasInternet = connectivityManager?.let { cm ->
+            val network = cm.activeNetwork ?: return@let false
+            val capabilities = cm.getNetworkCapabilities(network) ?: return@let false
+            capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        }
+        return hasConnectivity(hasInternet)
+    }
+
+    override fun listCachedJobs(): List<OfflineImageCache.CachedJobSummary> = offlineImageCache.listCachedJobs()
+
+    override fun evictFromCache(jobId: String) {
+        offlineImageCache.delete(jobId)
+    }
+
     private fun prefetchJobImages(jobId: String) {
+        if (!canPrefetchNow()) return
         val thumbUrl = buildUrlOrNull("/api/v1/jobs/$jobId/thumb")
         val previewUrl = buildUrlOrNull("/api/v1/jobs/$jobId/preview")
         val resultUrl = buildUrlOrNull("/api/v1/jobs/$jobId/result")
@@ -510,3 +557,25 @@ internal fun JobListResponse.withoutHiddenJobs(hiddenIds: Set<String>): JobListR
     if (hiddenIds.isEmpty()) return this
     return copy(items = items.filterNot { it.id in hiddenIds })
 }
+
+/** Which [NetworkType] an upload's [Constraints] should require, given the user's setting. */
+internal fun networkTypeFor(allowCellularData: Boolean): NetworkType = if (allowCellularData) NetworkType.CONNECTED else NetworkType.UNMETERED
+
+/**
+ * Whether an automatic result prefetch should proceed right now. [isCurrentNetworkUnmetered]
+ * is `null` when connectivity state couldn't be determined — treated as "don't block" rather
+ * than silently starving the cache over an unrelated platform quirk.
+ */
+internal fun canPrefetchGivenNetwork(allowCellularData: Boolean, isCurrentNetworkUnmetered: Boolean?): Boolean {
+    if (allowCellularData) return true
+    return isCurrentNetworkUnmetered ?: true
+}
+
+/**
+ * Whether cache-cleanup's destructive eviction step may proceed right now. Unlike
+ * [canPrefetchGivenNetwork] (where "unknown" defaults to *not* blocking a low-stakes, retryable
+ * prefetch), an unknown/unavailable [hasInternetCapability] here defaults to blocking — evicting
+ * a cache entry is irreversible on-device, so uncertainty should fail safe rather than risk
+ * leaving an image with zero reachable copies (spec FR-010).
+ */
+internal fun hasConnectivity(hasInternetCapability: Boolean?): Boolean = hasInternetCapability == true

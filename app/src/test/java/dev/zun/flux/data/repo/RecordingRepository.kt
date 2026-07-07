@@ -162,7 +162,10 @@ class RecordingRepository :
         promptId: Long?,
         customOnly: Boolean,
         newestFirst: Boolean,
+        favoritesOnly: Boolean,
     ): Flow<PagingData<JobSummaryDto>> = MutableStateFlow(PagingData.empty())
+
+    override suspend fun setFavorite(jobId: String, isFavorite: Boolean) = Unit
 
     override fun jobTagStats(): Flow<JobTagStats> = MutableStateFlow(
         JobTagStats(totalCount = 0, customCount = 0, perPromptCounts = emptyMap()),
@@ -213,5 +216,9 @@ class RecordingRepository :
 
     override fun offlineCacheStats(): OfflineCacheStats = OfflineCacheStats(bytes = 0L, fileCount = 0)
 
-    override fun clearOfflineImageCache() = Unit
+    override fun listCachedJobs(): List<OfflineImageCache.CachedJobSummary> = emptyList()
+
+    override fun evictFromCache(jobId: String) = Unit
+
+    override fun hasNetworkConnectivity(): Boolean = true
 }

@@ -63,6 +63,8 @@
     <string name="gallery_delete_selected">Delete selected</string>
     <string name="gallery_show_image_labels">Show image labels</string>
     <string name="gallery_hide_image_labels">Hide image labels</string>
+    <string name="gallery_favorites_only">Favorites only</string>
+    <string name="gallery_show_all">Show all</string>
     <string name="gallery_filter_by_tag">Filter by tag</string>
     <string name="gallery_sort">Sort</string>
     <string name="shortcut_new_edit_short">New edit</string>
@@ -91,6 +93,7 @@
     </plurals>
     <string name="gallery_undo">Undo</string>
     <string name="gallery_selected">Selected</string>
+    <string name="gallery_favorited">Favorited</string>
     <string name="gallery_not_cached_needs_network">Not cached — needs network</string>
     <string name="gallery_unavailable">Unavailable</string>
     <string name="gallery_delete_confirm_title">Delete selected?</string>
@@ -116,15 +119,22 @@
     <string name="viewer_loading">Loading</string>
     <string name="viewer_use_input">Use input</string>
     <string name="viewer_save">Save</string>
+    <string name="viewer_favorite">Favorite</string>
+    <string name="viewer_unfavorite">Unfavorite</string>
     <string name="viewer_details">Details</string>
     <string name="viewer_edit_history">History</string>
     <string name="viewer_delete">Delete</string>
     <string name="viewer_detail_created">Created</string>
+    <string name="viewer_detail_completed">Completed</string>
     <string name="viewer_detail_duration">Duration</string>
     <string name="viewer_detail_duration_seconds_format">%1$ds</string>
     <string name="viewer_detail_offline">Offline</string>
     <string name="viewer_detail_prompt">Prompt</string>
     <string name="viewer_detail_prompt_text">Prompt text</string>
+    <string name="viewer_detail_workflow">Workflow</string>
+    <string name="viewer_detail_try_harder">Try harder</string>
+    <string name="common_yes">Yes</string>
+    <string name="common_no">No</string>
     <string name="viewer_offline_original_cached">Original cached</string>
     <string name="viewer_offline_preview_cached">Preview cached</string>
     <string name="viewer_offline_thumb_cached">Thumbnail cached</string>
@@ -308,6 +318,9 @@
     <string name="settings_token_show">Show token</string>
     <string name="settings_token_hide">Hide token</string>
     <string name="settings_testing_connection">Testing connection…</string>
+    <string name="settings_data_usage_title">Data Usage</string>
+    <string name="settings_data_usage_detail">Controls whether submitting a photo for editing and fetching a finished result may use cellular data. Saving or sharing an already-downloaded image is never affected.</string>
+    <string name="settings_allow_cellular_data">Allow cellular data</string>
     <string name="settings_offline_cache_title">Offline Cache</string>
     <string name="settings_offline_cache_detail">Keeps recently viewed images usable when the server is unavailable.</string>
     <string name="settings_cached_images">Cached Images</string>
@@ -318,6 +331,13 @@
     <string name="settings_cache_size">Cache Size</string>
     <string name="settings_caching">Caching…</string>
     <string name="settings_refresh_cache">Refresh Cache</string>
+    <string name="cache_cleanup_title">Clear Offline Cache</string>
+    <string name="cache_cleanup_empty">Nothing is cached right now.</string>
+    <plurals name="cache_cleanup_summary_format">
+        <item quantity="one">%1$d image · %2$s will be cleared</item>
+        <item quantity="other">%1$d images · %2$s will be cleared</item>
+    </plurals>
+    <string name="cache_cleanup_confirm">Clear</string>
     <string name="settings_cert_pinning_title">Certificate Pinning</string>
     <string name="settings_cert_pinning_detail">Pin your servers\' certificates so a compromised CA can\'t impersonate them. Re-pin after cert renewal.</string>
     <string name="settings_no_pins_active">No pins active</string>
@@ -348,6 +368,4 @@
     <string name="settings_build">Build</string>
     <string name="settings_package">Package</string>
     <string name="settings_value_none">(none)</string>
-    <string name="settings_clear_cache_title">Clear offline cache?</string>
-    <string name="settings_clear_cache_message">Cached image files will be removed from this device. Server history and settings stay unchanged.</string>
 </resources>

@@ -2,6 +2,7 @@ package dev.zun.flux.data.local
 
 import androidx.paging.PagingSource
 import androidx.room.Dao
+import androidx.room.Embedded
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
@@ -10,6 +11,15 @@ import kotlinx.coroutines.flow.Flow
 data class PromptIdCount(val promptId: Long, val jobCount: Int)
 
 data class JobTagTotals(val customCount: Int, val totalCount: Int)
+
+/**
+ * A stack's cover row (its most-recently-created member) plus how many members the stack has,
+ * where a "stack" is every done job sharing [JobEntity.lineageRootId] (falling back to its own
+ * id when unset). [stackCount] respects whatever prompt/tag + favorites-only predicate the
+ * enclosing query applies — it does not account for the client-side free-text search filter,
+ * which is applied after paging (see research.md Decision 1's scoping note).
+ */
+data class JobWithStackCount(@Embedded val job: JobEntity, val stackCount: Int)
 
 @Dao
 interface JobDao {
@@ -27,9 +37,26 @@ interface JobDao {
 
     @Query(
         """
-        SELECT * FROM jobs
+        SELECT jobs.*,
+            (SELECT COUNT(*) FROM jobs j2
+             WHERE j2.status = 'done'
+             AND j2.id NOT IN (SELECT jobId FROM pending_deletes)
+             AND (:favoritesOnly = 0 OR j2.isFavorite = 1)
+             AND COALESCE(j2.lineageRootId, j2.id) = COALESCE(jobs.lineageRootId, jobs.id)
+            ) AS stackCount
+        FROM jobs
         WHERE status = 'done'
         AND id NOT IN (SELECT jobId FROM pending_deletes)
+        AND (:favoritesOnly = 0 OR isFavorite = 1)
+        AND jobs.id = (
+            SELECT j3.id FROM jobs j3
+            WHERE j3.status = 'done'
+            AND j3.id NOT IN (SELECT jobId FROM pending_deletes)
+            AND (:favoritesOnly = 0 OR j3.isFavorite = 1)
+            AND COALESCE(j3.lineageRootId, j3.id) = COALESCE(jobs.lineageRootId, jobs.id)
+            ORDER BY j3.createdAt DESC, j3.id DESC
+            LIMIT 1
+        )
         ORDER BY
             CASE WHEN :newestFirst THEN createdAt END DESC,
             CASE WHEN :newestFirst THEN id END DESC,
@@ -37,14 +64,33 @@ interface JobDao {
             CASE WHEN NOT :newestFirst THEN id END ASC
         """,
     )
-    fun pagedDoneJobsAll(newestFirst: Boolean): PagingSource<Int, JobEntity>
+    fun pagedDoneJobsAll(newestFirst: Boolean, favoritesOnly: Boolean): PagingSource<Int, JobWithStackCount>
 
     @Query(
         """
-        SELECT * FROM jobs
+        SELECT jobs.*,
+            (SELECT COUNT(*) FROM jobs j2
+             WHERE j2.status = 'done'
+             AND j2.promptId = :promptId
+             AND j2.id NOT IN (SELECT jobId FROM pending_deletes)
+             AND (:favoritesOnly = 0 OR j2.isFavorite = 1)
+             AND COALESCE(j2.lineageRootId, j2.id) = COALESCE(jobs.lineageRootId, jobs.id)
+            ) AS stackCount
+        FROM jobs
         WHERE status = 'done'
         AND promptId = :promptId
         AND id NOT IN (SELECT jobId FROM pending_deletes)
+        AND (:favoritesOnly = 0 OR isFavorite = 1)
+        AND jobs.id = (
+            SELECT j3.id FROM jobs j3
+            WHERE j3.status = 'done'
+            AND j3.promptId = :promptId
+            AND j3.id NOT IN (SELECT jobId FROM pending_deletes)
+            AND (:favoritesOnly = 0 OR j3.isFavorite = 1)
+            AND COALESCE(j3.lineageRootId, j3.id) = COALESCE(jobs.lineageRootId, jobs.id)
+            ORDER BY j3.createdAt DESC, j3.id DESC
+            LIMIT 1
+        )
         ORDER BY
             CASE WHEN :newestFirst THEN createdAt END DESC,
             CASE WHEN :newestFirst THEN id END DESC,
@@ -52,15 +98,36 @@ interface JobDao {
             CASE WHEN NOT :newestFirst THEN id END ASC
         """,
     )
-    fun pagedDoneJobsByPromptId(promptId: Long, newestFirst: Boolean): PagingSource<Int, JobEntity>
+    fun pagedDoneJobsByPromptId(promptId: Long, newestFirst: Boolean, favoritesOnly: Boolean): PagingSource<Int, JobWithStackCount>
 
     @Query(
         """
-        SELECT * FROM jobs
+        SELECT jobs.*,
+            (SELECT COUNT(*) FROM jobs j2
+             WHERE j2.status = 'done'
+             AND j2.promptId IS NULL
+             AND j2.promptText IS NOT NULL
+             AND j2.id NOT IN (SELECT jobId FROM pending_deletes)
+             AND (:favoritesOnly = 0 OR j2.isFavorite = 1)
+             AND COALESCE(j2.lineageRootId, j2.id) = COALESCE(jobs.lineageRootId, jobs.id)
+            ) AS stackCount
+        FROM jobs
         WHERE status = 'done'
         AND promptId IS NULL
         AND promptText IS NOT NULL
         AND id NOT IN (SELECT jobId FROM pending_deletes)
+        AND (:favoritesOnly = 0 OR isFavorite = 1)
+        AND jobs.id = (
+            SELECT j3.id FROM jobs j3
+            WHERE j3.status = 'done'
+            AND j3.promptId IS NULL
+            AND j3.promptText IS NOT NULL
+            AND j3.id NOT IN (SELECT jobId FROM pending_deletes)
+            AND (:favoritesOnly = 0 OR j3.isFavorite = 1)
+            AND COALESCE(j3.lineageRootId, j3.id) = COALESCE(jobs.lineageRootId, jobs.id)
+            ORDER BY j3.createdAt DESC, j3.id DESC
+            LIMIT 1
+        )
         ORDER BY
             CASE WHEN :newestFirst THEN createdAt END DESC,
             CASE WHEN :newestFirst THEN id END DESC,
@@ -68,7 +135,7 @@ interface JobDao {
             CASE WHEN NOT :newestFirst THEN id END ASC
         """,
     )
-    fun pagedDoneJobsCustom(newestFirst: Boolean): PagingSource<Int, JobEntity>
+    fun pagedDoneJobsCustom(newestFirst: Boolean, favoritesOnly: Boolean): PagingSource<Int, JobWithStackCount>
 
     @Query(
         """
@@ -147,6 +214,9 @@ interface JobDao {
 
     @Query("UPDATE jobs SET sourceSha256 = :hash, lineageRootId = :rootId WHERE id = :jobId")
     suspend fun updateSourceLineage(jobId: String, hash: String, rootId: String)
+
+    @Query("UPDATE jobs SET isFavorite = :isFavorite WHERE id = :jobId")
+    suspend fun setFavorite(jobId: String, isFavorite: Boolean)
 
     @Query(
         """

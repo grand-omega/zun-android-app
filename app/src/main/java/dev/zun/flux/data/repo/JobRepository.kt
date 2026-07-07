@@ -51,9 +51,18 @@ interface JobRepository {
     /**
      * Paged stream of done jobs, optionally narrowed by [promptId] or
      * [customOnly]. Pass `(null, false)` for no filter. [newestFirst]
-     * controls sort direction (createdAt with id tiebreak).
+     * controls sort direction (createdAt with id tiebreak). [favoritesOnly]
+     * narrows further to favorited jobs and combines with either filter above.
      */
-    fun pagedJobs(promptId: Long?, customOnly: Boolean, newestFirst: Boolean): Flow<PagingData<JobSummaryDto>>
+    fun pagedJobs(
+        promptId: Long?,
+        customOnly: Boolean,
+        newestFirst: Boolean,
+        favoritesOnly: Boolean = false,
+    ): Flow<PagingData<JobSummaryDto>>
+
+    /** Marks (or unmarks) a job as a favorite. Local-only; never sent to the server. */
+    suspend fun setFavorite(jobId: String, isFavorite: Boolean)
 
     /** Aggregate counts used by the gallery tag-filter dropdown. */
     fun jobTagStats(): Flow<JobTagStats>

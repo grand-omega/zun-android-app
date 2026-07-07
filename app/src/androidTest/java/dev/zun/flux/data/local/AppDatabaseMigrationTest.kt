@@ -14,7 +14,7 @@ import org.junit.runner.RunWith
 class AppDatabaseMigrationTest {
 
     @Test
-    fun migrate1To5_preservesJobRowsAndCreatesPendingDeletes() {
+    fun migrate1To6_preservesJobRowsAndCreatesPendingDeletes() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         context.deleteDatabase(TEST_DB)
 
@@ -35,7 +35,7 @@ class AppDatabaseMigrationTest {
             db.execSQL("INSERT INTO jobs (id, createdAt) VALUES ('job-1', 100)")
         }
 
-        // Opening through Room runs MIGRATION_1_2..4_5 and then validates the
+        // Opening through Room runs MIGRATION_1_2..5_6 and then validates the
         // migrated schema against the generated Room model — a schema mismatch
         // throws IllegalStateException before any query runs.
         val database = Room.databaseBuilder(context, AppDatabase::class.java, TEST_DB)
@@ -44,6 +44,7 @@ class AppDatabaseMigrationTest {
                 AppDatabase.MIGRATION_2_3,
                 AppDatabase.MIGRATION_3_4,
                 AppDatabase.MIGRATION_4_5,
+                AppDatabase.MIGRATION_5_6,
             )
             .build()
         try {
@@ -59,6 +60,48 @@ class AppDatabaseMigrationTest {
                 assertEquals(null, migrated.sourceSha256)
                 assertEquals(null, migrated.resultSha256)
                 assertEquals(null, migrated.lineageRootId)
+                // isFavorite is new in v6 — pre-existing rows must default to false.
+                assertEquals(false, migrated.isFavorite)
+            }
+        } finally {
+            database.close()
+        }
+    }
+
+    @Test
+    fun migrate5To6_isFavoriteCanBeSetAndReadBack() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        context.deleteDatabase(TEST_DB)
+
+        val dbFile = context.getDatabasePath(TEST_DB)
+        dbFile.parentFile?.mkdirs()
+        SQLiteDatabase.openOrCreateDatabase(dbFile, null).use { db ->
+            db.version = 5
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS jobs (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    status TEXT NOT NULL DEFAULT 'done',
+                    createdAt INTEGER NOT NULL DEFAULT 0
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("INSERT INTO jobs (id, status, createdAt) VALUES ('job-1', 'done', 100)")
+        }
+
+        val database = Room.databaseBuilder(context, AppDatabase::class.java, TEST_DB)
+            .addMigrations(AppDatabase.MIGRATION_5_6)
+            .build()
+        try {
+            runBlocking {
+                val dao = database.jobDao()
+                assertEquals(false, dao.getJobById("job-1")!!.isFavorite)
+
+                dao.setFavorite("job-1", true)
+                assertEquals(true, dao.getJobById("job-1")!!.isFavorite)
+
+                dao.setFavorite("job-1", false)
+                assertEquals(false, dao.getJobById("job-1")!!.isFavorite)
             }
         } finally {
             database.close()

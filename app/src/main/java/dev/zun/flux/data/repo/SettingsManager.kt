@@ -51,6 +51,11 @@ class SettingsManager(context: Context) {
         get() = prefs.getBoolean(KEY_GALLERY_SORT_NEWEST_FIRST, true)
         set(value) = prefs.edit { putBoolean(KEY_GALLERY_SORT_NEWEST_FIRST, value) }
 
+    /** Wi-Fi only by default (false); when true, AI-job upload/download may use cellular data. */
+    var allowCellularData: Boolean
+        get() = prefs.getBoolean(KEY_ALLOW_CELLULAR_DATA, false)
+        set(value) = prefs.edit { putBoolean(KEY_ALLOW_CELLULAR_DATA, value) }
+
     val isConfigured: Boolean
         get() = !serverUrl.isNullOrBlank() && !apiToken.isNullOrBlank()
 
@@ -60,5 +65,6 @@ class SettingsManager(context: Context) {
         private const val KEY_API_TOKEN = "api_token"
         private const val KEY_LAST_AUTH_TIMESTAMP = "last_auth_timestamp"
         private const val KEY_GALLERY_SORT_NEWEST_FIRST = "gallery_sort_newest_first"
+        private const val KEY_ALLOW_CELLULAR_DATA = "allow_cellular_data"
     }
 }

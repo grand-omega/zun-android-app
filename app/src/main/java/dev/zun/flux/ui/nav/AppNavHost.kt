@@ -28,6 +28,7 @@ import dev.zun.flux.ui.home.HomeRoute
 import dev.zun.flux.ui.progress.BatchProgressScreen
 import dev.zun.flux.ui.progress.ProgressScreen
 import dev.zun.flux.ui.result.ResultScreen
+import dev.zun.flux.ui.settings.CacheCleanupScreen
 import dev.zun.flux.ui.settings.SettingsScreen
 import dev.zun.flux.ui.settings.SetupScreen
 
@@ -147,6 +148,13 @@ fun AppNavHost(
         composable(Routes.SETTINGS) {
             SettingsScreen(
                 app = app,
+                onBack = { nav.popBackStack() },
+                onOpenCacheCleanup = { nav.navigate(Routes.CACHE_CLEANUP) },
+            )
+        }
+        composable(Routes.CACHE_CLEANUP) {
+            CacheCleanupScreen(
+                images = repositories.images,
                 onBack = { nav.popBackStack() },
             )
         }

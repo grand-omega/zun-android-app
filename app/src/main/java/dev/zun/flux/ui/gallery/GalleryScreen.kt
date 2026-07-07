@@ -31,6 +31,8 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.ImageNotSupported
 import androidx.compose.material.icons.filled.Search
@@ -132,6 +134,7 @@ fun GalleryScreen(
     val latestSelectedIds by rememberUpdatedState(selectedIds)
     val isSelectionMode by viewModel.isSelectionMode.collectAsStateWithLifecycle()
     val tagFilter by viewModel.tagFilter.collectAsStateWithLifecycle()
+    val favoritesOnly by viewModel.favoritesOnly.collectAsStateWithLifecycle()
     val sortNewestFirst by viewModel.sortNewestFirst.collectAsStateWithLifecycle()
     val availableTags by viewModel.availableTags.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
@@ -242,6 +245,19 @@ fun GalleryScreen(
                                     },
                                 ),
                                 tint = if (showImageMetadata) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                            )
+                        }
+                        IconButton(onClick = { viewModel.setFavoritesOnly(!favoritesOnly) }) {
+                            Icon(
+                                if (favoritesOnly) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                contentDescription = stringResource(
+                                    if (favoritesOnly) R.string.gallery_show_all else R.string.gallery_favorites_only,
+                                ),
+                                tint = if (favoritesOnly) {
                                     MaterialTheme.colorScheme.primary
                                 } else {
                                     MaterialTheme.colorScheme.onSurfaceVariant
@@ -583,7 +599,7 @@ fun GalleryScreen(
                                                 if (isSelectionMode) {
                                                     viewModel.toggleSelection(job.id)
                                                 } else {
-                                                    onJobClick(job.id)
+                                                    viewModel.openJob(job, onJobClick)
                                                 }
                                             },
                                         )

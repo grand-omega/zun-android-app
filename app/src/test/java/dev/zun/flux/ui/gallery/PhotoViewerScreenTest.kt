@@ -9,6 +9,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import dev.zun.flux.data.repo.FakeJobRepository
 import org.junit.Rule
 import org.junit.Test
@@ -132,7 +133,10 @@ class PhotoViewerScreenTest {
         rule.waitUntil(timeoutMillis = 3_000) {
             rule.onAllNodesWithTagSafe("viewer_page_a").isNotEmpty()
         }
-        rule.onNode(hasContentDescription("Delete")).performClick()
+        // The action bar now holds enough icons (favorite added alongside save/details/
+        // history/delete) to overflow a 360dp-wide screen, so it scrolls -- Delete may
+        // not be in the initial viewport.
+        rule.onNode(hasContentDescription("Delete")).performScrollTo().performClick()
         rule.onNodeWithText("Delete generation?").assertIsDisplayed()
     }
 
@@ -155,7 +159,7 @@ class PhotoViewerScreenTest {
         rule.waitUntil(timeoutMillis = 3_000) {
             rule.onAllNodesWithTagSafe("viewer_page_a").isNotEmpty()
         }
-        rule.onNode(hasContentDescription("Delete")).performClick()
+        rule.onNode(hasContentDescription("Delete")).performScrollTo().performClick()
         rule.onNodeWithText("Cancel").performClick()
 
         // Dialog gone, page still visible.
@@ -216,6 +220,35 @@ class PhotoViewerScreenTest {
         }
         rule.onNode(hasContentDescription("History")).assertIsEnabled().performClick()
         assert(historyRootId == "root-a") { "expected onViewHistory to be called with root-a, got $historyRootId" }
+    }
+
+    @Test
+    fun `scopedJobIds narrows the pager to just a stack's members`() {
+        val repo = FakeJobRepository().apply {
+            seedDoneJobs(listOf("j1", "j2", "j3", "j4", "j5"))
+        }
+        val viewModel = GalleryViewModel(repo, repo, repo)
+
+        rule.setContent {
+            PhotoViewerScreen(
+                initialJobId = "j2",
+                viewModel = viewModel,
+                images = repo,
+                onUseInput = {},
+                onViewHistory = {},
+                onBack = {},
+                scopedJobIds = setOf("j2", "j4"),
+            )
+        }
+
+        rule.waitUntil(timeoutMillis = 3_000) {
+            rule.onAllNodesWithTagSafe("viewer_page_j2").isNotEmpty()
+        }
+        rule.onNodeWithTag("viewer_page_j2").assertIsDisplayed()
+        assert(rule.onAllNodesWithTagSafe("viewer_page_j1").isEmpty()) { "j1 is not in the stack scope" }
+        assert(rule.onAllNodesWithTagSafe("viewer_page_j3").isEmpty()) { "j3 is not in the stack scope" }
+        assert(rule.onAllNodesWithTagSafe("viewer_page_j5").isEmpty()) { "j5 is not in the stack scope" }
+        rule.onNode(hasContentDescription("Image 1 of 2")).assertIsDisplayed()
     }
 
     private fun androidx.compose.ui.test.junit4.ComposeContentTestRule.onAllNodesWithTagSafe(tag: String) = onAllNodes(androidx.compose.ui.test.hasTestTag(tag)).fetchSemanticsNodes(atLeastOneRootRequired = false)

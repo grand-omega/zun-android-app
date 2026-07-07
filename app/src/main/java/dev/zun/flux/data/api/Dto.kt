@@ -100,6 +100,13 @@ data class JobSummaryDto(
     val created_at: Long,
     val completed_at: Long? = null,
     val duration_seconds: Int? = null,
+    // Local-only; the server never sends this. Populated from JobEntity when
+    // this DTO is used as the in-memory gallery/photo-viewer representation.
+    val isFavorite: Boolean = false,
+    // Local-only, computed at query time; the server never sends this. How many done jobs
+    // share this job's lineage root under the currently-applied gallery filters. 1 means "no
+    // stack" (no badge shown).
+    val stackCount: Int = 1,
 )
 
 @Serializable

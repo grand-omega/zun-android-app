@@ -8,7 +8,9 @@ import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffoldRole
 import androidx.compose.material3.adaptive.navigation.NavigableListDetailPaneScaffold
 import androidx.compose.material3.adaptive.navigation.rememberListDetailPaneScaffoldNavigator
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
@@ -40,6 +42,7 @@ fun GalleryScaffold(
         )
     val navigator = rememberListDetailPaneScaffoldNavigator<String>()
     val scope = rememberCoroutineScope()
+    val stackScope by viewModel.stackScope.collectAsStateWithLifecycle()
 
     NavigableListDetailPaneScaffold(
         navigator = navigator,
@@ -69,7 +72,11 @@ fun GalleryScaffold(
                         images = images,
                         onUseInput = onUseInput,
                         onViewHistory = onViewEditHistory,
-                        onBack = { scope.launch { navigator.navigateBack() } },
+                        onBack = {
+                            scope.launch { navigator.navigateBack() }
+                            viewModel.clearStackScope()
+                        },
+                        scopedJobIds = stackScope,
                     )
                 }
             }
