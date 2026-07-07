@@ -537,14 +537,15 @@ private fun JobDetailsSheet(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 val locale = LocalLocale.current.platformLocale
+                val dateFormatter = remember(locale) { SimpleDateFormat("MMM d, yyyy · HH:mm", locale) }
                 DetailRow(
                     stringResource(R.string.viewer_detail_created),
-                    SimpleDateFormat("MMM d, yyyy · HH:mm", locale).format(Date(job.created_at * 1000)),
+                    dateFormatter.format(Date(job.created_at * 1000)),
                 )
                 job.completed_at?.let {
                     DetailRow(
                         stringResource(R.string.viewer_detail_completed),
-                        SimpleDateFormat("MMM d, yyyy · HH:mm", locale).format(Date(it * 1000)),
+                        dateFormatter.format(Date(it * 1000)),
                     )
                 }
                 job.duration_seconds?.let {

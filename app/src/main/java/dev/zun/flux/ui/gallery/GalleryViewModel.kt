@@ -405,16 +405,27 @@ class GalleryViewModel(
      * root), resolves the stack's member ids first and scopes the viewer to just them; a plain
      * (unstacked) job navigates exactly as before, with no scope.
      */
+    private var isOpeningJob = false
+
     fun openJob(job: JobSummaryDto, onNavigate: (String) -> Unit) {
         if (job.stackCount <= 1) {
             _stackScope.value = null
             onNavigate(job.id)
             return
         }
+        // Resolving stack membership suspends; guard against a double-tap firing this twice
+        // before the first resolution completes, which would otherwise push the viewer onto
+        // the back stack more than once.
+        if (isOpeningJob) return
+        isOpeningJob = true
         viewModelScope.launch {
-            val rootId = jobRepo.getLineageRootId(job.id) ?: job.id
-            _stackScope.value = jobRepo.getJobsByLineageRoot(rootId).first().map { it.id }.toSet()
-            onNavigate(job.id)
+            try {
+                val rootId = jobRepo.getLineageRootId(job.id) ?: job.id
+                _stackScope.value = jobRepo.getJobsByLineageRoot(rootId).first().map { it.id }.toSet()
+                onNavigate(job.id)
+            } finally {
+                isOpeningJob = false
+            }
         }
     }
 

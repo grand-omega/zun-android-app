@@ -29,8 +29,11 @@ class CacheCleanupViewModel(private val images: ImageSourceRepository) : ViewMod
     private fun refresh() {
         viewModelScope.launch {
             _state.value = _state.value.copy(isLoading = true, blockedMessage = null)
-            // listCachedJobs() walks the whole cache dir -- keep it off the main thread.
-            val entries = withContext(Dispatchers.IO) { images.listCachedJobs() }
+            // listCachedJobs() walks the whole cache dir -- keep it off the main thread. Falls
+            // back to empty on a filesystem error (e.g. storage unmounted) rather than crashing.
+            val entries = withContext(Dispatchers.IO) {
+                runCatching { images.listCachedJobs() }.getOrDefault(emptyList())
+            }
             _state.value = CacheCleanupState(entries = entries, isLoading = false)
         }
     }

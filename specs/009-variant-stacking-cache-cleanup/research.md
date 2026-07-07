@@ -58,6 +58,17 @@ job rows and grouping them in Kotlin after paging.
   two same-`createdAt` rows, `NOT IN (SELECT ... pending_deletes)` interaction) are exactly the
   kind of thing worth a red-then-green test rather than an assumption.
 
+**Follow-up (PR review)**: the first implementation's join predicate was
+`COALESCE(j2.lineageRootId, j2.id) = COALESCE(jobs.lineageRootId, jobs.id)` — correct, but wrapping
+`j2`'s own columns in `COALESCE` prevents SQLite from using the index on `lineageRootId` (feature
+004 already indexes it) for the inner-table lookup, forcing a full scan of `j2`/`j3` per outer row.
+Rewritten as `(j2.lineageRootId = COALESCE(jobs.lineageRootId, jobs.id) OR (j2.lineageRootId IS
+NULL AND j2.id = COALESCE(jobs.lineageRootId, jobs.id)))` — semantically identical (still handles
+both the normal self-referencing-root case and the legacy/no-lineage-recorded fallback), but only
+wraps the *outer* row's columns (evaluated once per outer row, not once per inner row), leaving
+`j2.lineageRootId`/`j2.id` bare so the index can actually be used. All 6 `JobDaoStackingTest` cases
+still pass unchanged after the rewrite — same behavior, cheaper query.
+
 ## Decision 2: A stack's filmstrip reuses the existing viewer, scoped by job-id set — not a new screen or ViewModel
 
 **Decision**: Tapping a stacked cell opens the *existing* `PhotoViewerScreen`/`GalleryViewModel`

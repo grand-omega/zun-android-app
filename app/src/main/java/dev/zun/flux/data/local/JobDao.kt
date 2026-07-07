@@ -42,7 +42,7 @@ interface JobDao {
              WHERE j2.status = 'done'
              AND j2.id NOT IN (SELECT jobId FROM pending_deletes)
              AND (:favoritesOnly = 0 OR j2.isFavorite = 1)
-             AND COALESCE(j2.lineageRootId, j2.id) = COALESCE(jobs.lineageRootId, jobs.id)
+             AND (j2.lineageRootId = COALESCE(jobs.lineageRootId, jobs.id) OR (j2.lineageRootId IS NULL AND j2.id = COALESCE(jobs.lineageRootId, jobs.id)))
             ) AS stackCount
         FROM jobs
         WHERE status = 'done'
@@ -53,7 +53,7 @@ interface JobDao {
             WHERE j3.status = 'done'
             AND j3.id NOT IN (SELECT jobId FROM pending_deletes)
             AND (:favoritesOnly = 0 OR j3.isFavorite = 1)
-            AND COALESCE(j3.lineageRootId, j3.id) = COALESCE(jobs.lineageRootId, jobs.id)
+            AND (j3.lineageRootId = COALESCE(jobs.lineageRootId, jobs.id) OR (j3.lineageRootId IS NULL AND j3.id = COALESCE(jobs.lineageRootId, jobs.id)))
             ORDER BY j3.createdAt DESC, j3.id DESC
             LIMIT 1
         )
@@ -74,7 +74,7 @@ interface JobDao {
              AND j2.promptId = :promptId
              AND j2.id NOT IN (SELECT jobId FROM pending_deletes)
              AND (:favoritesOnly = 0 OR j2.isFavorite = 1)
-             AND COALESCE(j2.lineageRootId, j2.id) = COALESCE(jobs.lineageRootId, jobs.id)
+             AND (j2.lineageRootId = COALESCE(jobs.lineageRootId, jobs.id) OR (j2.lineageRootId IS NULL AND j2.id = COALESCE(jobs.lineageRootId, jobs.id)))
             ) AS stackCount
         FROM jobs
         WHERE status = 'done'
@@ -87,7 +87,7 @@ interface JobDao {
             AND j3.promptId = :promptId
             AND j3.id NOT IN (SELECT jobId FROM pending_deletes)
             AND (:favoritesOnly = 0 OR j3.isFavorite = 1)
-            AND COALESCE(j3.lineageRootId, j3.id) = COALESCE(jobs.lineageRootId, jobs.id)
+            AND (j3.lineageRootId = COALESCE(jobs.lineageRootId, jobs.id) OR (j3.lineageRootId IS NULL AND j3.id = COALESCE(jobs.lineageRootId, jobs.id)))
             ORDER BY j3.createdAt DESC, j3.id DESC
             LIMIT 1
         )
@@ -109,7 +109,7 @@ interface JobDao {
              AND j2.promptText IS NOT NULL
              AND j2.id NOT IN (SELECT jobId FROM pending_deletes)
              AND (:favoritesOnly = 0 OR j2.isFavorite = 1)
-             AND COALESCE(j2.lineageRootId, j2.id) = COALESCE(jobs.lineageRootId, jobs.id)
+             AND (j2.lineageRootId = COALESCE(jobs.lineageRootId, jobs.id) OR (j2.lineageRootId IS NULL AND j2.id = COALESCE(jobs.lineageRootId, jobs.id)))
             ) AS stackCount
         FROM jobs
         WHERE status = 'done'
@@ -124,7 +124,7 @@ interface JobDao {
             AND j3.promptText IS NOT NULL
             AND j3.id NOT IN (SELECT jobId FROM pending_deletes)
             AND (:favoritesOnly = 0 OR j3.isFavorite = 1)
-            AND COALESCE(j3.lineageRootId, j3.id) = COALESCE(jobs.lineageRootId, jobs.id)
+            AND (j3.lineageRootId = COALESCE(jobs.lineageRootId, jobs.id) OR (j3.lineageRootId IS NULL AND j3.id = COALESCE(jobs.lineageRootId, jobs.id)))
             ORDER BY j3.createdAt DESC, j3.id DESC
             LIMIT 1
         )
