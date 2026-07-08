@@ -1,24 +1,36 @@
 package dev.zun.flux.ui.gallery
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,6 +47,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -44,6 +57,14 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.zun.flux.R
+import dev.zun.flux.util.compositeReveal
+import dev.zun.flux.util.resolveToBitmap
+import dev.zun.flux.util.saveToPictures
+import dev.zun.flux.util.shareImages
+import dev.zun.flux.util.snapshotMask
+import dev.zun.flux.util.writeToTempFile
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /** Fraction of the brush radius that stays fully opaque before the soft falloff begins. */
 private const val SOFT_EDGE_START = 0.45f
@@ -70,6 +91,11 @@ internal fun interpolateStampPoints(from: Offset, to: Offset, spacing: Float): L
     }
 }
 
+/** How long an export result message (success or failure) stays visible before auto-dismissing. */
+private const val EXPORT_MESSAGE_DISPLAY_MS = 2_500L
+
+private enum class ExportKind { Save, Share }
+
 /**
  * Finger-erase before/after reveal (feature 010) — the original [beforeModel] covers the
  * transformed [afterModel] beneath it; dragging erases the covering layer wherever touched,
@@ -91,11 +117,16 @@ fun ScratchRevealCompare(
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     // Bumped on every stamp so the before-layer's drawWithContent (which reads it) is invalidated
     // and redraws — mutating maskBitmap's pixels in place doesn't itself trigger recomposition.
     var maskVersion by remember(maskBitmap) { mutableIntStateOf(0) }
     var lastPoint by remember(maskBitmap) { mutableStateOf<Offset?>(null) }
     var strokeRadiusPx by remember { mutableFloatStateOf(0f) }
+    var containerSize by remember { mutableStateOf(IntSize.Zero) }
+    var isExporting by remember { mutableStateOf(false) }
+    var exportMessage by remember { mutableStateOf<String?>(null) }
     val stampPaint = remember {
         Paint().apply {
             blendMode = BlendMode.DstOut
@@ -119,10 +150,65 @@ fun ScratchRevealCompare(
         maskVersion++
     }
 
+    val savedMessage = stringResource(R.string.compare_scratch_saved)
+    val saveFailedMessage = stringResource(R.string.compare_scratch_save_failed)
+    val needsNetworkMessage = stringResource(R.string.compare_scratch_save_needs_network)
+
+    fun export(kind: ExportKind) {
+        val mask = maskBitmap ?: return
+        if (isExporting || containerSize == IntSize.Zero) return
+        // Snapshot the mask synchronously, before any suspend call — it's exactly what the user
+        // has revealed right now, and must not keep changing underneath the async pipeline below
+        // while they keep dragging (see snapshotMask's kdoc).
+        val maskSnapshot = snapshotMask(mask)
+        val size = containerSize
+        isExporting = true
+        scope.launch {
+            try {
+                val after = resolveToBitmap(context, afterModel)
+                if (after == null) {
+                    exportMessage = saveFailedMessage
+                    return@launch
+                }
+                val before = resolveToBitmap(context, beforeModel)
+                if (before == null) {
+                    // The "before" source is never disk-cached by design (research.md Decision 2)
+                    // — this is the expected offline failure mode, not a generic error.
+                    exportMessage = needsNetworkMessage
+                    return@launch
+                }
+                val composite = compositeReveal(after, before, maskSnapshot, size)
+                val uri = writeToTempFile(context, composite)
+                val displayName = "flux-reveal-${System.currentTimeMillis()}.jpg"
+                when (kind) {
+                    ExportKind.Save -> {
+                        saveToPictures(context, uri, displayName)
+                        exportMessage = savedMessage
+                    }
+
+                    ExportKind.Share -> shareImages(context, listOf(uri))
+                }
+            } catch (e: Exception) {
+                exportMessage = saveFailedMessage
+            } finally {
+                isExporting = false
+            }
+        }
+    }
+
+    LaunchedEffect(exportMessage) {
+        if (exportMessage == null) return@LaunchedEffect
+        delay(EXPORT_MESSAGE_DISPLAY_MS)
+        exportMessage = null
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()
-            .onSizeChanged { onSizeKnown(it) }
+            .onSizeChanged {
+                containerSize = it
+                onSizeKnown(it)
+            }
             .pointerInput(maskBitmap) {
                 detectDragGestures(
                     onDragStart = { offset ->
@@ -168,6 +254,60 @@ fun ScratchRevealCompare(
                         drawImage(maskBitmap, blendMode = BlendMode.DstIn)
                     },
             )
+        }
+
+        Row(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(12.dp),
+        ) {
+            IconButton(
+                onClick = { export(ExportKind.Save) },
+                enabled = !isExporting,
+                modifier = Modifier.background(Color.Black.copy(alpha = 0.55f), CircleShape),
+            ) {
+                if (isExporting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = Color.White,
+                    )
+                } else {
+                    Icon(
+                        Icons.Default.Download,
+                        contentDescription = stringResource(R.string.compare_scratch_save),
+                        tint = Color.White,
+                    )
+                }
+            }
+            IconButton(
+                onClick = { export(ExportKind.Share) },
+                enabled = !isExporting,
+                modifier = Modifier.background(Color.Black.copy(alpha = 0.55f), CircleShape),
+            ) {
+                Icon(
+                    Icons.Default.Share,
+                    contentDescription = stringResource(R.string.compare_scratch_share),
+                    tint = Color.White,
+                )
+            }
+        }
+
+        exportMessage?.let { message ->
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 68.dp, end = 12.dp),
+                color = Color.Black.copy(alpha = 0.7f),
+                shape = RoundedCornerShape(16.dp),
+            ) {
+                Text(
+                    text = message,
+                    color = Color.White,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    style = MaterialTheme.typography.labelMedium,
+                )
+            }
         }
 
         Surface(
