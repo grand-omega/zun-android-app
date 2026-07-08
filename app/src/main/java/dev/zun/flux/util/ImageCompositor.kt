@@ -17,6 +17,7 @@ import coil3.BitmapImage
 import coil3.SingletonImageLoader
 import coil3.request.ImageRequest
 import coil3.request.SuccessResult
+import coil3.request.allowHardware
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -35,11 +36,13 @@ private const val MAX_COMPOSITE_DIMENSION = 2048
  * etc.). Unlike [saveToPictures]/[shareImages], which only byte-copy an already-materialized
  * source, this actually decodes through Coil's own `ImageLoader` — the same mechanism
  * `PhotoViewerScreen`'s full-res pre-warm already uses, just also extracting the resulting bitmap
- * rather than only checking success.
+ * rather than only checking success. Requests `allowHardware(false)` — Coil defaults to
+ * `HARDWARE`-config bitmaps, which [compositeReveal]'s software `Canvas` cannot draw (throws
+ * `Software rendering doesn't support hardware bitmaps`).
  */
 suspend fun resolveToBitmap(context: Context, model: Any?): Bitmap? = withContext(Dispatchers.IO) {
     if (model == null) return@withContext null
-    val request = ImageRequest.Builder(context).data(model).build()
+    val request = ImageRequest.Builder(context).data(model).allowHardware(false).build()
     val result = SingletonImageLoader.get(context).execute(request)
     ((result as? SuccessResult)?.image as? BitmapImage)?.bitmap
 }

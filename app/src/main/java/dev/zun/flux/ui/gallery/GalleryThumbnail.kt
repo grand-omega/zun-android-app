@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material3.Card
@@ -49,6 +50,7 @@ import dev.zun.flux.R
 import dev.zun.flux.data.api.JobSummaryDto
 import dev.zun.flux.data.api.PromptDto
 import dev.zun.flux.data.api.effectivePromptId
+import dev.zun.flux.data.repo.LOCAL_COMPOSITE_ID_PREFIX
 import dev.zun.flux.data.repo.OfflineImageAvailability
 import dev.zun.flux.ui.common.MissingImageState
 import dev.zun.flux.util.resolvePromptLabel
@@ -157,7 +159,16 @@ internal fun JobThumbnail(
                 },
             )
 
-            if (!isSelectionMode && availability?.resultCached == false) {
+            if (!isSelectionMode && job.id.startsWith(LOCAL_COMPOSITE_ID_PREFIX)) {
+                // Feature 015: a saved drag-reveal composite has no server generation behind it —
+                // this shares TopStart with NeedsNetworkIcon below since the two are mutually
+                // exclusive by construction (a local composite always reports fully cached).
+                LocalCompositeIcon(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(4.dp),
+                )
+            } else if (!isSelectionMode && availability?.resultCached == false) {
                 NeedsNetworkIcon(
                     modifier = Modifier
                         .align(Alignment.TopStart)
@@ -270,6 +281,20 @@ private fun HalfFavoriteIcon(modifier: Modifier = Modifier) {
                         this@drawWithContent.drawContent()
                     }
                 },
+        )
+    }
+}
+
+/** Marks a saved drag-reveal composite (feature 015) apart from an AI-generated result — reuses
+ *  the same icon already shown on the save action that created it (ScratchRevealCompare.kt). */
+@Composable
+private fun LocalCompositeIcon(modifier: Modifier = Modifier) {
+    Box(modifier = modifier) {
+        Icon(
+            imageVector = Icons.Default.Download,
+            contentDescription = stringResource(R.string.local_composite_badge_description),
+            tint = Color.White.copy(alpha = 0.82f),
+            modifier = Modifier.size(16.dp),
         )
     }
 }

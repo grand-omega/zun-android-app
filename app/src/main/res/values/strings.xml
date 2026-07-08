@@ -43,9 +43,11 @@
     <string name="compare_scratch_brush_size">Brush size</string>
     <string name="compare_scratch_save">Save this reveal</string>
     <string name="compare_scratch_share">Share this reveal</string>
-    <string name="compare_scratch_saved">Reveal saved to Gallery</string>
+    <string name="compare_scratch_saved">Reveal saved</string>
     <string name="compare_scratch_save_failed">Couldn\'t save this reveal. Try again.</string>
-    <string name="compare_scratch_save_needs_network">Couldn\'t save this reveal — the original photo isn\'t cached and needs network.</string>
+    <string name="compare_scratch_save_needs_network">Couldn\'t save this reveal — one of the photos isn\'t cached and needs network.</string>
+    <string name="local_composite_prompt_placeholder">Saved reveal</string>
+    <string name="local_composite_badge_description">Saved reveal, not an AI-generated result</string>
 
     <!-- Auth / Lock -->
     <string name="auth_locked_title">FluxEdit is locked</string>

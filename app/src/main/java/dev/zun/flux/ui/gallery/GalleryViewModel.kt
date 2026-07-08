@@ -1,6 +1,7 @@
 package dev.zun.flux.ui.gallery
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -92,6 +93,11 @@ class GalleryViewModel(
     fun setFavorite(jobId: String, isFavorite: Boolean) {
         viewModelScope.launch { jobRepo.setFavorite(jobId, isFavorite) }
     }
+
+    /** Unlike [setFavorite]'s fire-and-forget launch, this is awaited by its caller
+     *  ([dev.zun.flux.ui.gallery.ScratchRevealCompare]'s own coroutine), which manages its own
+     *  in-progress/success/failure state around the call. */
+    suspend fun saveLocalComposite(bitmap: Bitmap): Result<Unit> = jobRepo.saveLocalComposite(bitmap).map { }
 
     /** Free-text search over prompt labels and custom prompt text. */
     private val _searchQuery = MutableStateFlow("")

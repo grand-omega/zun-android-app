@@ -30,8 +30,9 @@ class GalleryThumbnailTest {
         stackCount: Int,
         isFavorite: Boolean = false,
         stackHasFavorite: Boolean = false,
+        id: String = "job-1",
     ) = JobSummaryDto(
-        id = "job-1",
+        id = id,
         created_at = 0L,
         stackCount = stackCount,
         isFavorite = isFavorite,
@@ -138,5 +139,43 @@ class GalleryThumbnailTest {
             hasContentDescription("Favorited") or hasContentDescription("One or more variants in this stack are favorited"),
         ).fetchSemanticsNodes(atLeastOneRootRequired = false)
         assertTrue("expected no heart at all", hearts.isEmpty())
+    }
+
+    @Test
+    fun `a saved local composite shows the distinguisher badge`() {
+        rule.setContent {
+            JobThumbnail(
+                job = job(stackCount = 1, id = "local-composite-abc123"),
+                prompts = emptyList(),
+                model = null,
+                availability = availability,
+                showMetadata = false,
+                isSelected = false,
+                isSelectionMode = false,
+                onClick = {},
+            )
+        }
+
+        rule.onNodeWithContentDescription("Saved reveal, not an AI-generated result").assertIsDisplayed()
+    }
+
+    @Test
+    fun `an ordinary AI-generated job shows no distinguisher badge`() {
+        rule.setContent {
+            JobThumbnail(
+                job = job(stackCount = 1, id = "job-1"),
+                prompts = emptyList(),
+                model = null,
+                availability = availability,
+                showMetadata = false,
+                isSelected = false,
+                isSelectionMode = false,
+                onClick = {},
+            )
+        }
+
+        val badges = rule.onAllNodes(hasContentDescription("Saved reveal, not an AI-generated result"))
+            .fetchSemanticsNodes(atLeastOneRootRequired = false)
+        assertTrue("expected no local-composite badge for an ordinary job", badges.isEmpty())
     }
 }

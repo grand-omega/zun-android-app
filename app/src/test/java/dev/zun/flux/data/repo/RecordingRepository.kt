@@ -1,5 +1,6 @@
 package dev.zun.flux.data.repo
 
+import android.graphics.Bitmap
 import android.net.Uri
 import androidx.paging.PagingData
 import dev.zun.flux.data.api.CapabilitiesResponse
@@ -214,6 +215,14 @@ class RecordingRepository :
     override suspend fun getLineageRootId(jobId: String): String? = null
 
     override fun getJobsByLineageRoot(rootId: String): Flow<List<JobSummaryDto>> = MutableStateFlow(emptyList())
+
+    var savedComposites = 0
+        private set
+
+    override suspend fun saveLocalComposite(bitmap: Bitmap): Result<String> {
+        savedComposites++
+        return Result.success("local-composite-recorded")
+    }
 
     override fun inputModel(inputId: Int?): Any? = null
 

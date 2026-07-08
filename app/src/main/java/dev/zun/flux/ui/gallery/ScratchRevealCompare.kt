@@ -1,5 +1,7 @@
 package dev.zun.flux.ui.gallery
 
+import android.graphics.Bitmap
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -59,7 +61,6 @@ import coil3.compose.AsyncImage
 import dev.zun.flux.R
 import dev.zun.flux.util.compositeReveal
 import dev.zun.flux.util.resolveToBitmap
-import dev.zun.flux.util.saveToPictures
 import dev.zun.flux.util.shareImages
 import dev.zun.flux.util.snapshotMask
 import dev.zun.flux.util.writeToTempFile
@@ -91,6 +92,8 @@ internal fun interpolateStampPoints(from: Offset, to: Offset, spacing: Float): L
     }
 }
 
+private const val TAG = "ScratchRevealCompare"
+
 /** How long an export result message (success or failure) stays visible before auto-dismissing. */
 private const val EXPORT_MESSAGE_DISPLAY_MS = 2_500L
 
@@ -114,6 +117,7 @@ fun ScratchRevealCompare(
     maskBitmap: ImageBitmap?,
     onSizeKnown: (IntSize) -> Unit,
     onBrushRadiusChange: (Dp) -> Unit,
+    onSaveComposite: suspend (Bitmap) -> Result<Unit>,
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
@@ -166,29 +170,30 @@ fun ScratchRevealCompare(
         scope.launch {
             try {
                 val after = resolveToBitmap(context, afterModel)
-                if (after == null) {
-                    exportMessage = saveFailedMessage
-                    return@launch
-                }
-                val before = resolveToBitmap(context, beforeModel)
-                if (before == null) {
-                    // The "before" source is never disk-cached by design (research.md Decision 2)
-                    // — this is the expected offline failure mode, not a generic error.
+                val before = if (after != null) resolveToBitmap(context, beforeModel) else null
+                if (after == null || before == null) {
+                    // The "before" source is never disk-cached by design (research.md Decision 2),
+                    // and "after" isn't guaranteed cached yet either right after a fresh generation
+                    // — in practice either can require a network fetch, so both failures get the
+                    // same "needs network" framing rather than only the before-image.
+                    Log.w(TAG, "Couldn't resolve source image(s) for export (after=$after, before=$before)")
                     exportMessage = needsNetworkMessage
                     return@launch
                 }
                 val composite = compositeReveal(after, before, maskSnapshot, size)
-                val uri = writeToTempFile(context, composite)
-                val displayName = "flux-reveal-${System.currentTimeMillis()}.jpg"
                 when (kind) {
                     ExportKind.Save -> {
-                        saveToPictures(context, uri, displayName)
+                        onSaveComposite(composite).getOrThrow()
                         exportMessage = savedMessage
                     }
 
-                    ExportKind.Share -> shareImages(context, listOf(uri))
+                    ExportKind.Share -> {
+                        val uri = writeToTempFile(context, composite)
+                        shareImages(context, listOf(uri))
+                    }
                 }
             } catch (e: Exception) {
+                Log.w(TAG, "Export failed", e)
                 exportMessage = saveFailedMessage
             } finally {
                 isExporting = false

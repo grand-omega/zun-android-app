@@ -1,5 +1,6 @@
 package dev.zun.flux.data.repo
 
+import android.graphics.Bitmap
 import android.net.Uri
 import androidx.paging.PagingData
 import dev.zun.flux.data.api.CapabilitiesResponse
@@ -369,6 +370,8 @@ class FakeJobRepository(
     override suspend fun getLineageRootId(jobId: String): String? = lineageRootIdsByJobId[jobId]
 
     override fun getJobsByLineageRoot(rootId: String): Flow<List<JobSummaryDto>> = MutableStateFlow(emptyList())
+
+    override suspend fun saveLocalComposite(bitmap: Bitmap): Result<String> = Result.success("local-composite-${UUID.randomUUID()}")
 
     override fun recentInputIds(limit: Int): Flow<List<Int>> = updates.map {
         entries.values.sortedByDescending { it.createdAt }

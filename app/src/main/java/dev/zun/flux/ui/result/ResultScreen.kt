@@ -322,6 +322,7 @@ fun ResultScreen(
                             } else {
                                 CompareMode.Slider
                             },
+                            onSaveComposite = { bitmap -> jobs.saveLocalComposite(bitmap).map { } },
                         )
                     } else {
                         // No input image (e.g. text-only generation) — just show the result.

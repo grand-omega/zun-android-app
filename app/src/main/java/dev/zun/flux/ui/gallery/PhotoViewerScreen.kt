@@ -403,6 +403,7 @@ fun PhotoViewerScreen(
                         } else {
                             CompareMode.Slider
                         },
+                        onSaveComposite = { bitmap -> viewModel.saveLocalComposite(bitmap) },
                         onDismiss = { showCompare = false },
                     )
                 } else {

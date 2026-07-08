@@ -1,5 +1,6 @@
 package dev.zun.flux.ui.gallery
 
+import android.graphics.Bitmap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
@@ -62,6 +63,7 @@ fun CompareModeSwitcher(
     beforeModel: Any?,
     afterModel: Any?,
     initialMode: CompareMode,
+    onSaveComposite: suspend (Bitmap) -> Result<Unit>,
     modifier: Modifier = Modifier,
 ) {
     var progress by remember { mutableFloatStateOf(0.5f) }
@@ -94,6 +96,7 @@ fun CompareModeSwitcher(
                     }
                 },
                 onBrushRadiusChange = { brushRadius = it },
+                onSaveComposite = onSaveComposite,
             )
         }
 
@@ -147,6 +150,7 @@ fun CompareOverlay(
     beforeModel: Any?,
     afterModel: Any?,
     initialMode: CompareMode = CompareMode.Slider,
+    onSaveComposite: suspend (Bitmap) -> Result<Unit>,
     onDismiss: () -> Unit,
 ) {
     Box(
@@ -158,6 +162,7 @@ fun CompareOverlay(
             beforeModel = beforeModel,
             afterModel = afterModel,
             initialMode = initialMode,
+            onSaveComposite = onSaveComposite,
         )
         IconButton(
             onClick = onDismiss,
