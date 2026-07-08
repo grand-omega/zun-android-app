@@ -24,7 +24,6 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
@@ -32,6 +31,8 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.ImageNotSupported
 import androidx.compose.material.icons.filled.Search
@@ -94,6 +95,7 @@ import dev.zun.flux.data.api.PromptDto
 import dev.zun.flux.data.api.effectivePromptId
 import dev.zun.flux.data.repo.ImageSourceRepository
 import dev.zun.flux.data.repo.OfflineImageAvailability
+import dev.zun.flux.ui.common.BackNavigationIcon
 import dev.zun.flux.ui.common.EmptyState
 import dev.zun.flux.ui.common.MissingImageState
 import dev.zun.flux.util.resolvePromptLabel
@@ -132,8 +134,10 @@ fun GalleryScreen(
     val latestSelectedIds by rememberUpdatedState(selectedIds)
     val isSelectionMode by viewModel.isSelectionMode.collectAsStateWithLifecycle()
     val tagFilter by viewModel.tagFilter.collectAsStateWithLifecycle()
+    val favoritesOnly by viewModel.favoritesOnly.collectAsStateWithLifecycle()
     val sortNewestFirst by viewModel.sortNewestFirst.collectAsStateWithLifecycle()
     val availableTags by viewModel.availableTags.collectAsStateWithLifecycle()
+    val revealEligibleJobIds by viewModel.revealEligibleJobIds.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
@@ -162,16 +166,12 @@ fun GalleryScreen(
     LaunchedEffect(pendingUndo, showUndoSnackbars) {
         if (!showUndoSnackbars) return@LaunchedEffect
         val undo = pendingUndo ?: return@LaunchedEffect
-        val result = snackbarHostState.showSnackbar(
+        snackbarHostState.showUndoDeletedSnackbar(
             message = undoDeletedMessage,
             actionLabel = undoActionLabel,
-            duration = androidx.compose.material3.SnackbarDuration.Short,
+            onUndo = { viewModel.undoDelete(undo) },
+            onDismiss = { viewModel.clearPendingUndo() },
         )
-        if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
-            viewModel.undoDelete(undo)
-        } else {
-            viewModel.clearPendingUndo()
-        }
     }
 
     Scaffold(
@@ -216,9 +216,7 @@ fun GalleryScreen(
                 TopAppBar(
                     title = { Text(stringResource(R.string.gallery_title)) },
                     navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                        }
+                        BackNavigationIcon(onBack = onBack, contentDescription = stringResource(R.string.common_back))
                     },
                     actions = {
                         IconButton(
@@ -248,6 +246,19 @@ fun GalleryScreen(
                                     },
                                 ),
                                 tint = if (showImageMetadata) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                            )
+                        }
+                        IconButton(onClick = { viewModel.setFavoritesOnly(!favoritesOnly) }) {
+                            Icon(
+                                if (favoritesOnly) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                contentDescription = stringResource(
+                                    if (favoritesOnly) R.string.gallery_show_all else R.string.gallery_favorites_only,
+                                ),
+                                tint = if (favoritesOnly) {
                                     MaterialTheme.colorScheme.primary
                                 } else {
                                     MaterialTheme.colorScheme.onSurfaceVariant
@@ -589,9 +600,11 @@ fun GalleryScreen(
                                                 if (isSelectionMode) {
                                                     viewModel.toggleSelection(job.id)
                                                 } else {
-                                                    onJobClick(job.id)
+                                                    viewModel.openJob(job, onJobClick)
                                                 }
                                             },
+                                            isRevealEligible = job.id in revealEligibleJobIds,
+                                            onRevealPlayed = viewModel::markRevealed,
                                         )
                                     }
 
@@ -622,5 +635,24 @@ fun GalleryScreen(
             onConfirm = { viewModel.confirmPostSaveDelete() },
             onDismiss = { viewModel.dismissPostSaveDelete() },
         )
+    }
+}
+
+/** Shared by [GalleryScreen] and `PhotoViewerScreen` — shows the "item(s) deleted" snackbar with Undo. */
+suspend fun SnackbarHostState.showUndoDeletedSnackbar(
+    message: String,
+    actionLabel: String,
+    onUndo: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val result = showSnackbar(
+        message = message,
+        actionLabel = actionLabel,
+        duration = androidx.compose.material3.SnackbarDuration.Short,
+    )
+    if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+        onUndo()
+    } else {
+        onDismiss()
     }
 }

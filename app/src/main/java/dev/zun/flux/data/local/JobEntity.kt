@@ -30,6 +30,7 @@ data class JobEntity(
     val sourceSha256: String? = null,
     val resultSha256: String? = null,
     val lineageRootId: String? = null,
+    val isFavorite: Boolean = false,
 )
 
 fun JobStatusDto.toEntity(): JobEntity = JobEntity(
@@ -79,7 +80,10 @@ fun JobEntity.toSummaryDto(): JobSummaryDto = JobSummaryDto(
     created_at = createdAt,
     completed_at = completedAt,
     duration_seconds = durationSeconds,
+    isFavorite = isFavorite,
 )
+
+fun JobWithStackCount.toSummaryDto(): JobSummaryDto = job.toSummaryDto().copy(stackCount = stackCount, stackHasFavorite = stackHasFavorite)
 
 fun JobEntity.toStatusDto(): JobStatusDto = JobStatusDto(
     id = id,

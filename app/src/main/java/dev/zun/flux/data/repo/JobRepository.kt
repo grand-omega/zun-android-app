@@ -1,10 +1,19 @@
 package dev.zun.flux.data.repo
 
+import android.graphics.Bitmap
 import androidx.paging.PagingData
 import dev.zun.flux.data.api.JobListResponse
 import dev.zun.flux.data.api.JobStatusDto
 import dev.zun.flux.data.api.JobSummaryDto
 import kotlinx.coroutines.flow.Flow
+
+/**
+ * Marks a job id as a purely local gallery entry (feature 015 — saved drag-reveal composites)
+ * rather than a real server-issued job id. Every consumer that recognizes this prefix (image
+ * resolution, offline-availability reporting, delete, and gallery-UI rendering) can act on it
+ * without ever touching the network — shared here since it's checked from multiple layers.
+ */
+const val LOCAL_COMPOSITE_ID_PREFIX = "local-composite-"
 
 /** Aggregate counts for the gallery tag-filter dropdown. */
 data class JobTagStats(
@@ -51,9 +60,18 @@ interface JobRepository {
     /**
      * Paged stream of done jobs, optionally narrowed by [promptId] or
      * [customOnly]. Pass `(null, false)` for no filter. [newestFirst]
-     * controls sort direction (createdAt with id tiebreak).
+     * controls sort direction (createdAt with id tiebreak). [favoritesOnly]
+     * narrows further to favorited jobs and combines with either filter above.
      */
-    fun pagedJobs(promptId: Long?, customOnly: Boolean, newestFirst: Boolean): Flow<PagingData<JobSummaryDto>>
+    fun pagedJobs(
+        promptId: Long?,
+        customOnly: Boolean,
+        newestFirst: Boolean,
+        favoritesOnly: Boolean = false,
+    ): Flow<PagingData<JobSummaryDto>>
+
+    /** Marks (or unmarks) a job as a favorite. Local-only; never sent to the server. */
+    suspend fun setFavorite(jobId: String, isFavorite: Boolean)
 
     /** Aggregate counts used by the gallery tag-filter dropdown. */
     fun jobTagStats(): Flow<JobTagStats>
@@ -80,4 +98,10 @@ interface JobRepository {
 
     /** Every successfully-completed job sharing [rootId], in the order the edits were made (FR-004). */
     fun getJobsByLineageRoot(rootId: String): Flow<List<JobSummaryDto>>
+
+    /**
+     * Saves [bitmap] as a new, purely local gallery entry (feature 015) — a flattened drag-reveal
+     * composite with no server-side counterpart. Returns the new job's id on success.
+     */
+    suspend fun saveLocalComposite(bitmap: Bitmap): Result<String>
 }

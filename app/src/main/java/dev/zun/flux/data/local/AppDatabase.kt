@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities = [JobEntity::class, PendingDeleteEntity::class], version = 5, exportSchema = true)
+@Database(entities = [JobEntity::class, PendingDeleteEntity::class], version = 6, exportSchema = true)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun jobDao(): JobDao
 
@@ -21,13 +21,14 @@ abstract class AppDatabase : RoomDatabase() {
         }
 
         private fun build(context: Context): AppDatabase = Room.databaseBuilder(context, AppDatabase::class.java, DB_NAME)
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
             .build()
 
         val MIGRATION_1_2 = schemaMigration(1, 2)
         val MIGRATION_2_3 = schemaMigration(2, 3)
         val MIGRATION_3_4 = schemaMigration(3, 4)
         val MIGRATION_4_5 = schemaMigration(4, 5)
+        val MIGRATION_5_6 = schemaMigration(5, 6)
 
         private fun schemaMigration(startVersion: Int, endVersion: Int): Migration = object : Migration(startVersion, endVersion) {
             override fun migrate(db: SupportSQLiteDatabase) {
@@ -56,7 +57,8 @@ abstract class AppDatabase : RoomDatabase() {
                     height INTEGER,
                     sourceSha256 TEXT,
                     resultSha256 TEXT,
-                    lineageRootId TEXT
+                    lineageRootId TEXT,
+                    isFavorite INTEGER NOT NULL DEFAULT 0
                 )
                 """.trimIndent(),
             )
@@ -87,6 +89,7 @@ abstract class AppDatabase : RoomDatabase() {
             addColumnIfMissing(db, jobColumns, "jobs", "sourceSha256 TEXT")
             addColumnIfMissing(db, jobColumns, "jobs", "resultSha256 TEXT")
             addColumnIfMissing(db, jobColumns, "jobs", "lineageRootId TEXT")
+            addColumnIfMissing(db, jobColumns, "jobs", "isFavorite INTEGER NOT NULL DEFAULT 0")
 
             db.execSQL("CREATE INDEX IF NOT EXISTS index_jobs_sourceSha256 ON jobs(sourceSha256)")
             db.execSQL("CREATE INDEX IF NOT EXISTS index_jobs_resultSha256 ON jobs(resultSha256)")

@@ -1,6 +1,9 @@
 package dev.zun.flux.data.repo
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.Uri
 import android.util.Log
 import androidx.paging.Pager
@@ -13,6 +16,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.workDataOf
+import dev.zun.flux.R
 import dev.zun.flux.Tuning
 import dev.zun.flux.data.api.CapabilitiesResponse
 import dev.zun.flux.data.api.FluxApi
@@ -21,6 +25,7 @@ import dev.zun.flux.data.api.JobCreatedResponse
 import dev.zun.flux.data.api.JobListResponse
 import dev.zun.flux.data.api.JobStatusDto
 import dev.zun.flux.data.api.JobSummaryDto
+import dev.zun.flux.data.api.PolishPromptRequest
 import dev.zun.flux.data.api.PromptDto
 import dev.zun.flux.data.api.WorkflowSupportDto
 import dev.zun.flux.data.api.Workflows
@@ -35,6 +40,7 @@ import dev.zun.flux.data.worker.JobUploadWorker
 import dev.zun.flux.util.sha256Hex
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -45,9 +51,13 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import retrofit2.HttpException
+import java.io.File
+import java.io.FileOutputStream
 import java.io.IOException
+import java.util.UUID
 
 class RealJobRepository(
     private val context: Context,
@@ -121,6 +131,8 @@ class RealJobRepository(
         refreshPromptsQuietly()
     }
 
+    override suspend fun polishPrompt(text: String): String = api.polishPrompt(PolishPromptRequest(text)).text
+
     override suspend fun submitJob(
         inputUri: Uri,
         selection: PromptSelection,
@@ -155,11 +167,12 @@ class RealJobRepository(
             JobUploadWorker.KEY_WORKFLOW to workflow,
             JobUploadWorker.KEY_KNOWN_SOURCE_INPUT_ID to (knownSourceInputId ?: -1),
         )
+        val networkType = networkTypeFor(settingsManager.allowCellularData)
         val request = OneTimeWorkRequestBuilder<JobUploadWorker>()
             .setInputData(data)
             .setConstraints(
                 Constraints.Builder()
-                    .setRequiredNetworkType(NetworkType.CONNECTED)
+                    .setRequiredNetworkType(networkType)
                     .build(),
             )
             .addTag(STAGED_PATH_TAG_PREFIX + staged.absolutePath)
@@ -260,6 +273,14 @@ class RealJobRepository(
     }
 
     override suspend fun deleteJob(jobId: String) {
+        if (jobId.startsWith(LOCAL_COMPOSITE_ID_PREFIX)) {
+            // No server counterpart exists for this id — deleting it must never touch the network
+            // (feature 015 FR-007), so this skips the pending-delete queue/DeleteSyncWorker entirely
+            // rather than relying on the existing graceful-404 handling other jobs go through.
+            dao.deleteJobById(jobId)
+            localCompositeFile(jobId).parentFile?.deleteRecursively()
+            return
+        }
         localDeletedIds.update { it + jobId }
         dao.insertPendingDelete(PendingDeleteEntity(jobId = jobId, createdAt = System.currentTimeMillis()))
         dao.deleteJobById(jobId)
@@ -305,7 +326,12 @@ class RealJobRepository(
         entities.filter { it.status == "done" }.map { it.toSummaryDto() }
     }
 
-    override fun pagedJobs(promptId: Long?, customOnly: Boolean, newestFirst: Boolean): Flow<PagingData<JobSummaryDto>> = Pager(
+    override fun pagedJobs(
+        promptId: Long?,
+        customOnly: Boolean,
+        newestFirst: Boolean,
+        favoritesOnly: Boolean,
+    ): Flow<PagingData<JobSummaryDto>> = Pager(
         config = PagingConfig(
             pageSize = Tuning.GALLERY_PAGE_SIZE,
             // One page up front (default is 3x) for a faster first paint;
@@ -316,13 +342,17 @@ class RealJobRepository(
         ),
         pagingSourceFactory = {
             when {
-                customOnly -> dao.pagedDoneJobsCustom(newestFirst)
-                promptId != null -> dao.pagedDoneJobsByPromptId(promptId, newestFirst)
-                else -> dao.pagedDoneJobsAll(newestFirst)
+                customOnly -> dao.pagedDoneJobsCustom(newestFirst, favoritesOnly)
+                promptId != null -> dao.pagedDoneJobsByPromptId(promptId, newestFirst, favoritesOnly)
+                else -> dao.pagedDoneJobsAll(newestFirst, favoritesOnly)
             }
         },
     ).flow.map { pagingData ->
         pagingData.map { it.toSummaryDto() }
+    }
+
+    override suspend fun setFavorite(jobId: String, isFavorite: Boolean) {
+        dao.setFavorite(jobId, isFavorite)
     }
 
     override fun jobTagStats(): Flow<JobTagStats> = combine(
@@ -409,32 +439,83 @@ class RealJobRepository(
         return buildUrlOrNull("/api/v1/inputs/$inputId/file")
     }
 
-    override fun thumbModel(jobId: String): Any? = offlineImageCache.localUri(jobId, OfflineImageCache.Kind.Thumb)
+    override fun thumbModel(jobId: String): Any? = localCompositeUriOrNull(jobId)
+        ?: offlineImageCache.localUri(jobId, OfflineImageCache.Kind.Thumb)
         ?: buildUrlOrNull("/api/v1/jobs/$jobId/thumb")
 
-    override fun previewModel(jobId: String): Any? = offlineImageCache.localUri(jobId, OfflineImageCache.Kind.Preview)
+    override fun previewModel(jobId: String): Any? = localCompositeUriOrNull(jobId)
+        ?: offlineImageCache.localUri(jobId, OfflineImageCache.Kind.Preview)
         ?: buildUrlOrNull("/api/v1/jobs/$jobId/preview")
 
-    override fun resultModel(jobId: String): Any? = offlineImageCache.localUri(jobId, OfflineImageCache.Kind.Result)
+    override fun resultModel(jobId: String): Any? = localCompositeUriOrNull(jobId)
+        ?: offlineImageCache.localUri(jobId, OfflineImageCache.Kind.Result)
         ?: buildUrlOrNull("/api/v1/jobs/$jobId/result")
 
-    override fun offlineAvailability(jobId: String): OfflineImageAvailability = offlineImageCache.availability(jobId)
+    override fun offlineAvailability(jobId: String): OfflineImageAvailability {
+        if (jobId.startsWith(LOCAL_COMPOSITE_ID_PREFIX)) {
+            return OfflineImageAvailability(thumbCached = true, previewCached = true, resultCached = true)
+        }
+        return offlineImageCache.availability(jobId)
+    }
+
+    /** The single flattened image file backing a feature-015 local composite, or `null` for an
+     *  ordinary server-backed job id. */
+    private fun localCompositeUriOrNull(jobId: String): Uri? {
+        if (!jobId.startsWith(LOCAL_COMPOSITE_ID_PREFIX)) return null
+        return Uri.fromFile(localCompositeFile(jobId))
+    }
+
+    private fun localCompositeFile(jobId: String): File = File(context.filesDir, localCompositeRelativePath(jobId))
+
+    override suspend fun saveLocalComposite(bitmap: Bitmap): Result<String> = withContext(Dispatchers.IO) {
+        runCatching {
+            val id = "$LOCAL_COMPOSITE_ID_PREFIX${UUID.randomUUID()}"
+            val file = localCompositeFile(id)
+            val now = System.currentTimeMillis()
+            val placeholderPrompt = context.getString(R.string.local_composite_prompt_placeholder)
+            // NonCancellable: the caller (ScratchRevealCompare's rememberCoroutineScope) can be
+            // cancelled by navigation mid-save. Without this, a cancellation landing between the
+            // file write and the Room insert would leave an orphaned file — local_composites/ is
+            // deliberately never scanned by anything (feature 015 research.md Decision 2), so such
+            // an orphan would never get cleaned up.
+            withContext(NonCancellable) {
+                file.parentFile?.mkdirs()
+                FileOutputStream(file).use { out -> bitmap.compress(Bitmap.CompressFormat.JPEG, 95, out) }
+                dao.insertJob(
+                    JobEntity(
+                        id = id,
+                        status = "done",
+                        inputId = null,
+                        promptId = null,
+                        promptText = placeholderPrompt,
+                        workflow = null,
+                        seed = null,
+                        progress = null,
+                        error = null,
+                        createdAt = now,
+                        startedAt = now,
+                        completedAt = now,
+                        durationSeconds = null,
+                        width = bitmap.width,
+                        height = bitmap.height,
+                    ),
+                )
+            }
+            id
+        }
+    }
 
     override val offlineCacheVersion get() = offlineImageCache.version
 
     override fun offlineCacheStats(): OfflineCacheStats = offlineImageCache.stats()
 
-    override fun clearOfflineImageCache() {
-        offlineImageCache.clear()
-    }
-
     private fun buildUrlOrNull(path: String): String? = settingsManager.serverUrl?.takeUnless { it.isBlank() }?.let { "$it$path" }
 
     /**
-     * REPLACE would otherwise wipe the lineage-tracking columns (they're
-     * local-only, never present on the server DTOs these entities are mapped
-     * from) on every bulk sync. Copies any previously-stored values across
-     * before the upsert.
+     * REPLACE would otherwise wipe local-only columns (lineage tracking,
+     * favorite status — never present on the server DTOs these entities are
+     * mapped from) on every bulk sync. Copies any previously-stored values
+     * across before the upsert.
      */
     private suspend fun carryForwardLineage(entities: List<JobEntity>): List<JobEntity> {
         val existingById = dao.getJobsByIds(entities.map { it.id }).associateBy { it.id }
@@ -444,6 +525,7 @@ class RealJobRepository(
                 sourceSha256 = existing.sourceSha256,
                 resultSha256 = existing.resultSha256,
                 lineageRootId = existing.lineageRootId,
+                isFavorite = existing.isFavorite,
             )
         }
     }
@@ -459,7 +541,45 @@ class RealJobRepository(
             .forEach { prefetchJobImages(it.id) }
     }
 
+    /**
+     * Automatic, opportunistic result prefetch is skipped (not errored) on a metered
+     * connection when the user hasn't allowed cellular data — it isn't on WorkManager
+     * like uploads are, so this is checked manually rather than via a NetworkType
+     * constraint.
+     */
+    private fun canPrefetchNow(): Boolean {
+        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+        val isUnmetered = connectivityManager?.let { cm ->
+            val network = cm.activeNetwork ?: return@let false
+            val capabilities = cm.getNetworkCapabilities(network) ?: return@let false
+            capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
+        }
+        return canPrefetchGivenNetwork(settingsManager.allowCellularData, isUnmetered)
+    }
+
+    /**
+     * Unlike [canPrefetchNow], cache-cleanup's safety gate (feature 009) doesn't care about the
+     * Wi-Fi-only setting — evicting while offline would leave a cached image with zero reachable
+     * copies regardless of that preference, so this only answers "is there connectivity at all."
+     */
+    override fun hasNetworkConnectivity(): Boolean {
+        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+        val hasInternet = connectivityManager?.let { cm ->
+            val network = cm.activeNetwork ?: return@let false
+            val capabilities = cm.getNetworkCapabilities(network) ?: return@let false
+            capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        }
+        return hasConnectivity(hasInternet)
+    }
+
+    override fun listCachedJobs(): List<OfflineImageCache.CachedJobSummary> = offlineImageCache.listCachedJobs()
+
+    override fun evictFromCache(jobId: String) {
+        offlineImageCache.delete(jobId)
+    }
+
     private fun prefetchJobImages(jobId: String) {
+        if (!canPrefetchNow()) return
         val thumbUrl = buildUrlOrNull("/api/v1/jobs/$jobId/thumb")
         val previewUrl = buildUrlOrNull("/api/v1/jobs/$jobId/preview")
         val resultUrl = buildUrlOrNull("/api/v1/jobs/$jobId/result")
@@ -510,3 +630,31 @@ internal fun JobListResponse.withoutHiddenJobs(hiddenIds: Set<String>): JobListR
     if (hiddenIds.isEmpty()) return this
     return copy(items = items.filterNot { it.id in hiddenIds })
 }
+
+/** Path, relative to [android.content.Context.getFilesDir], of a feature-015 local composite's
+ *  flattened image file — extracted as a pure function so this format is unit-testable without
+ *  constructing a full [RealJobRepository] (this file's tests only ever exercise pure top-level
+ *  functions like this one, not the class itself). */
+internal fun localCompositeRelativePath(jobId: String): String = "local_composites/$jobId/composite.jpg"
+
+/** Which [NetworkType] an upload's [Constraints] should require, given the user's setting. */
+internal fun networkTypeFor(allowCellularData: Boolean): NetworkType = if (allowCellularData) NetworkType.CONNECTED else NetworkType.UNMETERED
+
+/**
+ * Whether an automatic result prefetch should proceed right now. [isCurrentNetworkUnmetered]
+ * is `null` when connectivity state couldn't be determined — treated as "don't block" rather
+ * than silently starving the cache over an unrelated platform quirk.
+ */
+internal fun canPrefetchGivenNetwork(allowCellularData: Boolean, isCurrentNetworkUnmetered: Boolean?): Boolean {
+    if (allowCellularData) return true
+    return isCurrentNetworkUnmetered ?: true
+}
+
+/**
+ * Whether cache-cleanup's destructive eviction step may proceed right now. Unlike
+ * [canPrefetchGivenNetwork] (where "unknown" defaults to *not* blocking a low-stakes, retryable
+ * prefetch), an unknown/unavailable [hasInternetCapability] here defaults to blocking — evicting
+ * a cache entry is irreversible on-device, so uncertainty should fail safe rather than risk
+ * leaving an image with zero reachable copies (spec FR-010).
+ */
+internal fun hasConnectivity(hasInternetCapability: Boolean?): Boolean = hasInternetCapability == true

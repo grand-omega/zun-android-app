@@ -66,6 +66,10 @@ fun HomeScreen(
     onTogglePin: (Long) -> Unit,
     onImagesDropped: (List<Uri>) -> Unit = {},
     priorEditsByUri: Map<Uri, PriorEditsInfo> = emptyMap(),
+    polishState: PolishState = PolishState.Idle,
+    onPolishClick: () -> Unit = {},
+    canRevertPolish: Boolean = false,
+    onRevertPolishClick: () -> Unit = {},
 ) {
     var showPromptSheet by rememberSaveable { mutableStateOf(false) }
     var showPromptManageSheet by rememberSaveable { mutableStateOf(false) }
@@ -149,6 +153,10 @@ fun HomeScreen(
                     modifier = Modifier.weight(1f),
                     fillHeight = true,
                     showTryHarder = tryHarderAvailable,
+                    polishState = polishState,
+                    onPolishClick = onPolishClick,
+                    canRevertPolish = canRevertPolish,
+                    onRevertPolishClick = onRevertPolishClick,
                 )
                 composer(false)
             }
@@ -199,6 +207,10 @@ fun HomeScreen(
             pinnedIds = pinnedIds,
             onTogglePin = onTogglePin,
             showTryHarder = tryHarderAvailable,
+            polishState = polishState,
+            onPolishClick = onPolishClick,
+            canRevertPolish = canRevertPolish,
+            onRevertPolishClick = onRevertPolishClick,
         )
     }
 

@@ -139,19 +139,6 @@ class SettingsViewModel(
         }
     }
 
-    fun clearOfflineCache() {
-        viewModelScope.launch {
-            val stats = withContext(Dispatchers.IO) {
-                app.repositories.images.clearOfflineImageCache()
-                app.repositories.images.offlineCacheStats()
-            }
-            _offlineCache.value = OfflineCacheState(
-                stats = stats,
-                status = "Offline image cache cleared.",
-            )
-        }
-    }
-
     private fun updateDraft(block: ConnectionDraftState.() -> ConnectionDraftState) {
         _connectionDraft.value = _connectionDraft.value.block()
     }

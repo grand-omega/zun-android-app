@@ -1,7 +1,11 @@
 package dev.zun.flux.ui.progress
 
+import androidx.compose.runtime.Composable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import dev.zun.flux.data.api.JobStatusDto
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.util.toUserMessage
@@ -182,3 +186,10 @@ class ProgressViewModel(
         }
     }
 }
+
+/** Shared by [ProgressScreen], `BatchTile`, and `BatchPage` — one place to construct a [ProgressViewModel]. */
+@Composable
+fun rememberProgressViewModel(jobId: String, jobs: JobRepository): ProgressViewModel = viewModel(
+    key = jobId,
+    factory = viewModelFactory { initializer { ProgressViewModel(repository = jobs) } },
+)

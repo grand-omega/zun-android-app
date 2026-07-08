@@ -25,7 +25,6 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AssistChip
@@ -33,7 +32,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -64,14 +62,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.lifecycle.viewmodel.initializer
-import androidx.lifecycle.viewmodel.viewModelFactory
 import coil3.compose.AsyncImage
 import dev.zun.flux.R
 import dev.zun.flux.Tuning
 import dev.zun.flux.data.repo.ImageSourceRepository
 import dev.zun.flux.data.repo.JobRepository
+import dev.zun.flux.ui.common.BackNavigationIcon
 import dev.zun.flux.ui.common.LoadingScrim
 import dev.zun.flux.ui.common.PanelShape
 import dev.zun.flux.ui.common.StatusPill
@@ -162,9 +158,7 @@ private fun BatchGrid(
             TopAppBar(
                 title = { Text(pluralStringResource(R.plurals.progress_batch_n_generations_format, jobIds.size, jobIds.size)) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                    }
+                    BackNavigationIcon(onBack = onBack, contentDescription = stringResource(R.string.common_back))
                 },
             )
         },
@@ -198,16 +192,7 @@ private fun BatchTile(
     images: ImageSourceRepository,
     onClick: (isDone: Boolean) -> Unit,
 ) {
-    val viewModel: ProgressViewModel = viewModel(
-        key = jobId,
-        factory = viewModelFactory {
-            initializer {
-                ProgressViewModel(
-                    repository = jobs,
-                )
-            }
-        },
-    )
+    val viewModel: ProgressViewModel = rememberProgressViewModel(jobId, jobs)
     val state by viewModel.state.collectAsStateWithLifecycle()
     PollWhileStarted(viewModel, jobId)
 
@@ -348,9 +333,7 @@ private fun BatchFocused(
             TopAppBar(
                 title = { Text(stringResource(R.string.progress_batch_index_format, pagerState.currentPage + 1, jobIds.size)) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.progress_batch_back_to_overview))
-                    }
+                    BackNavigationIcon(onBack = onBack, contentDescription = stringResource(R.string.progress_batch_back_to_overview))
                 },
             )
         },
@@ -379,16 +362,7 @@ private fun BatchPage(
     images: ImageSourceRepository,
     onViewResult: () -> Unit,
 ) {
-    val viewModel: ProgressViewModel = viewModel(
-        key = jobId,
-        factory = viewModelFactory {
-            initializer {
-                ProgressViewModel(
-                    repository = jobs,
-                )
-            }
-        },
-    )
+    val viewModel: ProgressViewModel = rememberProgressViewModel(jobId, jobs)
     val state by viewModel.state.collectAsStateWithLifecycle()
     val currentDto = (state as? PollState.Running)?.dto ?: (state as? PollState.Done)?.dto
     val inputModel = remember(currentDto?.input_id) { images.inputModel(currentDto?.input_id) }

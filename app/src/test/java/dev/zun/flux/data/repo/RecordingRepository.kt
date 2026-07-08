@@ -1,5 +1,6 @@
 package dev.zun.flux.data.repo
 
+import android.graphics.Bitmap
 import android.net.Uri
 import androidx.paging.PagingData
 import dev.zun.flux.data.api.CapabilitiesResponse
@@ -82,6 +83,23 @@ class RecordingRepository :
         _promptsState.value = _promptsState.value.filterNot { it.id == promptId }
     }
 
+    var holdPolish: CompletableDeferred<Unit>? = null
+    var polishShouldFail = false
+    var polishCalls = 0
+        private set
+    var lastPolishInput: String? = null
+        private set
+
+    override suspend fun polishPrompt(text: String): String {
+        polishCalls++
+        lastPolishInput = text
+        holdPolish?.await()
+        if (polishShouldFail) {
+            error("Polish failed")
+        }
+        return "Polished: $text"
+    }
+
     override suspend fun submitJob(
         inputUri: Uri,
         selection: PromptSelection,
@@ -162,7 +180,10 @@ class RecordingRepository :
         promptId: Long?,
         customOnly: Boolean,
         newestFirst: Boolean,
+        favoritesOnly: Boolean,
     ): Flow<PagingData<JobSummaryDto>> = MutableStateFlow(PagingData.empty())
+
+    override suspend fun setFavorite(jobId: String, isFavorite: Boolean) = Unit
 
     override fun jobTagStats(): Flow<JobTagStats> = MutableStateFlow(
         JobTagStats(totalCount = 0, customCount = 0, perPromptCounts = emptyMap()),
@@ -195,6 +216,14 @@ class RecordingRepository :
 
     override fun getJobsByLineageRoot(rootId: String): Flow<List<JobSummaryDto>> = MutableStateFlow(emptyList())
 
+    var savedComposites = 0
+        private set
+
+    override suspend fun saveLocalComposite(bitmap: Bitmap): Result<String> {
+        savedComposites++
+        return Result.success("local-composite-recorded")
+    }
+
     override fun inputModel(inputId: Int?): Any? = null
 
     override fun thumbModel(jobId: String): Any? = null
@@ -213,5 +242,9 @@ class RecordingRepository :
 
     override fun offlineCacheStats(): OfflineCacheStats = OfflineCacheStats(bytes = 0L, fileCount = 0)
 
-    override fun clearOfflineImageCache() = Unit
+    override fun listCachedJobs(): List<OfflineImageCache.CachedJobSummary> = emptyList()
+
+    override fun evictFromCache(jobId: String) = Unit
+
+    override fun hasNetworkConnectivity(): Boolean = true
 }

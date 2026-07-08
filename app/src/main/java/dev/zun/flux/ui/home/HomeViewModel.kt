@@ -60,6 +60,14 @@ sealed interface SubmitState {
     data class Failed(val message: String) : SubmitState
 }
 
+sealed interface PolishState {
+    data object Idle : PolishState
+
+    data object InProgress : PolishState
+
+    data class Failed(val message: String) : PolishState
+}
+
 /** Progress through a batch submit: "Uploading [current] of [total]". */
 data class BatchProgress(val current: Int, val total: Int)
 
@@ -107,6 +115,13 @@ class HomeViewModel(
 
     private val _composer = MutableStateFlow(HomeComposerState())
     val composer: StateFlow<HomeComposerState> = _composer.asStateFlow()
+
+    private val _polishState = MutableStateFlow<PolishState>(PolishState.Idle)
+    val polishState: StateFlow<PolishState> = _polishState.asStateFlow()
+
+    /** Custom prompt text as it was just before the most recent successful polish, for revert. */
+    private val _prePolishText = MutableStateFlow<String?>(null)
+    val prePolishText: StateFlow<String?> = _prePolishText.asStateFlow()
 
     private val _priorEdits = MutableStateFlow<Map<Uri, PriorEditsInfo>>(emptyMap())
     val priorEdits: StateFlow<Map<Uri, PriorEditsInfo>> = _priorEdits.asStateFlow()
@@ -296,6 +311,42 @@ class HomeViewModel(
 
     fun updateCustomPrompt(text: String) {
         _composer.value = _composer.value.copy(customPromptText = text)
+        // A manual edit ends the previous polish's revert window (FR-003's "for as long as
+        // that prompt-writing session is still active") — the polish success path mutates
+        // customPromptText directly, bypassing this, so it doesn't clear its own target.
+        _prePolishText.value = null
+    }
+
+    /** Rewrites the current custom prompt via [PromptRepository.polishPrompt]. See FR-001-008. */
+    fun polishPrompt() {
+        val requestText = _composer.value.customPromptText
+        if (requestText.isBlank() || _polishState.value is PolishState.InProgress) return
+        _polishState.value = PolishState.InProgress
+        viewModelScope.launch {
+            val outcome = runCatching { promptRepo.polishPrompt(requestText) }
+            if (_composer.value.customPromptText != requestText) {
+                // Stale: the user changed the text while this was in flight — discard
+                // whatever came back rather than clobbering their newer edit (FR-005/FR spec
+                // Edge Cases).
+                _polishState.value = PolishState.Idle
+                return@launch
+            }
+            _polishState.value = outcome.fold(
+                onSuccess = { rewritten ->
+                    _prePolishText.value = requestText
+                    _composer.value = _composer.value.copy(customPromptText = rewritten)
+                    PolishState.Idle
+                },
+                onFailure = { PolishState.Failed(it.toUserMessage("polish")) },
+            )
+        }
+    }
+
+    /** Restores the custom prompt text to what it was before the last successful polish. */
+    fun revertPolish() {
+        val original = _prePolishText.value ?: return
+        _composer.value = _composer.value.copy(customPromptText = original)
+        _prePolishText.value = null
     }
 
     fun setTryHarder(enabled: Boolean) {
@@ -422,6 +473,8 @@ class HomeViewModel(
             _composer.value = _composer.value.copy(inputUris = emptyList())
             _priorEdits.value = emptyMap()
             recentSourceInputIds.value = emptyMap()
+            _prePolishText.value = null
+            _polishState.value = PolishState.Idle
         }
         _state.value = SubmitState.Idle
     }
