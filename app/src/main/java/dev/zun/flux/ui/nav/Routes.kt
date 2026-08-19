@@ -10,6 +10,7 @@ object Routes {
     const val RESULT = "result/{jobId}"
     const val BATCH_PROGRESS = "batch/{jobIds}"
     const val HISTORY = "history/{lineageRootId}"
+    const val CACHE_CLEANUP = "cache_cleanup"
 
     fun progress(jobId: String) = "progress/$jobId"
 

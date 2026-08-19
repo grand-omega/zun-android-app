@@ -52,6 +52,12 @@ interface FluxApi {
         @Path("id") id: Long,
     )
 
+    /** Rewrites a rough custom prompt into a structured one. Self-hosted server-side only. */
+    @POST("api/v1/prompts/polish")
+    suspend fun polishPrompt(
+        @Body body: PolishPromptRequest,
+    ): PolishPromptResponse
+
     // --- Jobs ---
 
     /** JSON probe — server answers 200/202 if it already has the input, else 409 need_upload. */

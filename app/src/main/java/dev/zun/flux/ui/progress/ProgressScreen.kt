@@ -16,15 +16,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -50,9 +46,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.lifecycle.viewmodel.initializer
-import androidx.lifecycle.viewmodel.viewModelFactory
 import coil3.compose.AsyncImage
 import dev.zun.flux.R
 import dev.zun.flux.Tuning
@@ -60,6 +53,7 @@ import dev.zun.flux.data.api.effectivePromptId
 import dev.zun.flux.data.repo.ImageSourceRepository
 import dev.zun.flux.data.repo.JobRepository
 import dev.zun.flux.data.repo.PromptRepository
+import dev.zun.flux.ui.common.BackNavigationIcon
 import dev.zun.flux.ui.common.LoadingScrim
 import dev.zun.flux.ui.common.PanelShape
 import dev.zun.flux.ui.common.StatusPill
@@ -98,18 +92,7 @@ fun ProgressScreen(
     onDone: () -> Unit,
     onBack: () -> Unit,
 ) {
-    val viewModel: ProgressViewModel =
-        viewModel(
-            key = jobId,
-            factory =
-            viewModelFactory {
-                initializer {
-                    ProgressViewModel(
-                        repository = jobs,
-                    )
-                }
-            },
-        )
+    val viewModel: ProgressViewModel = rememberProgressViewModel(jobId, jobs)
     val state by viewModel.state.collectAsStateWithLifecycle()
     val promptList by prompts.promptsState.collectAsStateWithLifecycle()
     val currentDto = (state as? PollState.Running)?.dto ?: (state as? PollState.Done)?.dto
@@ -130,9 +113,7 @@ fun ProgressScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.progress_title)) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                    }
+                    BackNavigationIcon(onBack = onBack, contentDescription = stringResource(R.string.common_back))
                 },
             )
         },

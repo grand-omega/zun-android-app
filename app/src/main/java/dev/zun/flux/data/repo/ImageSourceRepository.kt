@@ -64,6 +64,12 @@ interface ImageSourceRepository {
     /** Current private offline image cache size. */
     fun offlineCacheStats(): OfflineCacheStats
 
-    /** Drops cached generated images. Server history remains untouched. */
-    fun clearOfflineImageCache()
+    /** One entry per job with something cached, for the cache-cleanup preview (feature 009). */
+    fun listCachedJobs(): List<OfflineImageCache.CachedJobSummary>
+
+    /** Evicts one job's cached files. Server history and the job itself are untouched. */
+    fun evictFromCache(jobId: String)
+
+    /** Whether there's any network connectivity right now — see [RealJobRepository.hasNetworkConnectivity]. */
+    fun hasNetworkConnectivity(): Boolean
 }

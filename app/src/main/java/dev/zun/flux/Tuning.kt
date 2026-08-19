@@ -20,10 +20,12 @@ object Tuning {
     /** Max IOException retries before [data.worker.JobUploadWorker] gives up. */
     const val MAX_UPLOAD_RETRIES = 4
 
-    /** Age after which orphaned staged-upload files in cacheDir are swept at app
-     *  start. Active uploads are awaited at most ~60s before being cancelled, so
-     *  anything this old was leaked by a crash or failed cancellation cleanup. */
-    const val STAGED_UPLOAD_MAX_AGE_MS = 24L * 60L * 60L * 1000L
+    /** Age after which orphaned one-shot cacheDir files are swept at app start.
+     *  Active uploads are awaited at most ~60s before being cancelled, so anything
+     *  this old was leaked by a crash or failed cancellation cleanup. Share and
+     *  export copies are handed to another app by Uri, so the cutoff also has to
+     *  outlast any share sheet the user might leave open — a day does comfortably. */
+    const val STALE_CACHE_FILE_MAX_AGE_MS = 24L * 60L * 60L * 1000L
 
     // --- Caching --------------------------------------------------------------
 

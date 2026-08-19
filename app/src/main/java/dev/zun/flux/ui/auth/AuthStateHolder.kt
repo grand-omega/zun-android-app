@@ -24,6 +24,11 @@ class AuthStateHolder(private val settingsManager: SettingsManager) {
     private fun withinGraceWindow(): Boolean {
         val last = settingsManager.lastAuthTimestamp
         if (last == 0L) return false
-        return System.currentTimeMillis() - last <= settingsManager.lockoutDurationMs
+        // Wall clock, so moving the device clock backwards past the last unlock makes `elapsed`
+        // negative — which would satisfy a bare `<= lockoutDurationMs` and hand over an unlocked
+        // app. Any backwards jump is treated as expired instead: re-authenticating costs one
+        // biometric prompt, trusting it costs the lock entirely.
+        val elapsed = System.currentTimeMillis() - last
+        return elapsed >= 0 && elapsed <= settingsManager.lockoutDurationMs
     }
 }

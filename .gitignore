@@ -13,6 +13,11 @@ local.properties
 captures/
 .cxx/
 
+# Baseline-profile generator output. The run copies its result into
+# app/src/main/baseline-prof.txt, which is what gets committed and shipped;
+# this directory is just the generator's scratch output.
+app/src/*/generated/baselineProfiles/
+
 # Output
 *.apk
 *.aab

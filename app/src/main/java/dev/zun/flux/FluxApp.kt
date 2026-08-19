@@ -18,7 +18,7 @@ import dev.zun.flux.data.repo.RealJobRepository
 import dev.zun.flux.data.repo.SettingsManager
 import dev.zun.flux.data.repo.UploadRepository
 import dev.zun.flux.ui.auth.AuthStateHolder
-import io.sentry.android.core.SentryAndroid
+import dev.zun.flux.util.isSweepableCacheFile
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -79,11 +79,6 @@ class FluxApp : Application() {
     override fun onCreate() {
         super.onCreate()
 
-        // Off the critical path: Sentry only needs to be up before the first
-        // crash report, not before the first frame. The brief uncovered window
-        // is an accepted trade-off for faster cold start.
-        Thread { initSentry() }.start()
-
         settingsManager = SettingsManager(this)
         authStateHolder = AuthStateHolder(settingsManager)
         pinnedPrompts = PinnedPromptsStore(this)
@@ -114,42 +109,23 @@ class FluxApp : Application() {
 
         rebuildRepository()
 
-        sweepStagedUploadFiles()
+        sweepStaleCacheFiles()
     }
 
     /**
-     * Initialize Sentry crash reporting. Skipped silently if SENTRY_DSN
-     * wasn't provided at build time (e.g. fresh clone without a populated
-     * local.properties), so the app still runs; just no crash reports flow.
+     * Delete one-shot cacheDir files orphaned by a crash, or by a cancellation whose cleanup
+     * failed (see RealJobRepository.cancelJobUpload — the staged path is recovered from a
+     * WorkManager tag, which can miss). Nothing else ever removes these, so without this they
+     * accumulate until Android trims the whole cache.
+     *
+     * Which prefixes qualify, and why RecentInputCache's keyed store is excluded, lives with
+     * the predicate in [isSweepableCacheFile].
      */
-    private fun initSentry() {
-        if (BuildConfig.SENTRY_DSN.isBlank()) return
-        SentryAndroid.init(this) { options ->
-            options.dsn = BuildConfig.SENTRY_DSN
-            options.environment = if (BuildConfig.DEBUG) "debug" else "production"
-            // versionName comes from `git describe`, so this tag uniquely
-            // identifies which build a given crash came from.
-            options.release = "${BuildConfig.APPLICATION_ID}@${BuildConfig.VERSION_NAME}+${BuildConfig.VERSION_CODE}"
-            // Crashes only — performance traces eat the free-tier quota fast.
-            options.tracesSampleRate = 0.0
-            // Don't capture screenshots / view hierarchy on crash: prompts and
-            // generated images are user-content; better to opt out by default.
-            options.isAttachScreenshot = false
-            options.isAttachViewHierarchy = false
-        }
-    }
-
-    /**
-     * Delete staged upload files orphaned by a crash or a cancellation whose
-     * cleanup failed (see RealJobRepository.cancelJobUpload — the staged path
-     * is recovered from a WorkManager tag, which can miss). Without this they
-     * sit in cacheDir until Android trims it.
-     */
-    private fun sweepStagedUploadFiles() {
+    private fun sweepStaleCacheFiles() {
         Thread {
-            val cutoff = System.currentTimeMillis() - Tuning.STAGED_UPLOAD_MAX_AGE_MS
+            val cutoff = System.currentTimeMillis() - Tuning.STALE_CACHE_FILE_MAX_AGE_MS
             cacheDir.listFiles()
-                ?.filter { it.name.startsWith("upload_preprocessed_") && it.lastModified() < cutoff }
+                ?.filter { isSweepableCacheFile(it.name, it.lastModified(), cutoff) }
                 ?.forEach { it.delete() }
         }.start()
     }

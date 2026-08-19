@@ -22,12 +22,15 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.CompareArrows
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
@@ -80,10 +83,13 @@ import coil3.request.SuccessResult
 import dev.zun.flux.R
 import dev.zun.flux.data.api.JobSummaryDto
 import dev.zun.flux.data.api.PromptDto
+import dev.zun.flux.data.api.Workflows
 import dev.zun.flux.data.api.effectivePromptId
 import dev.zun.flux.data.repo.ImageSourceRepository
 import dev.zun.flux.data.repo.OfflineImageAvailability
+import dev.zun.flux.data.repo.SettingsManager
 import dev.zun.flux.ui.common.ActionBarSurface
+import dev.zun.flux.ui.common.BackNavigationIcon
 import dev.zun.flux.ui.common.MissingImageState
 import dev.zun.flux.util.resolvePromptLabel
 import dev.zun.flux.util.saveToPictures
@@ -107,8 +113,14 @@ fun PhotoViewerScreen(
     onUseInput: (Uri) -> Unit,
     onViewHistory: (String) -> Unit,
     onBack: () -> Unit,
+    scopedJobIds: Set<String>? = null,
+    settings: SettingsManager? = null,
 ) {
-    val jobs by viewModel.jobs.collectAsState()
+    val allJobs by viewModel.jobs.collectAsState()
+    // When opened from a stack (feature 009), narrow the pager to just that stack's members —
+    // every existing action below still reads/writes through the same viewModel.jobs-derived
+    // list, so favorite/delete/details/history all behave identically to the full-gallery case.
+    val jobs = if (scopedJobIds != null) allJobs.filter { it.id in scopedJobIds } else allJobs
     val prompts by viewModel.prompts.collectAsState()
 
     val pagerState =
@@ -201,16 +213,12 @@ fun PhotoViewerScreen(
     val undoActionLabel = stringResource(R.string.gallery_undo)
     LaunchedEffect(pendingUndo) {
         val undo = pendingUndo ?: return@LaunchedEffect
-        val result = snackbarHostState.showSnackbar(
+        snackbarHostState.showUndoDeletedSnackbar(
             message = undoDeletedMessage,
             actionLabel = undoActionLabel,
-            duration = androidx.compose.material3.SnackbarDuration.Short,
+            onUndo = { viewModel.undoDelete(undo) },
+            onDismiss = { viewModel.clearPendingUndo() },
         )
-        if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
-            viewModel.undoDelete(undo)
-        } else {
-            viewModel.clearPendingUndo()
-        }
     }
 
     LaunchedEffect(viewerNotice) {
@@ -234,9 +242,7 @@ fun PhotoViewerScreen(
                 TopAppBar(
                     title = { },
                     navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back), tint = Color.White)
-                        }
+                        BackNavigationIcon(onBack = onBack, contentDescription = stringResource(R.string.common_back), tint = Color.White)
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
                 )
@@ -282,6 +288,11 @@ fun PhotoViewerScreen(
                                 viewerNotice = saveFailedMessage
                             }
                         }
+                    },
+                    isFavorite = currentJob?.isFavorite == true,
+                    onToggleFavorite = {
+                        val job = currentJob ?: return@ViewerActionBar
+                        viewModel.setFavorite(job.id, !job.isFavorite)
                     },
                     onDetails = { showDetails = true },
                     onDelete = {
@@ -387,6 +398,12 @@ fun PhotoViewerScreen(
                     CompareOverlay(
                         beforeModel = images.inputModel(inputId),
                         afterModel = images.previewModel(currentJob.id),
+                        initialMode = if (settings?.defaultCompareModeIsScratch == true) {
+                            CompareMode.Scratch
+                        } else {
+                            CompareMode.Slider
+                        },
+                        onSaveComposite = { bitmap -> viewModel.saveLocalComposite(bitmap) },
                         onDismiss = { showCompare = false },
                     )
                 } else {
@@ -507,6 +524,7 @@ private fun JobDetailsSheet(
         Column(
             modifier =
             Modifier
+                .verticalScroll(rememberScrollState())
                 .padding(24.dp),
         ) {
             Box(
@@ -527,10 +545,17 @@ private fun JobDetailsSheet(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 val locale = LocalLocale.current.platformLocale
+                val dateFormatter = remember(locale) { SimpleDateFormat("MMM d, yyyy · HH:mm", locale) }
                 DetailRow(
                     stringResource(R.string.viewer_detail_created),
-                    SimpleDateFormat("MMM d, yyyy · HH:mm", locale).format(Date(job.created_at * 1000)),
+                    dateFormatter.format(Date(job.created_at * 1000)),
                 )
+                job.completed_at?.let {
+                    DetailRow(
+                        stringResource(R.string.viewer_detail_completed),
+                        dateFormatter.format(Date(it * 1000)),
+                    )
+                }
                 job.duration_seconds?.let {
                     DetailRow(
                         stringResource(R.string.viewer_detail_duration),
@@ -545,6 +570,13 @@ private fun JobDetailsSheet(
                 job.prompt_text?.takeIf { it.isNotBlank() }?.let {
                     DetailRow(stringResource(R.string.viewer_detail_prompt_text), it)
                 }
+                job.workflow?.let {
+                    DetailRow(stringResource(R.string.viewer_detail_workflow), it)
+                }
+                DetailRow(
+                    stringResource(R.string.viewer_detail_try_harder),
+                    stringResource(if (job.workflow == Workflows.TRY_HARDER_EDIT) R.string.common_yes else R.string.common_no),
+                )
             }
         }
     }
@@ -579,6 +611,8 @@ private fun ViewerActionBar(
     onCompare: () -> Unit,
     onUseInput: () -> Unit,
     onSave: () -> Unit,
+    isFavorite: Boolean,
+    onToggleFavorite: () -> Unit,
     onDetails: () -> Unit,
     onDelete: () -> Unit,
     onViewHistory: () -> Unit,
@@ -602,6 +636,11 @@ private fun ViewerActionBar(
             icon = Icons.Default.Download,
             label = stringResource(R.string.viewer_save),
             onClick = onSave,
+        )
+        ActionIcon(
+            icon = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+            label = stringResource(if (isFavorite) R.string.viewer_unfavorite else R.string.viewer_favorite),
+            onClick = onToggleFavorite,
         )
         ActionIcon(
             icon = Icons.Default.Info,

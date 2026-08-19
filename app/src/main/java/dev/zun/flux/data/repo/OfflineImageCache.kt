@@ -47,6 +47,9 @@ class OfflineImageCache internal constructor(
         Result("result.jpg"),
     }
 
+    /** One job's entry in the cache-cleanup preview (feature 009) — see [listCachedJobs]. */
+    data class CachedJobSummary(val jobId: String, val cachedKinds: Set<Kind>, val bytes: Long)
+
     private val semaphore = Semaphore(Tuning.OFFLINE_PREFETCH_CONCURRENCY)
 
     /** Bumps whenever cache contents change; UI keys availability re-reads off it. */
@@ -72,6 +75,23 @@ class OfflineImageCache internal constructor(
             bytes = files.sumOf { it.length() },
             fileCount = files.size,
         )
+    }
+
+    /**
+     * One entry per job with something cached, for the cache-cleanup preview (feature 009).
+     * Job ids are server-issued UUIDs, which [sanitizeFileName] passes through unchanged, so the
+     * per-job directory name recovered here matches the original [jobId].
+     */
+    fun listCachedJobs(): List<CachedJobSummary> {
+        val dirs = rootDir.listFiles { file -> file.isDirectory } ?: return emptyList()
+        return dirs.mapNotNull { dir ->
+            val kinds = Kind.entries.filter { kind ->
+                File(dir, kind.fileName).let { it.isFile && it.length() > 0L }
+            }.toSet()
+            if (kinds.isEmpty()) return@mapNotNull null
+            val bytes = dir.walkTopDown().filter { it.isFile }.sumOf { it.length() }
+            CachedJobSummary(jobId = dir.name, cachedKinds = kinds, bytes = bytes)
+        }
     }
 
     fun localUri(jobId: String, kind: Kind): Uri? {

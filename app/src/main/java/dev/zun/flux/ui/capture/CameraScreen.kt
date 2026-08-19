@@ -56,6 +56,10 @@ import dev.zun.flux.R
 import dev.zun.flux.ui.common.EmptyState
 import java.io.File
 
+/** Prefix for camera captures written to cacheDir before they enter the composer. Swept via [dev.zun.flux.util.isSweepableCacheFile];
+ *  keep the two in sync — a rename here silently changes what gets cleaned up. */
+internal const val CAPTURE_CACHE_PREFIX = "capture_"
+
 @Composable
 fun CameraScreen(
     onCaptured: (Uri) -> Unit,

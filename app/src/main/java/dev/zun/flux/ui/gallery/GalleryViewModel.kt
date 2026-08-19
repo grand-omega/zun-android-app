@@ -1,6 +1,7 @@
 package dev.zun.flux.ui.gallery
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -27,6 +28,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -80,6 +82,23 @@ class GalleryViewModel(
     private val _tagFilter = MutableStateFlow<TagFilter>(TagFilter.All)
     val tagFilter: StateFlow<TagFilter> = _tagFilter.asStateFlow()
 
+    /** Independent of [tagFilter] — combines with it rather than replacing it. */
+    private val _favoritesOnly = MutableStateFlow(false)
+    val favoritesOnly: StateFlow<Boolean> = _favoritesOnly.asStateFlow()
+
+    fun setFavoritesOnly(value: Boolean) {
+        _favoritesOnly.value = value
+    }
+
+    fun setFavorite(jobId: String, isFavorite: Boolean) {
+        viewModelScope.launch { jobRepo.setFavorite(jobId, isFavorite) }
+    }
+
+    /** Unlike [setFavorite]'s fire-and-forget launch, this is awaited by its caller
+     *  ([dev.zun.flux.ui.gallery.ScratchRevealCompare]'s own coroutine), which manages its own
+     *  in-progress/success/failure state around the call. */
+    suspend fun saveLocalComposite(bitmap: Bitmap): Result<Unit> = jobRepo.saveLocalComposite(bitmap).map { }
+
     /** Free-text search over prompt labels and custom prompt text. */
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
@@ -91,52 +110,60 @@ class GalleryViewModel(
     }
 
     /**
-     * Filtered list view of all done jobs. Used by PhotoViewerScreen
-     * (HorizontalPager). Grid uses [pagedGridItems] instead.
-     */
-    val jobs: StateFlow<List<JobSummaryDto>> =
-        combine(allJobs, _tagFilter, _searchQuery, prompts, _sortNewestFirst) { all, filter, query, ps, newestFirst ->
-            val tagFiltered = when (filter) {
-                TagFilter.All -> all
-                is TagFilter.ByPromptId -> all.filter { it.effectivePromptId == filter.promptId }
-                TagFilter.Custom -> all.filter { it.effectivePromptId == null && it.prompt_text != null }
-            }
-            val trimmed = query.trim()
-            val filtered = if (trimmed.isBlank()) tagFiltered else tagFiltered.filter { it.matchesQuery(trimmed, ps) }
-            // getJobsFlow is createdAt DESC, id DESC; reversing yields the exact
-            // ascending mirror, keeping viewer order in lockstep with the grid.
-            if (newestFirst) filtered else filtered.asReversed()
-        }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
-
-    /**
-     * Paged stream for the gallery grid, with date-separator rows inserted
-     * between groups. Reacts to [tagFilter] and [searchQuery] changes.
+     * Reacts to [tagFilter], [favoritesOnly] (independent, combinable dimensions),
+     * [searchQuery], [prompts], and sort order. Shared by [jobs] and [pagedGridItems].
      */
     private data class GridQuery(
         val filter: TagFilter,
+        val favoritesOnly: Boolean,
         val query: String,
         val prompts: List<PromptDto>,
         val newestFirst: Boolean,
     )
 
+    private val gridQuery: Flow<GridQuery> =
+        combine(_tagFilter, _favoritesOnly, _searchQuery, prompts, _sortNewestFirst) { filter, favoritesOnly, query, ps, newestFirst ->
+            GridQuery(filter, favoritesOnly, query.trim(), ps, newestFirst)
+        }
+
+    /**
+     * Filtered list view of all done jobs. Used by PhotoViewerScreen
+     * (HorizontalPager). Grid uses [pagedGridItems] instead.
+     */
+    val jobs: StateFlow<List<JobSummaryDto>> =
+        combine(allJobs, gridQuery) { all, q ->
+            val tagFiltered = when (q.filter) {
+                TagFilter.All -> all
+                is TagFilter.ByPromptId -> all.filter { it.effectivePromptId == q.filter.promptId }
+                TagFilter.Custom -> all.filter { it.effectivePromptId == null && it.prompt_text != null }
+            }
+            val favFiltered = if (q.favoritesOnly) tagFiltered.filter { it.isFavorite } else tagFiltered
+            val filtered = if (q.query.isBlank()) favFiltered else favFiltered.filter { it.matchesQuery(q.query, q.prompts) }
+            // getJobsFlow is createdAt DESC, id DESC; reversing yields the exact
+            // ascending mirror, keeping viewer order in lockstep with the grid.
+            if (q.newestFirst) filtered else filtered.asReversed()
+        }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    /**
+     * Paged stream for the gallery grid, with date-separator rows inserted
+     * between groups.
+     */
     @OptIn(ExperimentalCoroutinesApi::class)
     val pagedGridItems: Flow<PagingData<GalleryGridItem>> =
-        combine(_tagFilter, _searchQuery, prompts, _sortNewestFirst) { filter, query, ps, newestFirst ->
-            GridQuery(filter, query.trim(), ps, newestFirst)
-        }
-            .flatMapLatest { (filter, query, ps, newestFirst) ->
-                val (promptId, customOnly) = when (filter) {
+        gridQuery
+            .flatMapLatest { q ->
+                val (promptId, customOnly) = when (q.filter) {
                     TagFilter.All -> null to false
-                    is TagFilter.ByPromptId -> filter.promptId to false
+                    is TagFilter.ByPromptId -> q.filter.promptId to false
                     TagFilter.Custom -> null to true
                 }
-                jobRepo.pagedJobs(promptId, customOnly, newestFirst).map { pagingData ->
-                    if (query.isBlank()) {
+                jobRepo.pagedJobs(promptId, customOnly, q.newestFirst, q.favoritesOnly).map { pagingData ->
+                    if (q.query.isBlank()) {
                         pagingData
                     } else {
                         // Prompt list is small and already in memory; filtering the
                         // Room-backed pages here avoids duplicating labels into SQL.
-                        pagingData.filter { it.matchesQuery(query, ps) }
+                        pagingData.filter { it.matchesQuery(q.query, q.prompts) }
                     }
                 }
             }.map { pagingData ->
@@ -215,8 +242,47 @@ class GalleryViewModel(
     private val _postSaveDelete = MutableStateFlow<Set<String>?>(null)
     val postSaveDelete: StateFlow<Set<String>?> = _postSaveDelete.asStateFlow()
 
+    /**
+     * Job ids that transitioned from active to done while this ViewModel has been observing
+     * (see feature 011 research.md Decision 1) and haven't yet had their one-time reveal
+     * animation consumed. A thumbnail plays its reveal iff its id is in this set; playing it
+     * removes the id via [markRevealed] so it never replays.
+     */
+    private val _revealEligibleJobIds = MutableStateFlow<Set<String>>(emptySet())
+    val revealEligibleJobIds: StateFlow<Set<String>> = _revealEligibleJobIds.asStateFlow()
+
+    /**
+     * Last-seen [JobRepository.activeJobIds] emission, used only to diff the next one. Null
+     * until the first emission arrives, so that first emission is a baseline (nothing eligible)
+     * rather than being diffed against an assumed-empty set — this is what keeps a job that was
+     * already done before Gallery opened from ever being treated as a live completion.
+     */
+    private var previousActiveIds: Set<String>? = null
+
     init {
         refresh()
+        observeCompletions()
+    }
+
+    private fun observeCompletions() {
+        viewModelScope.launch {
+            jobRepo.activeJobIds().collect { active ->
+                val activeSet = active.toSet()
+                val previous = previousActiveIds
+                if (previous != null) {
+                    val justCompleted = previous - activeSet
+                    if (justCompleted.isNotEmpty()) {
+                        _revealEligibleJobIds.value = _revealEligibleJobIds.value + justCompleted
+                    }
+                }
+                previousActiveIds = activeSet
+            }
+        }
+    }
+
+    /** Consumes a thumbnail's one-time reveal eligibility once it has played. */
+    fun markRevealed(jobId: String) {
+        _revealEligibleJobIds.value = _revealEligibleJobIds.value - jobId
     }
 
     fun refresh() {
@@ -370,6 +436,48 @@ class GalleryViewModel(
     }
 
     suspend fun getLineageRootId(jobId: String): String? = jobRepo.getLineageRootId(jobId)
+
+    /**
+     * Ids of the currently-open stack's members, so [dev.zun.flux.ui.gallery.PhotoViewerScreen]
+     * can scope its pager to just them. `null` means "no stack open, show the normal full
+     * gallery" (feature 009).
+     */
+    private val _stackScope = MutableStateFlow<Set<String>?>(null)
+    val stackScope: StateFlow<Set<String>?> = _stackScope.asStateFlow()
+
+    /**
+     * Navigate to [job]. If it represents a stack (more than one variant sharing its lineage
+     * root), resolves the stack's member ids first and scopes the viewer to just them; a plain
+     * (unstacked) job navigates exactly as before, with no scope.
+     */
+    private var isOpeningJob = false
+
+    fun openJob(job: JobSummaryDto, onNavigate: (String) -> Unit) {
+        if (job.stackCount <= 1) {
+            _stackScope.value = null
+            onNavigate(job.id)
+            return
+        }
+        // Resolving stack membership suspends; guard against a double-tap firing this twice
+        // before the first resolution completes, which would otherwise push the viewer onto
+        // the back stack more than once.
+        if (isOpeningJob) return
+        isOpeningJob = true
+        viewModelScope.launch {
+            try {
+                val rootId = jobRepo.getLineageRootId(job.id) ?: job.id
+                _stackScope.value = jobRepo.getJobsByLineageRoot(rootId).first().map { it.id }.toSet()
+                onNavigate(job.id)
+            } finally {
+                isOpeningJob = false
+            }
+        }
+    }
+
+    /** Reset the stack scope once the user leaves the viewer, so the next tap starts fresh. */
+    fun clearStackScope() {
+        _stackScope.value = null
+    }
 
     private companion object {
         const val TAG = "GalleryViewModel"

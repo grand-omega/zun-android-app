@@ -22,6 +22,10 @@ import retrofit2.HttpException
 import java.io.File
 import java.io.IOException
 
+/** Prefix for upload copies staged in cacheDir for a WorkManager job to own. Swept by `FluxApp.sweepStaleCacheFiles`;
+ *  keep the two in sync — a rename here silently stops the sweep. */
+internal const val UPLOAD_STAGED_CACHE_PREFIX = "upload_staged_"
+
 class JobUploader(
     private val context: Context,
     private val api: FluxApi,
@@ -47,7 +51,7 @@ class JobUploader(
      * duplicate/prior-edit detection this is called from.
      */
     fun copyForUpload(uri: Uri): File {
-        val outFile = File(context.cacheDir, "upload_staged_${uri.lastPathSegment}_${System.nanoTime()}.jpg")
+        val outFile = File(context.cacheDir, "$UPLOAD_STAGED_CACHE_PREFIX${uri.lastPathSegment}_${System.nanoTime()}.jpg")
         context.contentResolver.openInputStream(uri).use { input ->
             requireNotNull(input) { "Failed to open input stream for $uri" }
             outFile.outputStream().use { output -> input.copyTo(output) }

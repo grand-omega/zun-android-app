@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -64,6 +65,10 @@ fun PromptLibrarySheet(
     pinnedIds: Set<Long> = emptySet(),
     onTogglePin: (Long) -> Unit = {},
     showTryHarder: Boolean = true,
+    polishState: PolishState = PolishState.Idle,
+    onPolishClick: () -> Unit = {},
+    canRevertPolish: Boolean = false,
+    onRevertPolishClick: () -> Unit = {},
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -84,6 +89,10 @@ fun PromptLibrarySheet(
             pinnedIds = pinnedIds,
             onTogglePin = onTogglePin,
             showTryHarder = showTryHarder,
+            polishState = polishState,
+            onPolishClick = onPolishClick,
+            canRevertPolish = canRevertPolish,
+            onRevertPolishClick = onRevertPolishClick,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp)
@@ -113,6 +122,10 @@ fun PromptLibraryContent(
     onTogglePin: (Long) -> Unit = {},
     fillHeight: Boolean = false,
     showTryHarder: Boolean = true,
+    polishState: PolishState = PolishState.Idle,
+    onPolishClick: () -> Unit = {},
+    canRevertPolish: Boolean = false,
+    onRevertPolishClick: () -> Unit = {},
 ) {
     var query by rememberSaveable { mutableStateOf("") }
 
@@ -207,6 +220,10 @@ fun PromptLibraryContent(
                 onClick = { onSelectPrompt(CUSTOM_PROMPT_ID) },
                 onTextChange = onCustomPromptChange,
                 onSaveClick = onSavePromptClick,
+                polishState = polishState,
+                onPolishClick = onPolishClick,
+                canRevertPolish = canRevertPolish,
+                onRevertPolishClick = onRevertPolishClick,
             )
         }
 
@@ -497,6 +514,10 @@ private fun CustomPromptItem(
     onClick: () -> Unit,
     onTextChange: (String) -> Unit,
     onSaveClick: () -> Unit,
+    polishState: PolishState = PolishState.Idle,
+    onPolishClick: () -> Unit = {},
+    canRevertPolish: Boolean = false,
+    onRevertPolishClick: () -> Unit = {},
 ) {
     Surface(
         shape = RoundedCornerShape(8.dp),
@@ -538,6 +559,34 @@ private fun CustomPromptItem(
                     placeholder = { Text(stringResource(R.string.prompts_custom_placeholder)) },
                     modifier = Modifier.fillMaxWidth(),
                 )
+                if (polishState is PolishState.Failed) {
+                    Text(
+                        text = stringResource(R.string.prompts_polish_failed),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    if (canRevertPolish) {
+                        TextButton(onClick = onRevertPolishClick) {
+                            Text(stringResource(R.string.prompts_polish_undo))
+                        }
+                    }
+                    Spacer(Modifier.weight(1f))
+                    TextButton(
+                        enabled = customText.isNotBlank() && polishState !is PolishState.InProgress,
+                        onClick = onPolishClick,
+                    ) {
+                        if (polishState is PolishState.InProgress) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp))
+                        } else {
+                            Text(stringResource(R.string.prompts_polish))
+                        }
+                    }
+                }
                 TextButton(
                     enabled = customText.isNotBlank(),
                     onClick = onSaveClick,

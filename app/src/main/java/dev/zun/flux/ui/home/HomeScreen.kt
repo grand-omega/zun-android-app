@@ -12,8 +12,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -66,10 +69,14 @@ fun HomeScreen(
     onTogglePin: (Long) -> Unit,
     onImagesDropped: (List<Uri>) -> Unit = {},
     priorEditsByUri: Map<Uri, PriorEditsInfo> = emptyMap(),
+    polishState: PolishState = PolishState.Idle,
+    onPolishClick: () -> Unit = {},
+    canRevertPolish: Boolean = false,
+    onRevertPolishClick: () -> Unit = {},
 ) {
     var showPromptSheet by rememberSaveable { mutableStateOf(false) }
     var showPromptManageSheet by rememberSaveable { mutableStateOf(false) }
-    val dropTargetModifier = rememberImageDropTarget(onImagesDropped)
+    val dropTargetModifier = Modifier.imageDropTarget(onImagesDropped)
 
     val canSubmit = imageUris.isNotEmpty() &&
         selectedPromptId != null &&
@@ -149,6 +156,10 @@ fun HomeScreen(
                     modifier = Modifier.weight(1f),
                     fillHeight = true,
                     showTryHarder = tryHarderAvailable,
+                    polishState = polishState,
+                    onPolishClick = onPolishClick,
+                    canRevertPolish = canRevertPolish,
+                    onRevertPolishClick = onRevertPolishClick,
                 )
                 composer(false)
             }
@@ -199,6 +210,10 @@ fun HomeScreen(
             pinnedIds = pinnedIds,
             onTogglePin = onTogglePin,
             showTryHarder = tryHarderAvailable,
+            polishState = polishState,
+            onPolishClick = onPolishClick,
+            canRevertPolish = canRevertPolish,
+            onRevertPolishClick = onRevertPolishClick,
         )
     }
 
@@ -210,6 +225,49 @@ fun HomeScreen(
             onUpdatePrompt = onUpdatePrompt,
             onDismiss = { showPromptManageSheet = false },
         )
+    }
+}
+
+/**
+ * Entry point to jobs that failed while the user was elsewhere. Failures are otherwise
+ * unreachable: the gallery lists only 'done' and [ActiveJobsBanner] covers only non-terminal
+ * work. Tapping opens batch progress, which already renders the failure with Retry and Dismiss.
+ */
+@Composable
+fun FailedJobsBanner(
+    count: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (count == 0) return
+    Surface(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.errorContainer,
+        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Filled.ErrorOutline,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(12.dp))
+                Text(pluralStringResource(R.plurals.home_n_generations_failed_format, count, count))
+            }
+            Text(
+                text = stringResource(R.string.home_failed_jobs_action),
+                style = MaterialTheme.typography.labelLarge,
+            )
+        }
     }
 }
 

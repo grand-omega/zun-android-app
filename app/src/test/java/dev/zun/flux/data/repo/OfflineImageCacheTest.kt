@@ -102,6 +102,37 @@ class OfflineImageCacheTest {
         assertTrue(temp.root.resolve("offline_images/new/thumb.jpg").exists())
     }
 
+    @Test
+    fun listCachedJobs_reportsOneEntryPerJobWithItsCachedKindsAndBytes() = runTest {
+        val cache = OfflineImageCache(
+            rootDir = temp.newFolder("offline_images"),
+            okHttpClientProvider = { imageClient { "12345678".encodeToByteArray() } },
+            maxBytes = 10_000,
+        )
+        cache.prefetch("job-1", OfflineImageCache.Kind.Thumb, "https://example.test/thumb")
+        cache.prefetch("job-1", OfflineImageCache.Kind.Preview, "https://example.test/preview")
+        cache.prefetch("job-2", OfflineImageCache.Kind.Result, "https://example.test/result")
+
+        val summaries = cache.listCachedJobs().associateBy { it.jobId }
+
+        assertEquals(2, summaries.size)
+        assertEquals(setOf(OfflineImageCache.Kind.Thumb, OfflineImageCache.Kind.Preview), summaries.getValue("job-1").cachedKinds)
+        assertEquals(16L, summaries.getValue("job-1").bytes)
+        assertEquals(setOf(OfflineImageCache.Kind.Result), summaries.getValue("job-2").cachedKinds)
+        assertEquals(8L, summaries.getValue("job-2").bytes)
+    }
+
+    @Test
+    fun listCachedJobs_isEmptyWhenNothingIsCached() = runTest {
+        val cache = OfflineImageCache(
+            rootDir = temp.newFolder("offline_images"),
+            okHttpClientProvider = { imageClient { ByteArray(0) } },
+            maxBytes = 10_000,
+        )
+
+        assertEquals(emptyList<OfflineImageCache.CachedJobSummary>(), cache.listCachedJobs())
+    }
+
     private fun imageClient(bytes: () -> ByteArray): OkHttpClient = OkHttpClient.Builder()
         .addInterceptor(
             Interceptor { chain ->

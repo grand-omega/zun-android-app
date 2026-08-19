@@ -8,7 +8,6 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.easylauncher)
     alias(libs.plugins.androidx.baselineprofile)
-    alias(libs.plugins.sentry.android)
 }
 
 val keystorePropsFile = rootProject.file("keystore.properties")
@@ -16,30 +15,6 @@ val keystorePropsFile = rootProject.file("keystore.properties")
 private val localProps: Properties = rootProject.file("local.properties").let { f ->
     Properties().apply { if (f.exists()) f.inputStream().use { load(it) } }
 }
-
-/**
- * SENTRY_DSN — Sentry project ingest endpoint. DSNs are not secret in
- * Sentry's threat model, but routing it through local.properties (dev) /
- * GitHub Actions secret (CI) keeps project-specific endpoints out of
- * source control. If absent at build time, the app still compiles and
- * runs — `SentryAndroid.init` silently no-ops on a blank DSN, so the
- * binary just doesn't report crashes.
- */
-val sentryDsn: String =
-    localProps.getProperty("SENTRY_DSN", "")
-        .ifBlank { System.getenv("SENTRY_DSN") ?: "" }
-
-/**
- * SENTRY_AUTH_TOKEN — write-authority API token for the Sentry Gradle
- * plugin's ProGuard mapping upload + source-context bundling. Sourced from
- * local.properties for dev builds and from the SENTRY_AUTH_TOKEN env var in
- * CI (set via the GitHub Actions secret of the same name in the release
- * job). Mapping upload silently disables itself if no token is found, so
- * CI's unsigned R8-verify build keeps working without the secret.
- */
-val sentryAuthToken: String =
-    localProps.getProperty("SENTRY_AUTH_TOKEN", "")
-        .ifBlank { System.getenv("SENTRY_AUTH_TOKEN") ?: "" }
 
 /**
  * DEBUG_DEFAULT_SERVER_URL — the server address a debug build starts with
@@ -121,8 +96,6 @@ android {
         versionCode = resolvedVersionCode
         versionName = resolvedVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-
-        buildConfigField("String", "SENTRY_DSN", "\"$sentryDsn\"")
     }
 
     val keystoreProps = Properties().apply {
@@ -235,29 +208,6 @@ easylauncher {
     }
 }
 
-sentry {
-    org.set("yanwen-xu")
-    projectName.set("android")
-
-    // Upload + source bundling are gated on having an auth token. Local dev
-    // with the token in local.properties → uploads. CI release-tag job with
-    // SENTRY_AUTH_TOKEN secret → uploads. CI's PR/push job (no secret) →
-    // silently skips so the R8 verify build still passes.
-    val haveToken = sentryAuthToken.isNotBlank()
-    autoUploadProguardMapping.set(haveToken)
-    includeSourceContext.set(haveToken)
-    if (haveToken) {
-        authToken.set(sentryAuthToken)
-    }
-
-    autoInstallation.enabled.set(false)
-    // Bytecode-level OkHttp/Room instrumentation is free regardless and adds
-    // useful breadcrumbs (HTTP requests, DB queries) to crash reports.
-    tracingInstrumentation {
-        enabled.set(true)
-    }
-}
-
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.core.splashscreen)
@@ -318,8 +268,6 @@ dependencies {
     // automatically when the producer plugin runs.
     implementation(libs.androidx.profileinstaller)
     "baselineProfile"(project(":baselineprofile"))
-
-    implementation(libs.sentry.android)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

@@ -36,7 +36,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -112,7 +112,10 @@ fun HomeRoute(
     val tryHarderAvailable by viewModel.tryHarderAvailable.collectAsStateWithLifecycle()
     val batchProgress by viewModel.batchProgress.collectAsStateWithLifecycle()
     val activeJobIds by viewModel.activeJobIds.collectAsStateWithLifecycle()
+    val failedJobIds by viewModel.failedJobIds.collectAsStateWithLifecycle()
     val priorEditsByUri by viewModel.priorEdits.collectAsStateWithLifecycle()
+    val polishState by viewModel.polishState.collectAsStateWithLifecycle()
+    val prePolishText by viewModel.prePolishText.collectAsStateWithLifecycle()
     val recentInputIds by remember { images.recentInputIds(3) }
         .collectAsStateWithLifecycle(initialValue = emptyList())
     val haptic = LocalHapticFeedback.current
@@ -279,7 +282,7 @@ fun HomeRoute(
         }
     }
 
-    val isWide = currentWindowAdaptiveInfo().windowSizeClass
+    val isWide = currentWindowAdaptiveInfoV2().windowSizeClass
         .isWidthAtLeastBreakpoint(androidx.window.core.layout.WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)
 
     Scaffold(
@@ -320,6 +323,13 @@ fun HomeRoute(
                 ActiveJobsBanner(
                     count = activeJobIds.size,
                     onClick = { onResumeBatch(activeJobIds) },
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+            }
+            if (failedJobIds.isNotEmpty()) {
+                FailedJobsBanner(
+                    count = failedJobIds.size,
+                    onClick = { onResumeBatch(failedJobIds) },
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 )
             }
@@ -416,6 +426,10 @@ fun HomeRoute(
                     onTogglePin = { app.pinnedPrompts.toggle(it) },
                     onImagesDropped = { uris -> appendUris(uris, false) },
                     priorEditsByUri = priorEditsByUri,
+                    polishState = polishState,
+                    onPolishClick = viewModel::polishPrompt,
+                    canRevertPolish = prePolishText != null,
+                    onRevertPolishClick = viewModel::revertPolish,
                 )
                 if (isRefreshing || pullDistancePx > 0f) {
                     Surface(

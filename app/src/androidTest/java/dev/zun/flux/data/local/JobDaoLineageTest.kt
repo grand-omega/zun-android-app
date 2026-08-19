@@ -135,6 +135,49 @@ class JobDaoLineageTest {
         assertEquals(setOf("a", "c"), result.map { it.id }.toSet())
     }
 
+    @Test
+    fun setFavorite_togglesTheFlagWithoutTouchingOtherColumns() = runBlocking {
+        dao.insertJob(job(id = "job-1", status = "done", progress = 1f))
+
+        dao.setFavorite("job-1", true)
+        assertEquals(true, dao.getJobById("job-1")?.isFavorite)
+        assertEquals("done", dao.getJobById("job-1")?.status)
+
+        dao.setFavorite("job-1", false)
+        assertEquals(false, dao.getJobById("job-1")?.isFavorite)
+    }
+
+    @Test
+    fun reinsertingAFavoritedJobWithReplace_wipesTheFlagUnlessCarriedForward() = runBlocking {
+        // This is the exact regression research.md Decision 1 calls out: REPLACE
+        // wipes local-only columns unless the caller explicitly copies them
+        // forward first, the same way RealJobRepository.carryForwardLineage does
+        // for sourceSha256/resultSha256/lineageRootId.
+        dao.insertJob(job(id = "job-1", status = "done"))
+        dao.setFavorite("job-1", true)
+        assertEquals(true, dao.getJobById("job-1")?.isFavorite)
+
+        // A "fresh" entity as if just mapped from a server DTO -- isFavorite
+        // defaults to false because the server never sends it.
+        val freshFromServer = job(id = "job-1", status = "done")
+        dao.insertJob(freshFromServer)
+        assertEquals(
+            "without carrying isFavorite forward, REPLACE wipes it back to false",
+            false,
+            dao.getJobById("job-1")?.isFavorite,
+        )
+
+        dao.setFavorite("job-1", true)
+        val existing = dao.getJobById("job-1")!!
+        val carriedForward = freshFromServer.copy(isFavorite = existing.isFavorite)
+        dao.insertJob(carriedForward)
+        assertEquals(
+            "carrying isFavorite forward before the upsert must preserve it",
+            true,
+            dao.getJobById("job-1")?.isFavorite,
+        )
+    }
+
     private fun job(
         id: String,
         status: String,

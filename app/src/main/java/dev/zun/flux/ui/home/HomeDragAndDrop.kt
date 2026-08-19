@@ -13,11 +13,11 @@ import androidx.compose.ui.draganddrop.toAndroidDragEvent
 
 /**
  * Accepts images dragged from other apps (split-screen Gallery, Files, DeX
- * windows) and hands their content URIs to [onImagesDropped]. Apply the
- * returned modifier to the drop surface.
+ * windows) and hands their content URIs to [onImagesDropped]. Apply to the
+ * drop surface; hoist the result if more than one surface needs it.
  */
 @Composable
-fun rememberImageDropTarget(onImagesDropped: (List<Uri>) -> Unit): Modifier {
+fun Modifier.imageDropTarget(onImagesDropped: (List<Uri>) -> Unit): Modifier {
     val activity = LocalActivity.current
     val target = remember(activity, onImagesDropped) {
         object : DragAndDropTarget {
@@ -34,7 +34,7 @@ fun rememberImageDropTarget(onImagesDropped: (List<Uri>) -> Unit): Modifier {
             }
         }
     }
-    return Modifier.dragAndDropTarget(
+    return this.dragAndDropTarget(
         shouldStartDragAndDrop = { event ->
             event.mimeTypes().any { it.startsWith("image/") }
         },

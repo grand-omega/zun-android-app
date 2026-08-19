@@ -30,7 +30,7 @@ All paths relative to `app/src/main/java/dev/zun/flux/`.
 |---|---|---|
 | `data/api` | Retrofit interface for the server contract | `FluxApi.kt` |
 | `data/local` | Room database, DAOs, entities | `AppDatabase.kt`, `JobDao.kt`, `JobEntity.kt`, `PendingDeleteEntity.kt` |
-| `data/repo` | Narrow repository interfaces + the unified implementation + persistence helpers | `RealJobRepository.kt`, `SettingsManager.kt`, `KeystoreSecureStore.kt`, `OfflineImageCache.kt` |
+| `data/repo` | Narrow repository interfaces + the unified implementation + persistence helpers | `RealJobRepository.kt`, `SettingsManager.kt`, `KeystoreSecureStore.kt`, `OfflineImageCache.kt`, `JobUploader.kt`, `RecentInputCache.kt`, `CachedPromptsStore.kt`, `PinnedPromptsStore.kt`, `LineageAssignment.kt`, `ConnectionDiagnoser.kt` |
 | `data/net` | Cert pinning | `CertPinStore.kt`, `CertCapturer.kt` |
 | `data/worker` | Background WorkManager jobs | `JobUploadWorker.kt`, `DeleteSyncWorker.kt` |
 | `data/diag` | OkHttp interceptor that records errors / timings for the Settings → Diagnostics panel | `Diagnostics.kt` |
@@ -42,7 +42,8 @@ All paths relative to `app/src/main/java/dev/zun/flux/`.
 | `ui/auth` | Biometric gate, lock screen, `AuthStateHolder` (lockout timer, `isAuthed` flag) |
 | `ui/capture` | CameraX-based source-image capture |
 | `ui/common` | Shared Composables (snackbar host, error rows, etc.) |
-| `ui/gallery` | Paginated job list, filtering, photo viewer, before/after compare |
+| `ui/gallery` | Paginated job list, filtering, photo viewer, before/after compare, scratch-to-reveal compare + export |
+| `ui/history` | Edit-lineage history for a job (`EditHistoryScreen`, `EditHistoryViewModel`) |
 | `ui/home` | Image picker, prompt picker, batch submission (`HomeViewModel`) |
 | `ui/nav` | `AppNavHost` — start destination resolves to Setup or Home based on `isConfigured` |
 | `ui/progress` | Single-job progress polling + batch multi-job progress |
@@ -52,11 +53,11 @@ All paths relative to `app/src/main/java/dev/zun/flux/`.
 
 ### `util/`
 
-Small helpers: `ImageUtils`, `ErrorMessages`, `ServerUrls`, `ShareUtils`, `MediaStoreSaver`, `PromptLabels`, `Time`.
+Small helpers: `ImageUtils`, `ErrorMessages`, `ServerUrls`, `ShareUtils`, `MediaStoreSaver`, `PromptLabels`, `Time`, `ImageCompositor` (flattens a drag-reveal before/after into one bitmap), `CacheSweep` (decides which one-shot `cacheDir` files `FluxApp` deletes at startup).
 
 ### Entry points
 
-- `FluxApp.kt` — `Application` subclass. Constructs the `OkHttpClient`, `OfflineImageCache`, `AuthStateHolder`, `SettingsManager`, and the `Repositories` bundle.
+- `FluxApp.kt` — `Application` subclass. Constructs the `OkHttpClient`, `OfflineImageCache`, `AuthStateHolder`, `SettingsManager`, `PinnedPromptsStore`, `CertPinStore`, and the `Repositories` bundle; configures the Coil `ImageLoader` and sweeps stale `cacheDir` files at startup.
 - `MainActivity.kt` — single activity hosting `AppNavHost`.
 - `ui/nav/AppNavHost.kt` — Compose `NavHost`; routes screens, wires per-feature ViewModels with the right repository interfaces.
 
@@ -104,10 +105,12 @@ When the user changes the server URL, token, or pinning state, `FluxApp.rebuildO
 
 | Where | What |
 |---|---|
-| Room (`AppDatabase`, plain SQLite) | `jobs` and `pending_deletes` tables. Schema version 4. Schemas exported under `app/schemas/`. |
+| Room (`AppDatabase`, plain SQLite) | `jobs` and `pending_deletes` tables. Schema version 6. Schemas exported under `app/schemas/` (versions 4-6; 1-3 were never exported). |
 | Plain SharedPreferences (`settings`) | Server URL, biometric lockout duration, last successful unlock timestamp |
 | `KeystoreSecureStore` (`secure_v2`) | API token encrypted as AES/GCM ciphertext with the key held in Android Keystore |
 | `files/offline_images/` | JPEG cache for thumb / preview / result variants, LRU-evicted |
+| `files/local_composites/` | Saved drag-reveal composites (feature 015). Server-less jobs, id-prefixed `local-composite-`; deleting one never touches the network |
+| `cacheDir` | One-shot staging for uploads, shares, exports, captures. Swept at startup by `FluxApp.sweepStaleCacheFiles` past `Tuning.STALE_CACHE_FILE_MAX_AGE_MS` |
 | WorkManager | Upload and delete-sync work, persists across process death |
 
 ## Server contract

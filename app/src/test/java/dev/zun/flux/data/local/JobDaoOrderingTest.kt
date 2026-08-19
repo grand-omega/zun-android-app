@@ -59,10 +59,10 @@ class JobDaoOrderingTest {
     )
 
     private suspend fun pagedAllIds(newestFirst: Boolean = true): List<String> {
-        val page = dao.pagedDoneJobsAll(newestFirst).load(
+        val page = dao.pagedDoneJobsAll(newestFirst, favoritesOnly = false).load(
             PagingSource.LoadParams.Refresh(key = null, loadSize = 100, placeholdersEnabled = false),
         ) as PagingSource.LoadResult.Page
-        return page.data.map { it.id }
+        return page.data.map { it.job.id }
     }
 
     @Test

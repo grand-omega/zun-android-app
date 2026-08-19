@@ -14,14 +14,14 @@ jobs:
     permissions:
       contents: read
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       with:
         # Full history so app/build.gradle.kts can derive versionCode/versionName
         # from `git rev-list --count HEAD` and `git describe --tags`.
         fetch-depth: 0
 
     - name: set up JDK 21
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         java-version: '21'
         distribution: 'temurin'
@@ -35,7 +35,7 @@ jobs:
         echo "sdk.dir=$ANDROID_HOME" > local.properties
 
     - name: Setup Gradle
-      uses: gradle/actions/setup-gradle@v4
+      uses: gradle/actions/setup-gradle@v6
 
     - name: Lint GitHub Actions workflows
       uses: rhysd/actionlint@v1.7.12
@@ -60,7 +60,7 @@ jobs:
       run: ./gradlew assembleRelease --stacktrace
 
     - name: Upload Debug Artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: flux-edit-debug
         path: app/build/outputs/apk/debug/app-debug.apk
@@ -72,12 +72,12 @@ jobs:
     permissions:
       contents: read
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       with:
         fetch-depth: 0
 
     - name: set up JDK 21
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         java-version: '21'
         distribution: 'temurin'
@@ -91,7 +91,7 @@ jobs:
         echo "sdk.dir=$ANDROID_HOME" > local.properties
 
     - name: Setup Gradle
-      uses: gradle/actions/setup-gradle@v4
+      uses: gradle/actions/setup-gradle@v6
 
     - name: Enable KVM
       run: |
@@ -115,14 +115,14 @@ jobs:
     permissions:
       contents: write
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       with:
         # Full history so app/build.gradle.kts can derive versionCode/versionName
         # from `git rev-list --count HEAD` and `git describe --tags`.
         fetch-depth: 0
 
     - name: set up JDK 21
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         java-version: '21'
         distribution: 'temurin'
@@ -136,7 +136,7 @@ jobs:
         echo "sdk.dir=$ANDROID_HOME" > local.properties
 
     - name: Setup Gradle
-      uses: gradle/actions/setup-gradle@v4
+      uses: gradle/actions/setup-gradle@v6
 
     # Decode the release keystore + write keystore.properties on tag builds.
     # The repo signing block in app/build.gradle.kts will pick these up
@@ -169,19 +169,7 @@ jobs:
         keyPassword=${{ secrets.KEYSTORE_KEY_PASSWORD }}
         EOF
 
-    # SENTRY_DSN ends up in BuildConfig.SENTRY_DSN at compile time so the
-    # signed release APK can actually report crashes. Without this, CI's
-    # auto-generated local.properties contains only sdk.dir, the gradle
-    # config reads an empty DSN, and SentryAndroid.init silently no-ops in
-    # the production binary — defeating the whole crash-reporting setup.
-    #
-    # SENTRY_AUTH_TOKEN scopes ProGuard mapping upload + source-context
-    # bundling. Tag-only — PR/push CI doesn't need it; the build's gradle
-    # config gracefully skips upload when the token isn't set.
     - name: Build Release APK
-      env:
-        SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
-        SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
       run: ./gradlew assembleRelease --stacktrace
 
     - name: Stage release APK for release upload
@@ -194,7 +182,7 @@ jobs:
         cp "$signed" "flux-edit-${{ github.ref_name }}.apk"
 
     - name: Create Release
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v3
       with:
         files: flux-edit-${{ github.ref_name }}.apk
         name: ${{ github.ref_name }}

@@ -69,6 +69,16 @@ data class NeedUploadResponse(
 )
 
 @Serializable
+data class PolishPromptRequest(
+    val text: String,
+)
+
+@Serializable
+data class PolishPromptResponse(
+    val text: String,
+)
+
+@Serializable
 data class JobStatusDto(
     val id: String,
     val status: String,
@@ -100,6 +110,17 @@ data class JobSummaryDto(
     val created_at: Long,
     val completed_at: Long? = null,
     val duration_seconds: Int? = null,
+    // Local-only; the server never sends this. Populated from JobEntity when
+    // this DTO is used as the in-memory gallery/photo-viewer representation.
+    val isFavorite: Boolean = false,
+    // Local-only, computed at query time; the server never sends this. How many done jobs
+    // share this job's lineage root under the currently-applied gallery filters. 1 means "no
+    // stack" (no badge shown).
+    val stackCount: Int = 1,
+    // Local-only, computed at query time. True when any job in this stack (cover or not) is
+    // favorited — lets the gallery show a partial-favorite cue on a stack whose own cover isn't
+    // the favorited member, without implying the whole stack was favorited.
+    val stackHasFavorite: Boolean = false,
 )
 
 @Serializable

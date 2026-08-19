@@ -16,11 +16,9 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -32,6 +30,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -61,6 +60,7 @@ import dev.zun.flux.R
 import dev.zun.flux.Tuning
 import dev.zun.flux.data.net.captureCertificatePin
 import dev.zun.flux.data.worker.JobUploadWorker
+import dev.zun.flux.ui.common.BackNavigationIcon
 import dev.zun.flux.ui.common.ScreenPadding
 import dev.zun.flux.ui.common.SettingsGroup
 import dev.zun.flux.ui.common.StatusPill
@@ -77,6 +77,7 @@ import java.util.Locale
 fun SettingsScreen(
     app: FluxApp,
     onBack: () -> Unit,
+    onOpenCacheCleanup: () -> Unit = {},
 ) {
     val viewModel: SettingsViewModel = viewModel(
         factory = viewModelFactory {
@@ -85,6 +86,8 @@ fun SettingsScreen(
     )
     val settingsManager = app.settingsManager
     var lockoutDuration by remember { mutableLongStateOf(settingsManager.lockoutDurationMs) }
+    var allowCellularData by remember { mutableStateOf(settingsManager.allowCellularData) }
+    var defaultCompareModeIsScratch by remember { mutableStateOf(settingsManager.defaultCompareModeIsScratch) }
     val connectionDraft by viewModel.connectionDraft.collectAsStateWithLifecycle()
     val offlineCache by viewModel.offlineCache.collectAsStateWithLifecycle()
     val serverHealth by viewModel.serverHealth.collectAsStateWithLifecycle()
@@ -99,7 +102,6 @@ fun SettingsScreen(
     var pinResult by remember { mutableStateOf<String?>(null) }
 
     var tokenVisible by remember { mutableStateOf(false) }
-    var showClearCacheConfirm by remember { mutableStateOf(false) }
 
     val lockoutOptions = listOf(
         0L to stringResource(R.string.settings_lockout_always),
@@ -115,9 +117,7 @@ fun SettingsScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.settings_title)) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                    }
+                    BackNavigationIcon(onBack = onBack, contentDescription = stringResource(R.string.common_back))
                 },
             )
         },
@@ -213,6 +213,46 @@ fun SettingsScreen(
                 }
 
                 SettingsGroup(
+                    title = stringResource(R.string.settings_data_usage_title),
+                    detail = stringResource(R.string.settings_data_usage_detail),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(stringResource(R.string.settings_allow_cellular_data))
+                        Switch(
+                            checked = allowCellularData,
+                            onCheckedChange = {
+                                allowCellularData = it
+                                settingsManager.allowCellularData = it
+                            },
+                        )
+                    }
+                }
+
+                SettingsGroup(
+                    title = stringResource(R.string.settings_compare_title),
+                    detail = stringResource(R.string.settings_compare_detail),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(stringResource(R.string.settings_default_compare_scratch))
+                        Switch(
+                            checked = defaultCompareModeIsScratch,
+                            onCheckedChange = {
+                                defaultCompareModeIsScratch = it
+                                settingsManager.defaultCompareModeIsScratch = it
+                            },
+                        )
+                    }
+                }
+
+                SettingsGroup(
                     title = stringResource(R.string.settings_offline_cache_title),
                     detail = stringResource(R.string.settings_offline_cache_detail),
                 ) {
@@ -239,7 +279,7 @@ fun SettingsScreen(
                             }
                         }
                         OutlinedButton(
-                            onClick = { showClearCacheConfirm = true },
+                            onClick = onOpenCacheCleanup,
                             modifier = Modifier.weight(1f),
                         ) {
                             Text(stringResource(R.string.common_clear))
@@ -384,29 +424,6 @@ fun SettingsScreen(
             }
         }
     }
-
-    if (showClearCacheConfirm) {
-        AlertDialog(
-            onDismissRequest = { showClearCacheConfirm = false },
-            title = { Text(stringResource(R.string.settings_clear_cache_title)) },
-            text = { Text(stringResource(R.string.settings_clear_cache_message)) },
-            confirmButton = {
-                androidx.compose.material3.TextButton(
-                    onClick = {
-                        showClearCacheConfirm = false
-                        viewModel.clearOfflineCache()
-                    },
-                ) {
-                    Text(stringResource(R.string.common_clear), color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                androidx.compose.material3.TextButton(onClick = { showClearCacheConfirm = false }) {
-                    Text(stringResource(R.string.common_cancel))
-                }
-            },
-        )
-    }
 }
 
 @Composable
@@ -472,7 +489,7 @@ private fun relativeTimeOrDash(timestampMs: Long?): String {
 
 private fun formatClock(timestampMs: Long): String = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(timestampMs))
 
-private fun formatBytes(bytes: Long): String {
+internal fun formatBytes(bytes: Long): String {
     val mb = bytes / (1024.0 * 1024.0)
     return if (mb < 1024) {
         "%.1f MB".format(mb)
