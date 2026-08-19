@@ -140,16 +140,28 @@ fun compositeReveal(after: Bitmap, before: Bitmap, mask: ImageBitmap, containerS
     val maskSrc = afterFit.toClampedAndroidRect(maskAndroidBitmap.width, maskAndroidBitmap.height)
 
     if (beforeSrc.width() > 0 && beforeSrc.height() > 0 && maskSrc.width() > 0 && maskSrc.height() > 0) {
+        // Both layers are full-size ARGB_8888 scratch buffers (~16MB each at the 2048 cap) that
+        // exist only to apply the mask. They are recycled as soon as each is consumed rather than
+        // left for the collector — maskLayer first, which drops one buffer before the final draw.
+        // Only these two are ours to free: `after`/`before` belong to Coil's memory cache, `mask`
+        // to the caller's snapshot, and `output` is returned.
         val beforeLayer = Bitmap.createBitmap(outputWidth, outputHeight, Bitmap.Config.ARGB_8888)
-        Canvas(beforeLayer).drawBitmap(before, beforeSrc, dst, null)
+        try {
+            Canvas(beforeLayer).drawBitmap(before, beforeSrc, dst, null)
 
-        val maskLayer = Bitmap.createBitmap(outputWidth, outputHeight, Bitmap.Config.ARGB_8888)
-        Canvas(maskLayer).drawBitmap(maskAndroidBitmap, maskSrc, dst, null)
+            val maskLayer = Bitmap.createBitmap(outputWidth, outputHeight, Bitmap.Config.ARGB_8888)
+            try {
+                Canvas(maskLayer).drawBitmap(maskAndroidBitmap, maskSrc, dst, null)
+                val maskPaint = Paint().apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN) }
+                Canvas(beforeLayer).drawBitmap(maskLayer, 0f, 0f, maskPaint)
+            } finally {
+                maskLayer.recycle()
+            }
 
-        val maskPaint = Paint().apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN) }
-        Canvas(beforeLayer).drawBitmap(maskLayer, 0f, 0f, maskPaint)
-
-        canvas.drawBitmap(beforeLayer, 0f, 0f, null)
+            canvas.drawBitmap(beforeLayer, 0f, 0f, null)
+        } finally {
+            beforeLayer.recycle()
+        }
     }
 
     return output
