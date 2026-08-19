@@ -500,7 +500,7 @@ private fun BatchPage(
  * own entry point on Home this branch is routinely reached in a terminal state.
  */
 @Composable
-private fun sourceImageContentDescription(state: PollState): String = stringResource(
+internal fun sourceImageContentDescription(state: PollState): String = stringResource(
     when (state) {
         is PollState.Failed -> R.string.progress_batch_source_image_failed
 
