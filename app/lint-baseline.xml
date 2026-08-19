@@ -2,15 +2,17 @@
 <!--
   Baseline rationale (audited 2026-05):
 
-  - OldTargetApi / GradleDependency: SDK 37 is available but 36 is current and
-    stable for the Android 16 / Z Fold 7 target. Bump deferred until we have a
-    concrete reason (a 37-only API or Play Store deadline). Keep baselined.
+  - OldTargetApi: compileSdk is now 37, but targetSdk stays at 36 — bumping it
+    opts into Android 17 behavior changes and needs on-device testing first.
+    Deferred until that testing happens or a Play Store deadline forces it.
+    (The companion GradleDependency entry for compileSdk 36 was dropped when
+    compileSdk moved to 37 — it no longer matches anything.)
 
   - AcceptsUserCertificates: lint reports this from the debug overlay, where
     user CAs are intentionally trusted for mitmproxy/local-device testing.
     Release keeps system trust anchors only. Intentional; keep baselined.
 -->
-<issues format="6" by="lint 9.2.1" type="baseline" client="gradle" dependencies="false" name="AGP (9.2.1)" variant="all" version="9.2.1">
+<issues format="6" by="lint 9.3.1" type="baseline" client="gradle" dependencies="false" name="AGP (9.3.1)" variant="all" version="9.3.1">
 
     <issue
         id="OldTargetApi"
@@ -21,17 +23,6 @@
             file="build.gradle.kts"
             line="79"
             column="9"/>
-    </issue>
-
-    <issue
-        id="GradleDependency"
-        message="A newer version of `compileSdk` than 36 is available: 37"
-        errorLine1="    compileSdk = 36"
-        errorLine2="    ~~~~~~~~~~~~~~~">
-        <location
-            file="build.gradle.kts"
-            line="73"
-            column="5"/>
     </issue>
 
     <issue
