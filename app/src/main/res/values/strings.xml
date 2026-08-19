@@ -275,6 +275,9 @@
     <string name="progress_batch_deleted">Deleted</string>
     <string name="progress_batch_cancelled">Cancelled</string>
     <string name="progress_batch_source_image_in_progress">Source image in progress</string>
+    <string name="progress_batch_source_image_failed">Source image for a failed generation</string>
+    <string name="progress_batch_source_image_cancelled">Source image for a cancelled generation</string>
+    <string name="progress_batch_source_image_deleted">Source image for a deleted generation</string>
     <string name="progress_batch_view_result">View result</string>
     <string name="home_resume_active_jobs_action">View</string>
     <string name="home_failed_jobs_action">Review</string>

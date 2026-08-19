@@ -238,7 +238,7 @@ private fun BatchTile(
             // Dimmed input + state overlay.
             AsyncImage(
                 model = inputModel,
-                contentDescription = stringResource(R.string.progress_batch_source_image_in_progress),
+                contentDescription = sourceImageContentDescription(state),
                 modifier = Modifier.fillMaxSize().alpha(0.45f),
             )
             when (val s = state) {
@@ -406,7 +406,7 @@ private fun BatchPage(
                 } else {
                     AsyncImage(
                         model = inputModel,
-                        contentDescription = stringResource(R.string.progress_batch_source_image_in_progress),
+                        contentDescription = sourceImageContentDescription(state),
                         modifier = Modifier
                             .fillMaxSize()
                             .alpha(0.6f),
@@ -492,3 +492,23 @@ private fun BatchPage(
         }
     }
 }
+
+/**
+ * Describes the dimmed source thumbnail for whatever the job is actually doing. Both call sites
+ * sit in the not-done branch, which also covers Failed/Cancelled/Deleted — a flat "in progress"
+ * there tells a screen-reader user the opposite of what happened. Now that failed jobs get their
+ * own entry point on Home this branch is routinely reached in a terminal state.
+ */
+@Composable
+private fun sourceImageContentDescription(state: PollState): String = stringResource(
+    when (state) {
+        is PollState.Failed -> R.string.progress_batch_source_image_failed
+
+        PollState.Cancelled -> R.string.progress_batch_source_image_cancelled
+
+        PollState.Deleted -> R.string.progress_batch_source_image_deleted
+
+        PollState.Starting, is PollState.Running, is PollState.Done ->
+            R.string.progress_batch_source_image_in_progress
+    },
+)
