@@ -11,6 +11,10 @@ import java.io.FileOutputStream
 import java.security.MessageDigest
 import kotlin.math.max
 
+/** Prefix for local copies of picked images that lived outside our own cacheDir. Swept via [dev.zun.flux.util.isSweepableCacheFile];
+ *  keep the two in sync — a rename here silently changes what gets cleaned up. */
+internal const val LOCAL_INPUT_CACHE_PREFIX = "input_"
+
 /** Prefix for one-shot pre-processed upload copies in cacheDir. Swept by `FluxApp.sweepStaleCacheFiles`;
  *  keep the two in sync — a rename here silently stops the sweep. */
 internal const val UPLOAD_PREPROCESSED_CACHE_PREFIX = "upload_preprocessed_"

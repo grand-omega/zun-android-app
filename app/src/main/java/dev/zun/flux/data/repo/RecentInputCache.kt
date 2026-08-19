@@ -4,6 +4,10 @@ import android.content.Context
 import android.net.Uri
 import dev.zun.flux.data.api.FluxApi
 
+/** Prefix for [RecentInputCache]'s keyed store. NOT a one-shot file — it is re-read by inputId, so it must never be swept. Swept via [dev.zun.flux.util.isSweepableCacheFile];
+ *  keep the two in sync — a rename here silently changes what gets cleaned up. */
+internal const val RECENT_INPUT_CACHE_PREFIX = "input_recent_"
+
 class RecentInputCache(
     private val context: Context,
     private val api: FluxApi,
