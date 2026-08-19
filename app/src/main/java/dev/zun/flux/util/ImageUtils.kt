@@ -11,6 +11,10 @@ import java.io.FileOutputStream
 import java.security.MessageDigest
 import kotlin.math.max
 
+/** Prefix for one-shot pre-processed upload copies in cacheDir. Swept by `FluxApp.sweepStaleCacheFiles`;
+ *  keep the two in sync — a rename here silently stops the sweep. */
+internal const val UPLOAD_PREPROCESSED_CACHE_PREFIX = "upload_preprocessed_"
+
 /**
  * Preprocesses an image for upload by downscaling it to a maximum dimension
  * and compressing it as a JPEG.
@@ -47,7 +51,7 @@ fun prepareImageForUpload(
         1f
     }
 
-    val outputFile = File(context.cacheDir, "upload_preprocessed_${System.currentTimeMillis()}.jpg")
+    val outputFile = File(context.cacheDir, "$UPLOAD_PREPROCESSED_CACHE_PREFIX${System.currentTimeMillis()}.jpg")
     try {
         // 4. Precise scaling and rotation
         if (scale < 1f || rotation != 0) {

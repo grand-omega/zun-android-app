@@ -16,8 +16,12 @@ import dev.zun.flux.data.repo.PinnedPromptsStore
 import dev.zun.flux.data.repo.PromptRepository
 import dev.zun.flux.data.repo.RealJobRepository
 import dev.zun.flux.data.repo.SettingsManager
+import dev.zun.flux.data.repo.UPLOAD_STAGED_CACHE_PREFIX
 import dev.zun.flux.data.repo.UploadRepository
 import dev.zun.flux.ui.auth.AuthStateHolder
+import dev.zun.flux.util.REVEAL_EXPORT_CACHE_PREFIX
+import dev.zun.flux.util.SHARE_CACHE_PREFIX
+import dev.zun.flux.util.UPLOAD_PREPROCESSED_CACHE_PREFIX
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -108,20 +112,30 @@ class FluxApp : Application() {
 
         rebuildRepository()
 
-        sweepStagedUploadFiles()
+        sweepStaleCacheFiles()
     }
 
     /**
-     * Delete staged upload files orphaned by a crash or a cancellation whose
-     * cleanup failed (see RealJobRepository.cancelJobUpload — the staged path
-     * is recovered from a WorkManager tag, which can miss). Without this they
-     * sit in cacheDir until Android trims it.
+     * Delete one-shot cacheDir files orphaned by a crash, or by a cancellation whose cleanup
+     * failed (see RealJobRepository.cancelJobUpload — the staged path is recovered from a
+     * WorkManager tag, which can miss). Nothing else ever removes these, so without this they
+     * accumulate until Android trims the whole cache.
+     *
+     * Deliberately NOT swept:
+     *  - `input_recent_` — RecentInputCache's keyed store, re-read by inputId rather than
+     *    written once and forgotten. Note it also means no prefix here may be `input_`, which
+     *    would match those names too.
+     *  - `capture_` / `input_` — camera captures and locally-cached picks can still be
+     *    referenced by a composer the user left pending, so age alone doesn't make them dead.
      */
-    private fun sweepStagedUploadFiles() {
+    private fun sweepStaleCacheFiles() {
         Thread {
-            val cutoff = System.currentTimeMillis() - Tuning.STAGED_UPLOAD_MAX_AGE_MS
+            val cutoff = System.currentTimeMillis() - Tuning.STALE_CACHE_FILE_MAX_AGE_MS
             cacheDir.listFiles()
-                ?.filter { it.name.startsWith("upload_preprocessed_") && it.lastModified() < cutoff }
+                ?.filter { file ->
+                    file.lastModified() < cutoff &&
+                        STALE_CACHE_PREFIXES.any { file.name.startsWith(it) }
+                }
                 ?.forEach { it.delete() }
         }.start()
     }
@@ -178,6 +192,20 @@ class FluxApp : Application() {
                 images = real,
             ),
             version = ++repositoryVersion,
+        )
+    }
+
+    private companion object {
+        /**
+         * Every one-shot cache-file prefix [sweepStaleCacheFiles] cleans up, taken from the
+         * writers rather than re-spelled here — the sweep previously hardcoded a single literal
+         * and silently missed [UPLOAD_STAGED_CACHE_PREFIX], the very orphan it documented.
+         */
+        val STALE_CACHE_PREFIXES = listOf(
+            UPLOAD_PREPROCESSED_CACHE_PREFIX,
+            UPLOAD_STAGED_CACHE_PREFIX,
+            SHARE_CACHE_PREFIX,
+            REVEAL_EXPORT_CACHE_PREFIX,
         )
     }
 }

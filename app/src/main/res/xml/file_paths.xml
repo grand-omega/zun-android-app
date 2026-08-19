@@ -2,4 +2,8 @@
 <paths>
     <cache-path name="my_cache" path="." />
     <files-path name="offline_images" path="offline_images/" />
+    <!-- Feature 015 local composites. Without this root, sharing a saved composite throws
+         IllegalArgumentException inside FileProvider.getUriForFile — which both share helpers
+         swallow into a misleading "connect to the server" message. -->
+    <files-path name="local_composites" path="local_composites/" />
 </paths>

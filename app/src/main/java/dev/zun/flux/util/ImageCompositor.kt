@@ -26,6 +26,10 @@ import kotlin.math.max
 import kotlin.math.min
 import androidx.compose.ui.geometry.Rect as ComposeRect
 
+/** Prefix for flattened drag-reveal composites written to cacheDir for save/share. Swept by `FluxApp.sweepStaleCacheFiles`;
+ *  keep the two in sync — a rename here silently stops the sweep. */
+internal const val REVEAL_EXPORT_CACHE_PREFIX = "reveal-export-"
+
 /** Output canvas cap — matches [prepareImageForUpload]'s existing `maxDimension` convention, so an
  *  uncapped-resolution result PNG can't produce an unbounded in-memory composite. */
 private const val MAX_COMPOSITE_DIMENSION = 2048
@@ -159,7 +163,7 @@ fun compositeReveal(after: Bitmap, before: Bitmap, mask: ImageBitmap, containerS
  * [shareImages] via their existing `is Uri ->` branch — no changes needed to either utility.
  */
 suspend fun writeToTempFile(context: Context, bitmap: Bitmap): Uri = withContext(Dispatchers.IO) {
-    val file = File(context.cacheDir, "reveal-export-${System.currentTimeMillis()}.jpg")
+    val file = File(context.cacheDir, "$REVEAL_EXPORT_CACHE_PREFIX${System.currentTimeMillis()}.jpg")
     FileOutputStream(file).use { out -> bitmap.compress(Bitmap.CompressFormat.JPEG, 95, out) }
     Uri.fromFile(file)
 }

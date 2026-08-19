@@ -11,6 +11,10 @@ import okhttp3.Request
 import java.io.File
 import java.net.URL
 
+/** Prefix for cacheDir copies made so a remote image can go out through FileProvider. Swept by `FluxApp.sweepStaleCacheFiles`;
+ *  keep the two in sync — a rename here silently stops the sweep. */
+internal const val SHARE_CACHE_PREFIX = "share_"
+
 suspend fun shareImage(context: Context, source: Any) {
     val okHttpClient = (context.applicationContext as? FluxApp)?.okHttpClient
 
@@ -27,7 +31,7 @@ suspend fun shareImage(context: Context, source: Any) {
         is String -> {
             // Download remote image to cache first to share it
             withContext(Dispatchers.IO) {
-                val file = File(context.cacheDir, "share_${System.currentTimeMillis()}.jpg")
+                val file = File(context.cacheDir, "$SHARE_CACHE_PREFIX${System.currentTimeMillis()}.jpg")
                 if (okHttpClient != null) {
                     val request = Request.Builder().url(source).build()
                     okHttpClient.newCall(request).execute().use { response ->
@@ -93,7 +97,7 @@ private suspend fun shareableUri(context: Context, source: Any): Uri? {
 
         is String -> {
             withContext(Dispatchers.IO) {
-                val file = File(context.cacheDir, "share_${System.currentTimeMillis()}_${source.hashCode()}.jpg")
+                val file = File(context.cacheDir, "$SHARE_CACHE_PREFIX${System.currentTimeMillis()}_${source.hashCode()}.jpg")
                 if (okHttpClient != null) {
                     val request = Request.Builder().url(source).build()
                     okHttpClient.newCall(request).execute().use { response ->
