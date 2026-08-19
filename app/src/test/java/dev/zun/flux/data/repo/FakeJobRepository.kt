@@ -357,6 +357,8 @@ class FakeJobRepository(
 
     override fun activeJobIds(): Flow<List<String>> = MutableStateFlow(emptyList())
 
+    override fun failedJobIds(): Flow<List<String>> = MutableStateFlow(emptyList())
+
     override suspend fun syncHistory() {
         // No-op for fake
     }

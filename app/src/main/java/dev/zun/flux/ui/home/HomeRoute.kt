@@ -112,6 +112,7 @@ fun HomeRoute(
     val tryHarderAvailable by viewModel.tryHarderAvailable.collectAsStateWithLifecycle()
     val batchProgress by viewModel.batchProgress.collectAsStateWithLifecycle()
     val activeJobIds by viewModel.activeJobIds.collectAsStateWithLifecycle()
+    val failedJobIds by viewModel.failedJobIds.collectAsStateWithLifecycle()
     val priorEditsByUri by viewModel.priorEdits.collectAsStateWithLifecycle()
     val polishState by viewModel.polishState.collectAsStateWithLifecycle()
     val prePolishText by viewModel.prePolishText.collectAsStateWithLifecycle()
@@ -322,6 +323,13 @@ fun HomeRoute(
                 ActiveJobsBanner(
                     count = activeJobIds.size,
                     onClick = { onResumeBatch(activeJobIds) },
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+            }
+            if (failedJobIds.isNotEmpty()) {
+                FailedJobsBanner(
+                    count = failedJobIds.size,
+                    onClick = { onResumeBatch(failedJobIds) },
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 )
             }

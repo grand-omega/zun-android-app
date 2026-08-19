@@ -370,6 +370,8 @@ class RealJobRepository(
 
     override fun activeJobIds(): Flow<List<String>> = dao.getActiveJobs().map { entities -> entities.map { it.id } }
 
+    override fun failedJobIds(): Flow<List<String>> = dao.getFailedJobs().map { entities -> entities.map { it.id } }
+
     override fun deletedJobIds(): Flow<Set<String>> = combine(
         dao.getPendingDeleteIdsFlow(),
         localDeletedIds,

@@ -155,6 +155,13 @@ class HomeViewModel(
             initialValue = emptyList(),
         )
 
+    val failedJobIds: StateFlow<List<String>> = jobRepo.failedJobIds()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = emptyList(),
+        )
+
     private val _health = MutableStateFlow<HealthState>(HealthState.Checking)
     val health: StateFlow<HealthState> = _health.asStateFlow()
 

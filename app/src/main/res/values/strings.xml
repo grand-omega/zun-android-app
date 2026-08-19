@@ -263,6 +263,10 @@
         <item quantity="one">%1$d generation</item>
         <item quantity="other">%1$d generations</item>
     </plurals>
+    <plurals name="home_n_generations_failed_format">
+        <item quantity="one">%1$d generation failed</item>
+        <item quantity="other">%1$d generations failed</item>
+    </plurals>
     <string name="progress_batch_index_format">%1$d of %2$d</string>
     <string name="progress_batch_back_to_overview">Back to overview</string>
     <string name="progress_batch_completed_generation">Completed generation</string>
@@ -273,6 +277,7 @@
     <string name="progress_batch_source_image_in_progress">Source image in progress</string>
     <string name="progress_batch_view_result">View result</string>
     <string name="home_resume_active_jobs_action">View</string>
+    <string name="home_failed_jobs_action">Review</string>
 
     <!-- Result -->
     <string name="result_title">Result</string>

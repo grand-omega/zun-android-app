@@ -195,6 +195,22 @@ interface JobDao {
     )
     fun getActiveJobs(): Flow<List<JobEntity>>
 
+    /**
+     * Failed jobs the user has not cleared yet. Deliberately excludes 'cancelled': the user
+     * cancelled those themselves, so re-surfacing them would be nagging about their own action.
+     * A row leaves this set when it is dismissed from batch progress (which deletes the local
+     * record) or deleted, so it self-clears through existing actions rather than a timer.
+     */
+    @Query(
+        """
+        SELECT * FROM jobs
+        WHERE status = 'failed'
+        AND id NOT IN (SELECT jobId FROM pending_deletes)
+        ORDER BY createdAt ASC, id ASC
+        """,
+    )
+    fun getFailedJobs(): Flow<List<JobEntity>>
+
     @Query("SELECT * FROM jobs WHERE id = :jobId")
     suspend fun getJobById(jobId: String): JobEntity?
 

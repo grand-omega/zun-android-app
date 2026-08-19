@@ -85,6 +85,14 @@ interface JobRepository {
      */
     fun activeJobIds(): Flow<List<String>>
 
+    /**
+     * Ids of jobs that failed and have not been cleared. Without this the failure is
+     * unreachable once the user leaves progress: the gallery lists only 'done', the active-jobs
+     * banner excludes terminal states, and syncHistory fetches only 'done' — so a job that
+     * failed in the background had no surface at all.
+     */
+    fun failedJobIds(): Flow<List<String>>
+
     /** Job ids hidden locally because the user deleted them but server sync may still be pending. */
     fun deletedJobIds(): Flow<Set<String>>
 
