@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.IntSize
+import androidx.core.graphics.createBitmap
 import coil3.BitmapImage
 import coil3.SingletonImageLoader
 import coil3.request.ImageRequest
@@ -127,7 +128,7 @@ fun compositeReveal(after: Bitmap, before: Bitmap, mask: ImageBitmap, containerS
     val outputHeight = max(1, (after.height * scaleDown).toInt())
     val dst = RectF(0f, 0f, outputWidth.toFloat(), outputHeight.toFloat())
 
-    val output = Bitmap.createBitmap(outputWidth, outputHeight, Bitmap.Config.ARGB_8888)
+    val output = createBitmap(outputWidth, outputHeight)
     val canvas = Canvas(output)
     canvas.drawBitmap(after, null, dst, null)
 
@@ -145,11 +146,11 @@ fun compositeReveal(after: Bitmap, before: Bitmap, mask: ImageBitmap, containerS
         // left for the collector — maskLayer first, which drops one buffer before the final draw.
         // Only these two are ours to free: `after`/`before` belong to Coil's memory cache, `mask`
         // to the caller's snapshot, and `output` is returned.
-        val beforeLayer = Bitmap.createBitmap(outputWidth, outputHeight, Bitmap.Config.ARGB_8888)
+        val beforeLayer = createBitmap(outputWidth, outputHeight)
         try {
             Canvas(beforeLayer).drawBitmap(before, beforeSrc, dst, null)
 
-            val maskLayer = Bitmap.createBitmap(outputWidth, outputHeight, Bitmap.Config.ARGB_8888)
+            val maskLayer = createBitmap(outputWidth, outputHeight)
             try {
                 Canvas(maskLayer).drawBitmap(maskAndroidBitmap, maskSrc, dst, null)
                 val maskPaint = Paint().apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN) }

@@ -76,7 +76,7 @@ fun HomeScreen(
 ) {
     var showPromptSheet by rememberSaveable { mutableStateOf(false) }
     var showPromptManageSheet by rememberSaveable { mutableStateOf(false) }
-    val dropTargetModifier = rememberImageDropTarget(onImagesDropped)
+    val dropTargetModifier = Modifier.imageDropTarget(onImagesDropped)
 
     val canSubmit = imageUris.isNotEmpty() &&
         selectedPromptId != null &&

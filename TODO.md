@@ -8,6 +8,13 @@ One `<!-- TODO -->` marker remains in `README.md`:
 
 **Screenshots** — add files under `docs/img/` and reference them from the Features section. Even one phone-frame screenshot of Home + Gallery is enough.
 
+*Blocked, verified on device 2026-08-19:* `MainActivity` sets `FLAG_SECURE`, so the
+OS refuses to capture the app. `adb exec-out screencap` on the display running
+FluxEdit returns a pure black frame, while the same command on the other display
+of the same phone captures normally — the block is the flag, not the tooling.
+Producing screenshots therefore means building a throwaway variant with
+`FLAG_SECURE` removed. Don't retry a plain screenshot expecting it to work.
+
 ## Resolved (2026-06)
 
 - **Instrumented tests in CI** — `connectedDebugAndroidTest` now runs on an

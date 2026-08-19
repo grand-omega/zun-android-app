@@ -4,7 +4,9 @@
 
 - **JDK 21** for Gradle (the compiled bytecode still targets Java 17 via `sourceCompatibility`, `targetCompatibility`, and `jvmTarget`)
 - **Android SDK** with `compileSdk = 37`, `minSdk = 36`, `targetSdk = 36`
-- **Gradle** via the wrapper (`./gradlew`); AGP `9.2.1`, Kotlin `2.4.0`, KSP for Room
+- **Gradle** via the wrapper (`./gradlew`); AGP, Kotlin and KSP (for Room) versions all live in
+  `gradle/libs.versions.toml` — read them there rather than from a copy here, which is how
+  this line went stale the last time those were bumped
 - **Git** — recommended; `versionCode` and `versionName` are derived from git history (see [Versioning](#versioning))
 
 ## One-time setup
