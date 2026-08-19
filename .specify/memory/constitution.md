@@ -1,17 +1,19 @@
 <!--
 Sync Impact Report
 ==================
-Version change: 1.0.0 → 1.1.0
-Rationale: Feature 003 (debug-server-isolation) surfaced that the sibling
-server ecosystem and dev/prod isolation were undocumented as durable
-principles — this codifies them so future features inherit the rule
-without re-litigating it.
+Version change: 1.1.0 → 2.0.0
+Rationale: Sentry was removed from the app entirely (SDK, Gradle plugin,
+mapping upload, manifest auto-init, and `FluxApp.initSentry`). Principle I's
+carve-out for it is now dead text, and leaving it standing would license
+re-adding crash reporting without a further amendment. Removing a standing
+exemption from a NON-NEGOTIABLE principle narrows what the principle permits,
+so this is a MAJOR bump: a plan that previously passed the Constitution Check
+by citing the Sentry carve-out would now fail it.
 
 Modified principles:
-  - V. Server Contract Fidelity (expanded to name zun-flux-pipeline and the
-    dev-branch requirement for server-side changes)
-Added principles:
-  - VI. Development/Production Environment Isolation
+  - I. Privacy & Security by Default (crash-reporting exemption removed; the
+    prohibition on analytics/trackers/crash reporting is now unconditional)
+Added principles: none
 Added sections: none
 Removed sections: none
 
@@ -24,7 +26,8 @@ Templates requiring updates:
      references found; no changes needed.
   ⚠ No .specify/templates/commands/*.md directory present in this install; skipped.
 
-Follow-up TODOs: none.
+Follow-up TODOs: none. Historical references to Sentry in specs/003-* are
+records of what was true at the time and are deliberately left unmodified.
 -->
 
 # FluxEdit (zun-android-app) Constitution
@@ -33,8 +36,8 @@ Follow-up TODOs: none.
 
 ### I. Privacy & Security by Default (NON-NEGOTIABLE)
 
-No analytics, no third-party trackers, and no crash reporting beyond the
-existing opt-in Sentry integration. API tokens MUST be stored via the
+No analytics, no third-party trackers, and no crash reporting — the app
+MUST NOT report to any third-party service. API tokens MUST be stored via the
 Android Keystore-backed encrypted store (`KeystoreSecureStore`) — never in
 plain SharedPreferences, logs, or crash reports. App backups (`allowBackup`)
 and Auto Backup MUST remain disabled. Biometric/device-credential lock MUST
@@ -176,4 +179,4 @@ typo clarifications. Every plan produced by `/speckit-plan` MUST include a
 Constitution Check gate; violations MUST be justified in that plan's
 Complexity Tracking table, or the plan MUST be revised to comply.
 
-**Version**: 1.1.0 | **Ratified**: 2026-07-03 | **Last Amended**: 2026-07-05
+**Version**: 2.0.0 | **Ratified**: 2026-07-03 | **Last Amended**: 2026-08-18

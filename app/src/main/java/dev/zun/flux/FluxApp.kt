@@ -18,7 +18,6 @@ import dev.zun.flux.data.repo.RealJobRepository
 import dev.zun.flux.data.repo.SettingsManager
 import dev.zun.flux.data.repo.UploadRepository
 import dev.zun.flux.ui.auth.AuthStateHolder
-import io.sentry.android.core.SentryAndroid
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -79,11 +78,6 @@ class FluxApp : Application() {
     override fun onCreate() {
         super.onCreate()
 
-        // Off the critical path: Sentry only needs to be up before the first
-        // crash report, not before the first frame. The brief uncovered window
-        // is an accepted trade-off for faster cold start.
-        Thread { initSentry() }.start()
-
         settingsManager = SettingsManager(this)
         authStateHolder = AuthStateHolder(settingsManager)
         pinnedPrompts = PinnedPromptsStore(this)
@@ -115,28 +109,6 @@ class FluxApp : Application() {
         rebuildRepository()
 
         sweepStagedUploadFiles()
-    }
-
-    /**
-     * Initialize Sentry crash reporting. Skipped silently if SENTRY_DSN
-     * wasn't provided at build time (e.g. fresh clone without a populated
-     * local.properties), so the app still runs; just no crash reports flow.
-     */
-    private fun initSentry() {
-        if (BuildConfig.SENTRY_DSN.isBlank()) return
-        SentryAndroid.init(this) { options ->
-            options.dsn = BuildConfig.SENTRY_DSN
-            options.environment = if (BuildConfig.DEBUG) "debug" else "production"
-            // versionName comes from `git describe`, so this tag uniquely
-            // identifies which build a given crash came from.
-            options.release = "${BuildConfig.APPLICATION_ID}@${BuildConfig.VERSION_NAME}+${BuildConfig.VERSION_CODE}"
-            // Crashes only — performance traces eat the free-tier quota fast.
-            options.tracesSampleRate = 0.0
-            // Don't capture screenshots / view hierarchy on crash: prompts and
-            // generated images are user-content; better to opt out by default.
-            options.isAttachScreenshot = false
-            options.isAttachViewHierarchy = false
-        }
     }
 
     /**
