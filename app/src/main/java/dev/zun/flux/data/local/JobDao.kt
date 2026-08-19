@@ -261,14 +261,20 @@ interface JobDao {
     @Query(
         """
         SELECT * FROM jobs
-        WHERE lineageRootId = :rootId
+        WHERE (lineageRootId = :rootId OR (lineageRootId IS NULL AND id = :rootId))
         AND status = 'done'
         ORDER BY createdAt ASC
         """,
     )
     fun getJobsByLineageRoot(rootId: String): Flow<List<JobEntity>>
 
-    @Query("SELECT COUNT(*) FROM jobs WHERE lineageRootId = :rootId AND status = 'done'")
+    @Query(
+        """
+        SELECT COUNT(*) FROM jobs
+        WHERE (lineageRootId = :rootId OR (lineageRootId IS NULL AND id = :rootId))
+        AND status = 'done'
+        """,
+    )
     suspend fun countByLineageRoot(rootId: String): Int
 
     @Query("SELECT * FROM jobs WHERE id IN (:ids)")
