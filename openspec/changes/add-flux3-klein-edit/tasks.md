@@ -2,14 +2,15 @@
 
 ## 1. Default workflow switch
 
-- [x] 1.1 In `app/src/main/java/dev/zun/flux/data/api/Workflows.kt`, set `DEFAULT_EDIT = "flux3_klein_edit"`. Leave `TRY_HARDER_EDIT` unchanged. Verify: `./gradlew :app:compileDebugKotlin`.
-- [x] 1.2 `HomeViewModelTest.kt`:
+- [ ] 1.1 In `app/src/main/java/dev/zun/flux/data/api/Workflows.kt`, set `DEFAULT_EDIT = "flux3_klein_edit"`. Leave `TRY_HARDER_EDIT` unchanged. Verify: `./gradlew :app:compileDebugKotlin`.
+- [ ] 1.2 `HomeViewModelTest.kt`:
   - change `submit_customPromptUsesDefaultWorkflowWhenTryHarderIsOff` to expect `flux3_klein_edit`;
   - add a test that saving a prompt from the composer calls `createPrompt` with `workflow = "flux3_klein_edit"`;
   - add a test that submitting with a `FakeJobRepository` saved prompt (bound to `flux2_klein_edit`) sets `lastPromptId` to that id and sends no `prompt_text`. Do not assert anything about `lastWorkflow` on this path (design Decision 2).
 
   Verify: `./gradlew testDebugUnitTest`.
-- [x] 1.3 Extend `JobEntityTest` so that an entity and DTO with `workflow = "flux2_klein_edit"` round-trip unchanged through the mapping that the gallery and photo viewer use. Verify: `./gradlew testDebugUnitTest`.
+- [ ] 1.3 Extend `JobEntityTest` so that an entity and DTO with `workflow = "flux2_klein_edit"` round-trip unchanged through the mapping that the gallery and photo viewer use. Verify: `./gradlew testDebugUnitTest`.
+  - Status 1.1-1.3: code and tests are committed in `882a940`, but their stated Gradle checks are unconfirmed (see 2.2: the toolchain is not available here without a large download). Check these boxes once `./gradlew lint testDebugUnitTest compileDebugKotlin` is reproduced and passes.
 - [x] 1.4 Check `docs/architecture.md` and `README.md` for workflow-name mentions. None are expected, so no change. Verify: `grep -rn "klein_edit" docs README.md` returns nothing that needs updating.
 
 ## 2. Integration
