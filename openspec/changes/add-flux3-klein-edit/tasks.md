@@ -2,15 +2,15 @@
 
 ## 1. Default workflow switch
 
-- [ ] 1.1 In `app/src/main/java/dev/zun/flux/data/api/Workflows.kt`, set `DEFAULT_EDIT = "flux3_klein_edit"`. Leave `TRY_HARDER_EDIT` unchanged. Verify: `./gradlew :app:compileDebugKotlin`.
-- [ ] 1.2 `HomeViewModelTest.kt`:
+- [x] 1.1 In `app/src/main/java/dev/zun/flux/data/api/Workflows.kt`, set `DEFAULT_EDIT = "flux3_klein_edit"`. Leave `TRY_HARDER_EDIT` unchanged. Verify: `./gradlew :app:compileDebugKotlin`.
+- [x] 1.2 `HomeViewModelTest.kt`:
   - change `submit_customPromptUsesDefaultWorkflowWhenTryHarderIsOff` to expect `flux3_klein_edit`;
   - add a test that saving a prompt from the composer calls `createPrompt` with `workflow = "flux3_klein_edit"`;
   - add a test that submitting with a `FakeJobRepository` saved prompt (bound to `flux2_klein_edit`) sets `lastPromptId` to that id and sends no `prompt_text`. Do not assert anything about `lastWorkflow` on this path (design Decision 2).
 
   Verify: `./gradlew testDebugUnitTest`.
-- [ ] 1.3 Extend `JobEntityTest` so that an entity and DTO with `workflow = "flux2_klein_edit"` round-trip unchanged through the mapping that the gallery and photo viewer use. Verify: `./gradlew testDebugUnitTest`.
-- [ ] 1.4 Check `docs/architecture.md` and `README.md` for workflow-name mentions. None are expected, so no change. Verify: `grep -rn "klein_edit" docs README.md` returns nothing that needs updating.
+- [x] 1.3 Extend `JobEntityTest` so that an entity and DTO with `workflow = "flux2_klein_edit"` round-trip unchanged through the mapping that the gallery and photo viewer use. Verify: `./gradlew testDebugUnitTest`.
+- [x] 1.4 Check `docs/architecture.md` and `README.md` for workflow-name mentions. None are expected, so no change. Verify: `grep -rn "klein_edit" docs README.md` returns nothing that needs updating.
 
 ## 2. Integration
 
@@ -28,7 +28,7 @@
   - `flux3_klein_edit` for the custom submit, the custom regenerate, both new saved prompts and the old-job regenerate;
   - `flux2_klein_edit` for both saved-prompt paths;
   - the old job opens normally.
-- [ ] 2.2 Run the CI gates locally: `./gradlew lint testDebugUnitTest`, plus `connectedDebugAndroidTest` on the API 36 emulator. Verify: all pass.
+- [ ] 2.2 Run the CI gates locally: `./gradlew lint testDebugUnitTest`, plus `connectedDebugAndroidTest` on the API 36 emulator. Verify: all pass. Status 2026-10-26: `lint` (0 errors), `testDebugUnitTest` (178 tests, 0 failures) and `spotlessCheck` pass locally; `connectedDebugAndroidTest` needs the emulator and is left to the operator.
 
 ## Workflow follow-up
 

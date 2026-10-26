@@ -32,6 +32,28 @@ class JobEntityTest {
     }
 
     @Test
+    fun legacyFlux2Summary_roundTripsThroughGalleryAndViewerMappings() {
+        val dto = JobSummaryDto(
+            id = "job-legacy",
+            status = "done",
+            input_id = 9,
+            source_prompt_id = 3,
+            prompt_text = null,
+            workflow = "flux2_klein_edit",
+            seed = 77,
+            created_at = 100,
+            completed_at = 112,
+            duration_seconds = 12,
+        )
+
+        val entity = dto.toEntity()
+
+        assertEquals("flux2_klein_edit", entity.workflow)
+        assertEquals(dto, entity.toSummaryDto())
+        assertEquals("flux2_klein_edit", entity.toStatusDto().workflow)
+    }
+
+    @Test
     fun summaryEntity_usesDurationWhenCompletedAtIsMissing() {
         val dto = JobSummaryDto(
             id = "job-2",
