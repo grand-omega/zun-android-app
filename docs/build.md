@@ -65,6 +65,36 @@ For CI tag builds where the working copy might be a shallow checkout, override e
 VERSION_CODE_OVERRIDE=42 VERSION_NAME_OVERRIDE=v1.2.3 ./gradlew bundleRelease
 ```
 
+### Where release tags go
+
+**Tag the dev-side commit that the release PR merged — not the merge commit
+GitHub creates on `main`.**
+
+`versionName` comes from `git describe --tags`, which only sees tags on an
+ancestor of the commit being described. A merge commit on `main` is never an
+ancestor of `dev`, so a tag placed there is invisible from `dev` forever.
+
+That is not hypothetical: `v3.0.0`, `v3.1.0` and `v3.1.1` were each tagged on
+their merge commit, and as a result every build from `dev` reported `v2.1.0`
+— three releases stale — until `v3.2.0`. Release artifacts were correct
+throughout, because the release job checks out the tag itself; it was debug
+builds that misreported.
+
+Tagging the merged commit puts the tag on both branches' history: it is
+`dev`'s tip and, through the merge, an ancestor of `main`.
+
+```bash
+# after the release PR merges, with <sha> = the dev-side commit it merged
+git tag -a v3.2.0 <sha> -m "..."
+git push origin v3.2.0
+```
+
+One expected consequence: `git describe --tags origin/main` reads
+`v3.2.0-1-g<merge sha>` rather than a bare tag. **This is correct, not a
+mistake to be "fixed" by retagging the merge commit** — that would restore
+the stale-version bug. Nothing is built from `main` directly, and the release
+job resolves `github.ref` to the tag, so the shipped `versionName` is exact.
+
 ## Room migrations
 
 Schemas are exported by KSP to `app/schemas/dev.zun.flux.data.local.AppDatabase/`. When you bump the database version:
