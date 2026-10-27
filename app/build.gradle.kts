@@ -162,6 +162,11 @@ android {
     testOptions {
         unitTests.isIncludeAndroidResources = true
         unitTests.isReturnDefaultValues = true
+        // Robolectric 4.17 reaches jdk.internal.access on JDK 17+; see
+        // robolectric.org/getting-started, "Running with Java 17 and higher".
+        unitTests.all {
+            it.jvmArgs("--add-opens=java.base/jdk.internal.access=ALL-UNNAMED")
+        }
     }
 }
 

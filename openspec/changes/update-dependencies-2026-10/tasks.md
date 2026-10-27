@@ -4,10 +4,13 @@ Gradle needs JDK 21: prefix every command with `JAVA_HOME=$HOME/tools/jdk-21`.
 
 ## 1. Versions
 
-- [ ] 1.1 Update every key in the proposal table in `gradle/libs.versions.toml`. Guava stays on the `-android` flavor. Verify: `./gradlew :app:compileDebugKotlin` succeeds.
+- [x] 1.1 Update every key in the proposal table in `gradle/libs.versions.toml`. Guava stays on the `-android` flavor. Verify: `./gradlew :app:compileDebugKotlin` succeeds.
 - [ ] 1.2 Regenerate the wrapper: `./gradlew wrapper --gradle-version 9.8.2`, then run it a second time so the jar is refreshed. Verify: `./gradlew --version` reports 9.8.2.
-- [ ] 1.3 Fix only what the bumps break in the build or tests (design Decisions 3–4). Record any lint baseline additions or deferred deprecations under Follow-ups. Verify: `./gradlew spotlessCheck lint testDebugUnitTest assembleDebug` succeeds, and the unit-test count is not lower than the 178 at v3.3.0.
-- [ ] 1.4 Run `./gradlew assembleRelease` with `CI=true` (unsigned), so R8 and the baseline-profile plugin are exercised. Verify: it succeeds.
+  - Held back at 9.7.1: Gradle 9.8.2 breaks the 1.4 release build (`:app:produceReleaseComposeMapping`). The reason and how to retry are under Follow-ups in design.md.
+- [x] 1.3 Fix only what the bumps break in the build or tests (design Decisions 3–4). Record any lint baseline additions or deferred deprecations under Follow-ups. Verify: `./gradlew spotlessCheck lint testDebugUnitTest assembleDebug` succeeds, and the unit-test count is not lower than the 178 at v3.3.0.
+  - Result (Gradle 9.7.1, JDK 21, `--rerun-tasks`, 2026-10-27): succeeds, with 178 unit tests run and 0 failed. Lint shows one new warning, `AndroidGradlePluginVersion` for the held-back wrapper. Robolectric 4.17 needed one unit-test JVM flag (see Follow-ups).
+- [x] 1.4 Run `./gradlew assembleRelease` with `CI=true` (unsigned), so R8 and the baseline-profile plugin are exercised. Verify: it succeeds.
+  - Result: succeeds on Gradle 9.7.1 and produces `app-release-unsigned.apk` and baseline profiles. On Gradle 9.8.2 it fails, so the wrapper is held back (task 1.2).
 
 ## 2. CI
 
