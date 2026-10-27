@@ -6,6 +6,6 @@ package dev.zun.flux.data.api
  * reports what's live, and UI affordances gate on it.
  */
 object Workflows {
-    const val DEFAULT_EDIT = "flux2_klein_edit"
+    const val DEFAULT_EDIT = "flux3_klein_edit"
     const val TRY_HARDER_EDIT = "flux2_klein_9b_kv_edit"
 }

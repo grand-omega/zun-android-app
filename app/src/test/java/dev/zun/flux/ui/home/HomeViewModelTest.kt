@@ -1,6 +1,7 @@
 package dev.zun.flux.ui.home
 
 import android.net.Uri
+import dev.zun.flux.data.repo.FakeJobRepository
 import dev.zun.flux.data.repo.RecordingRepository
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -149,7 +150,35 @@ class HomeViewModelTest {
         viewModel.submit()
         advanceUntilIdle()
 
-        assertEquals("flux2_klein_edit", repository.lastWorkflow)
+        assertEquals("flux3_klein_edit", repository.lastWorkflow)
+    }
+
+    @Test
+    fun savePrompt_createsPromptBoundToFlux3() = runTest {
+        runCurrent()
+        viewModel.updateCustomPrompt("make it cinematic")
+
+        viewModel.savePrompt("Cinematic", "make it cinematic")
+        advanceUntilIdle()
+
+        val created = repository.promptsState.value.single { it.id == 100L }
+        assertEquals("flux3_klein_edit", created.workflow)
+    }
+
+    @Test
+    fun submit_legacyFlux2SavedPromptSendsPromptIdWithoutText() = runTest {
+        val legacy = FakeJobRepository().listPrompts().first()
+        assertEquals("flux2_klein_edit", legacy.workflow)
+        val saved = repository.createPrompt(legacy.label, legacy.text.orEmpty(), legacy.workflow!!)
+        runCurrent()
+        viewModel.addInputUris(listOf(Uri.EMPTY), maxImages = 20)
+        viewModel.selectPrompt(saved.id)
+
+        viewModel.submit()
+        advanceUntilIdle()
+
+        assertEquals(saved.id, repository.lastPromptId)
+        assertNull(repository.lastPromptText)
     }
 
     @Test
